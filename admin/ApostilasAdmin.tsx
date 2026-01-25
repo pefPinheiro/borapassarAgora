@@ -285,9 +285,18 @@ const ApostilasAdmin: React.FC = () => {
         }
 
         try {
+            // Definir data de comissão padrão (1 ano) se estiver vazia
+            let commissionDate = formData.commission_valid_until;
+            if (!commissionDate) {
+                const oneYearLater = new Date();
+                oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+                commissionDate = oneYearLater.toISOString().split('T')[0];
+            }
+
             // Preservamos todos os campos do formData, garantindo que os auxiliares do select estejam ok
             const apPayload = {
                 ...formData,
+                commission_valid_until: commissionDate,
                 assigned_editor_id: formData.assigned_editor_id || null,
                 filters: formData.filters || {},
                 updated_at: new Date().toISOString()
