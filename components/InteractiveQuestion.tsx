@@ -95,7 +95,8 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
     };
 
     const baseTextData = getBaseTextData();
-    const hasBaseText = !!baseTextData.content;
+    // Verifica se tem conteúdo real removendo tags HTML vazias
+    const hasBaseText = !!baseTextData.content && baseTextData.content.replace(/<[^>]*>/g, '').trim().length > 0;
 
     return (
         <div className="premium-question-wrapper w-full overflow-hidden print:overflow-visible break-inside-auto">
@@ -148,7 +149,7 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                     <div className={`mb-8 p-8 bg-slate-50 border-l-4 border-indigo-500 premium-question-text text-slate-600 text-sm leading-relaxed ${showBaseText ? 'animate-in fade-in slide-in-from-top-2 duration-500' : 'hidden print:block'}`}>
                         <h4 className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4 flex items-center gap-2 break-words">
                             <span className="material-symbols-outlined text-lg">description</span>
-                            {baseTextData.title}
+                            TEXTO DE APOIO
                         </h4>
                         <div className="prose prose-slate max-w-none break-words overflow-hidden" dangerouslySetInnerHTML={{ __html: baseTextData.content }} />
                     </div>
