@@ -1,0 +1,112 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=JetBrains+Mono:wght@500;800&display=swap');
+
+:root {
+  --blue-primary: #137fec;
+}
+
+/* 
+  Na versão 4, a fonte padrão configurada (font-sans) é aplicada automaticamente pelo Preflight,
+  então não é necessário aplicá-la manualmente no body via @apply.
+*/
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Teste de detecção de CSS */
+#root {
+  min-height: 100vh;
+}
+
+/* Premium Question Card Global Styles */
+.premium-question-wrapper {
+  margin: 3rem 0;
+  background-color: rgba(248, 250, 252, 0.5);
+  padding: 1.5rem;
+  border-radius: 0;
+}
+
+.premium-question-card {
+  background-color: white;
+  padding: 1.5rem;
+  border-radius: 0;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.premium-question-header h3 {
+  font-family: 'Lexend', sans-serif;
+  display: flex;
+  align-items: center;
+}
+
+.premium-question-header h3::before {
+  content: '#';
+  font-family: 'Lexend', sans-serif;
+  font-size: 1.8rem;
+  color: #cbd5e1;
+  font-weight: 900;
+  margin-right: 0.75rem;
+  line-height: 1;
+}
+
+.premium-question-text {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+.premium-tag-banca {
+  background-color: #eff6ff;
+  color: #137fec;
+  font-family: 'Lexend', sans-serif;
+}
+
+.premium-tag-ano {
+  background-color: #f1f5f9;
+  color: #64748b;
+  font-family: 'Lexend', sans-serif;
+}
+
+.premium-button-alt {
+  border-radius: 0;
+  border: 2px solid #f1f5f9;
+  transition: all 0.2s ease;
+}
+
+.premium-button-alt:hover:not(:disabled) {
+  background-color: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.premium-alt-circle {
+  border-radius: 0;
+  border-width: 2px;
+  font-family: 'Lexend', sans-serif;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .premium-question-wrapper {
+    background: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .premium-question-card {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}

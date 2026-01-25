@@ -1,0 +1,8 @@
+{
+  "name": "Bora Passar Agora",
+  "description": "Uma plataforma completa para gestão e estudo de concursos públicos, com painéis para administrador e aluno, simulados, banco de questões e materiais didáticos.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

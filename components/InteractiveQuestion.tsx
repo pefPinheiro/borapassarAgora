@@ -1,0 +1,233 @@
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+
+export interface InteractiveQuestionProps {
+    id?: string;
+    question?: {
+        id: string;
+        enunciado: string;
+        text_bases?: { content: string; title?: string } | null;
+        texto_base?: string | null;
+        alternativas: {
+            id: string;
+            texto: string;
+            isCorreta: boolean;
+        }[];
+        resposta_professor?: string | null;
+        bancas?: { name: string } | null;
+        disciplinas?: { name: string } | null;
+        assuntos?: { name: string } | null;
+        ano?: string | number | null;
+    };
+    startOpen?: boolean;
+    disabled?: boolean;
+    onAnswer?: (altId: string) => void;
+    onBeforeAnswer?: () => boolean;
+}
+
+const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question: propQuestion, onAnswer, onBeforeAnswer, disabled }) => {
+    const [localQuestion, setLocalQuestion] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+    const [selectedAlt, setSelectedAlt] = useState<string | null>(null);
+    const [showResult, setShowResult] = useState(false);
+    const [showBaseText, setShowBaseText] = useState(false);
+
+    const activeQuestion = propQuestion || localQuestion;
+
+    useEffect(() => {
+        if (id && !propQuestion) {
+            const fetchQuestion = async () => {
+                setLoading(true);
+                try {
+                    const { data, error } = await supabase
+                        .from('questions')
+                        .select('*, bancas(name), disciplinas(name), text_bases(content, title)')
+                        .eq('id', id)
+                        .single();
+                    if (data) setLocalQuestion(data);
+                } catch (e) {
+                    console.error('Error fetching interactive question:', e);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchQuestion();
+        }
+    }, [id, propQuestion]);
+
+    const handleAnswer = (altId: string) => {
+        if (showResult) return;
+
+        // Allow parent to block the interaction (e.g. daily limit locked)
+        if (onBeforeAnswer && !onBeforeAnswer()) {
+            return;
+        }
+
+        setSelectedAlt(altId);
+        setShowResult(true);
+        if (onAnswer) onAnswer(altId);
+    };
+
+    if (loading) return (
+        <div className="p-10 border border-slate-100 bg-slate-50/50 flex flex-col items-center justify-center gap-3 animate-pulse">
+            <div className="size-8 border-2 border-slate-200 border-t-[#3b82f6] rounded-full animate-spin"></div>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sincronizando Desafio...</span>
+        </div>
+    );
+
+    if (!activeQuestion) return null;
+
+    // Helper to safely extract base text content and title
+    const getBaseTextData = () => {
+        const tb = activeQuestion.text_bases as any;
+        let data = { content: '', title: '' };
+
+        if (Array.isArray(tb) && tb.length > 0) {
+            data = tb[0];
+        } else if (tb && !Array.isArray(tb)) {
+            data = tb;
+        }
+
+        return {
+            content: data.content || activeQuestion.texto_base || '',
+            title: data.title || 'Texto de Apoio'
+        };
+    };
+
+    const baseTextData = getBaseTextData();
+    const hasBaseText = !!baseTextData.content;
+
+    return (
+        <div className="premium-question-wrapper w-full overflow-hidden print:overflow-visible break-inside-auto">
+            <div className="premium-question-card overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center gap-4 mb-8 justify-between premium-question-header">
+                    <div className="flex items-center gap-4">
+                        <div className="size-11 bg-[#3b82f6] flex items-center justify-center text-white shadow-lg shadow-blue-200 print:hidden">
+                            <span className="material-symbols-outlined text-2xl">quiz</span>
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-black text-slate-900 m-0 leading-none tracking-tight">Desafio de Fixação</h3>
+                            <div className="flex flex-wrap items-center gap-2 mt-3">
+                                {activeQuestion.disciplinas?.name && (
+                                    <span className="bg-slate-900 text-white text-[9px] font-black uppercase tracking-[0.1em] px-2.5 py-1 rounded-sm">
+                                        {activeQuestion.disciplinas.name}
+                                    </span>
+                                )}
+                                {activeQuestion.assuntos?.name && (
+                                    <span className="bg-indigo-600 text-white text-[9px] font-black uppercase tracking-[0.1em] px-2.5 py-1 rounded-sm">
+                                        {activeQuestion.assuntos.name}
+                                    </span>
+                                )}
+                                {activeQuestion.bancas?.name && (
+                                    <span className="premium-tag-banca text-[9px] font-black uppercase tracking-[0.15em] px-2.5 py-1 rounded-sm shadow-sm border border-blue-100">
+                                        {activeQuestion.bancas.name}
+                                    </span>
+                                )}
+                                {activeQuestion.ano && (
+                                    <span className="premium-tag-ano text-[9px] font-black uppercase tracking-[0.15em] px-2.5 py-1 rounded-sm shadow-sm border border-slate-200">
+                                        {activeQuestion.ano}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    {hasBaseText && (
+                        <button
+                            onClick={() => setShowBaseText(!showBaseText)}
+                            className={`px-5 py-2.5 rounded-full border text-[10px] font-black uppercase tracking-widest transition-all no-print flex items-center gap-2 ${showBaseText ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'}`}
+                        >
+                            <span className="material-symbols-outlined text-[18px]">{showBaseText ? 'visibility_off' : 'description'}</span>
+                            {showBaseText ? 'Ocultar Texto' : 'Texto Base'}
+                        </button>
+                    )}
+                </div>
+
+                {/* Texto Base / Apoio */}
+                {hasBaseText && (
+                    <div className={`mb-8 p-8 bg-slate-50 border-l-4 border-indigo-500 premium-question-text text-slate-600 text-sm leading-relaxed ${showBaseText ? 'animate-in fade-in slide-in-from-top-2 duration-500' : 'hidden print:block'}`}>
+                        <h4 className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4 flex items-center gap-2 break-words">
+                            <span className="material-symbols-outlined text-lg">description</span>
+                            {baseTextData.title}
+                        </h4>
+                        <div className="prose prose-slate max-w-none break-words overflow-hidden" dangerouslySetInnerHTML={{ __html: baseTextData.content }} />
+                    </div>
+                )}
+
+                {/* Enunciado */}
+                <div className="text-lg font-bold text-slate-800 leading-relaxed mb-10 premium-question-text break-words" dangerouslySetInnerHTML={{ __html: activeQuestion.enunciado }} />
+
+                {/* Alternativas */}
+                <div className="space-y-4">
+                    {activeQuestion.alternativas.map((alt: any, idx: number) => {
+                        const isSelected = selectedAlt === alt.id;
+                        const isThisCorrect = alt.isCorreta;
+                        const showAsCorrect = showResult && isThisCorrect;
+
+                        let wrapperClass = "premium-button-alt";
+                        let circleClass = "premium-alt-circle border-slate-200 text-slate-400";
+
+                        if (showResult && isThisCorrect) {
+                            wrapperClass = "border-emerald-500 bg-emerald-50 pointer-events-none";
+                            circleClass = "bg-emerald-500 border-emerald-500 text-white";
+                        } else if (isSelected && !isThisCorrect) {
+                            wrapperClass = "border-red-500 bg-red-50 pointer-events-none";
+                            circleClass = "bg-red-500 border-red-500 text-white";
+                        } else if (isSelected) {
+                            wrapperClass = "border-blue-500 bg-blue-50";
+                            circleClass = "bg-[#3b82f6] border-[#3b82f6] text-white";
+                        }
+
+                        return (
+                            <button
+                                key={alt.id}
+                                disabled={showResult || disabled}
+                                onClick={() => handleAnswer(alt.id)}
+                                className={`w-full flex items-center gap-5 p-5 transition-all text-left outline-none ${wrapperClass}`}
+                            >
+                                <div className={`size-9 flex items-center justify-center text-sm font-black transition-all shrink-0 ${circleClass}`}>
+                                    {showAsCorrect ? <span className="material-symbols-outlined text-[20px]">check</span> : String.fromCharCode(65 + idx)}
+                                </div>
+                                <span className="text-[15px] font-semibold text-slate-700 flex-1 premium-question-text">{alt.texto}</span>
+                                {showResult && isThisCorrect && <span className="material-symbols-outlined text-emerald-500 animate-in zoom-in text-2xl">check_circle</span>}
+                                {showResult && isSelected && !isThisCorrect && <span className="material-symbols-outlined text-red-500 animate-in zoom-in text-2xl">cancel</span>}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Comentário do Professor */}
+                {showResult && activeQuestion.resposta_professor && (
+                    <div className="mt-10 pt-10 border-t border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="size-10 bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-200">
+                                <span className="material-symbols-outlined text-xl">school</span>
+                            </div>
+                            <div>
+                                <h4 className="text-[11px] font-black text-emerald-600 uppercase tracking-[0.2em] m-0">Gabarito Comentado</h4>
+                                <p className="text-[10px] text-slate-400 font-bold m-0 uppercase mt-0.5">Análise do Especialista</p>
+                            </div>
+                        </div>
+                        <div className="text-[15px] text-slate-600 leading-relaxed bg-emerald-50/30 p-8 border-l-4 border-emerald-500 premium-question-text" dangerouslySetInnerHTML={{ __html: activeQuestion.resposta_professor }} />
+                    </div>
+                )}
+
+                {/* Print Only Footer */}
+                <div className="hidden print-gabarito mt-6 pt-6 border-t border-slate-300">
+                    <div className="text-[11px] font-black uppercase tracking-widest text-slate-900 mb-4">Gabarito Oficial</div>
+                    <div className="text-xl font-black text-[#137fec]">
+                        Resposta: {(() => {
+                            const idx = activeQuestion.alternativas.findIndex((a: any) => a.isCorreta);
+                            if (idx === -1) return 'N/A';
+                            const text = activeQuestion.alternativas[idx].texto;
+                            if (['certo', 'errado'].includes(text.toLowerCase().trim())) return text.toUpperCase();
+                            return String.fromCharCode(65 + idx);
+                        })()}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default InteractiveQuestion;

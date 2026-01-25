@@ -1,0 +1,65 @@
+[
+    {
+        "enunciado": "<p>De acordo com a Constituição Federal, a República Federativa do Brasil buscará a integração econômica, política, social e cultural dos povos da América Latina, visando à formação de uma comunidade latino-americana de nações.</p>",
+        "texto_base": "<p>Texto base opcional que será salvo apenas para esta questão (Manual).</p>",
+        "text_base_id": null,
+        "resposta_professor": "<p>A resposta está prevista no Parágrafo Único do Art. 4º da CF/88.</p>",
+        "disciplina": "Direito Constitucional",
+        "assunto": "Princípios Fundamentais",
+        "banca": "Cebraspe",
+        "ano": "2024",
+        "dificuldade": "Fácil",
+        "modalidade": "Certo/Errado",
+        "alternativas": [
+            {
+                "id": "1",
+                "texto": "Certo",
+                "isCorreta": true
+            },
+            {
+                "id": "2",
+                "texto": "Errado",
+                "isCorreta": false
+            }
+        ]
+    },
+    {
+        "enunciado": "<p>A disciplina da organização administrativa do Estado compreende:</p>",
+        "texto_base": null,
+        "text_base_id": "cole-aqui-o-uuid-do-texto-base-se-ja-existir",
+        "resposta_professor": "<p>Organização administrativa envolve administração direta e indireta.</p>",
+        "disciplina": "Direito Administrativo",
+        "assunto": "Organização Administrativa",
+        "banca": "FGV",
+        "ano": "2023",
+        "dificuldade": "Médio",
+        "modalidade": "Multipla Escolha (5)",
+        "alternativas": [
+            {
+                "id": "1",
+                "texto": "Apenas as autarquias.",
+                "isCorreta": false
+            },
+            {
+                "id": "2",
+                "texto": "Administração Direta e Indireta.",
+                "isCorreta": true
+            },
+            {
+                "id": "3",
+                "texto": "Somente Ministérios.",
+                "isCorreta": false
+            },
+            {
+                "id": "4",
+                "texto": "Exclusivamente empresas públicas.",
+                "isCorreta": false
+            },
+            {
+                "id": "5",
+                "texto": "Apenas o Poder Legislativo.",
+                "isCorreta": false
+            }
+        ]
+    }
+]
