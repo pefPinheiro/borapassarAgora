@@ -1195,16 +1195,13 @@ const ApostilaReader: React.FC = () => {
 
             {/* Focus Mode Tooltip */}
             {isFocusMode && (
-                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 no-print">
-                    <div className="bg-slate-900/95 backdrop-blur-xl text-white px-8 py-4 rounded-3xl text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-6 shadow-2xl animate-in fade-in slide-in-from-bottom-5 duration-700 border border-white/5">
-                        <span className="flex items-center gap-2">
-                            <span className="size-2 bg-blue-500 rounded-full animate-pulse"></span>
-                            Modo de Leitura Ativado
-                        </span>
-                        <div className="h-4 w-px bg-white/10"></div>
-                        <button onClick={() => setIsFocusMode(false)} className="text-[#137fec] hover:text-white transition-colors">Sair do Modo Foco</button>
-                    </div>
-                </div>
+                <button
+                    onClick={() => setIsFocusMode(false)}
+                    className="fixed bottom-6 right-6 z-50 bg-slate-900/10 hover:bg-slate-900 text-slate-400 hover:text-white p-3 rounded-full transition-all no-print backdrop-blur-sm"
+                    title="Sair do Modo Foco"
+                >
+                    <span className="material-symbols-outlined text-xl">close_fullscreen</span>
+                </button>
             )}
         </div>
     );
