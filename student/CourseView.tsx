@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import katex from 'katex';
@@ -208,18 +208,21 @@ const CourseView: React.FC = () => {
   };
 
   // Group items by discipline and effect to collapse all by default
-  const groupedItems = items.reduce((acc: any, curr) => {
+  const groupedItems = useMemo(() => items.reduce((acc: any, curr) => {
     const disciplineName = curr.apostila?.disciplina?.name || 'Geral';
     if (!acc[disciplineName]) acc[disciplineName] = [];
     acc[disciplineName].push(curr);
     return acc;
-  }, {});
+  }, {}), [items]);
+
+  const collapsedInitialized = useRef(false);
 
   useEffect(() => {
     const disciplineKeys = Object.keys(groupedItems);
-    if (disciplineKeys.length > 0 && collapsedDisciplines.length === 0 && items.length > 0) {
-      // Deixa todos recolhidos apenas se for a primeira vez que carregamos os itens
+    // Só inicializa o collapsed se tiver itens e AINDA NÃO tiver sido inicializado
+    if (disciplineKeys.length > 0 && !collapsedInitialized.current) {
       setCollapsedDisciplines(disciplineKeys);
+      collapsedInitialized.current = true;
     }
   }, [groupedItems]);
 
