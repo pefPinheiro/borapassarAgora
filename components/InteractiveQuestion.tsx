@@ -102,14 +102,14 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
         <div className="premium-question-wrapper w-full overflow-hidden print:overflow-visible break-inside-auto">
             <div className="premium-question-card overflow-hidden">
                 {/* Header */}
-                <div className="flex items-center gap-4 mb-8 justify-between premium-question-header">
-                    <div className="flex items-center gap-4">
-                        <div className="size-11 bg-[#3b82f6] flex items-center justify-center text-white shadow-lg shadow-blue-200 print:hidden">
+                <div className="flex flex-col md:flex-row md:items-center gap-6 mb-8 justify-between premium-question-header">
+                    <div className="flex items-start md:items-center gap-4">
+                        <div className="size-11 bg-[#3b82f6] flex items-center justify-center text-white shadow-lg shadow-blue-200 print:hidden shrink-0 rounded-xl">
                             <span className="material-symbols-outlined text-2xl">quiz</span>
                         </div>
                         <div>
                             <h3 className="text-xl font-black text-slate-900 m-0 leading-none tracking-tight">Desafio de Fixação</h3>
-                            <div className="flex flex-wrap items-center gap-2 mt-3">
+                            <div className="flex flex-wrap items-center gap-2 mt-3 text-left">
                                 {activeQuestion.disciplinas?.name && (
                                     <span className="bg-slate-900 text-white text-[9px] font-black uppercase tracking-[0.1em] px-2.5 py-1 rounded-sm">
                                         {activeQuestion.disciplinas.name}
@@ -136,7 +136,7 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                     {hasBaseText && (
                         <button
                             onClick={() => setShowBaseText(!showBaseText)}
-                            className={`px-5 py-2.5 rounded-full border text-[10px] font-black uppercase tracking-widest transition-all no-print flex items-center gap-2 ${showBaseText ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'}`}
+                            className={`w-full md:w-auto px-5 py-3 md:py-2.5 rounded-xl md:rounded-full border text-[10px] font-black uppercase tracking-widest transition-all no-print flex items-center justify-center gap-2 ${showBaseText ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'}`}
                         >
                             <span className="material-symbols-outlined text-[18px]">{showBaseText ? 'visibility_off' : 'description'}</span>
                             {showBaseText ? 'Ocultar Texto' : 'Texto Base'}
@@ -146,7 +146,7 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
 
                 {/* Texto Base / Apoio */}
                 {hasBaseText && (
-                    <div className={`mb-8 p-8 bg-slate-50 border-l-4 border-indigo-500 premium-question-text text-slate-600 text-sm leading-relaxed ${showBaseText ? 'animate-in fade-in slide-in-from-top-2 duration-500' : 'hidden print:block'}`}>
+                    <div className={`mb-8 p-6 md:p-8 bg-slate-50 border-l-4 border-indigo-500 premium-question-text text-slate-600 text-sm leading-relaxed ${showBaseText ? 'animate-in fade-in slide-in-from-top-2 duration-500' : 'hidden print:block'}`}>
                         <h4 className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4 flex items-center gap-2 break-words">
                             <span className="material-symbols-outlined text-lg">description</span>
                             TEXTO DE APOIO
@@ -156,10 +156,10 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                 )}
 
                 {/* Enunciado */}
-                <div className="text-lg font-bold text-slate-800 leading-relaxed mb-10 premium-question-text break-words" dangerouslySetInnerHTML={{ __html: activeQuestion.enunciado }} />
+                <div className="text-base md:text-lg font-bold text-slate-800 leading-relaxed mb-8 md:mb-10 premium-question-text break-words" dangerouslySetInnerHTML={{ __html: activeQuestion.enunciado }} />
 
                 {/* Alternativas */}
-                <div className="space-y-4">
+                <div className="space-y-3 md:space-y-4">
                     {activeQuestion.alternativas.map((alt: any, idx: number) => {
                         const isSelected = selectedAlt === alt.id;
                         const isThisCorrect = alt.isCorreta;
@@ -184,14 +184,14 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                                 key={alt.id}
                                 disabled={showResult || disabled}
                                 onClick={() => handleAnswer(alt.id)}
-                                className={`w-full flex items-center gap-5 p-5 transition-all text-left outline-none ${wrapperClass}`}
+                                className={`w-full flex items-start gap-4 md:gap-5 p-4 md:p-5 transition-all text-left outline-none rounded-2xl md:rounded-3xl border-2 ${wrapperClass}`}
                             >
-                                <div className={`size-9 flex items-center justify-center text-sm font-black transition-all shrink-0 ${circleClass}`}>
-                                    {showAsCorrect ? <span className="material-symbols-outlined text-[20px]">check</span> : String.fromCharCode(65 + idx)}
+                                <div className={`size-8 md:size-9 flex items-center justify-center text-xs md:text-sm font-black transition-all shrink-0 rounded-full border-2 mt-0.5 ${circleClass}`}>
+                                    {showAsCorrect ? <span className="material-symbols-outlined text-[18px] md:text-[20px]">check</span> : String.fromCharCode(65 + idx)}
                                 </div>
-                                <span className="text-[15px] font-semibold text-slate-700 flex-1 premium-question-text">{alt.texto}</span>
-                                {showResult && isThisCorrect && <span className="material-symbols-outlined text-emerald-500 animate-in zoom-in text-2xl">check_circle</span>}
-                                {showResult && isSelected && !isThisCorrect && <span className="material-symbols-outlined text-red-500 animate-in zoom-in text-2xl">cancel</span>}
+                                <span className="text-sm md:text-[15px] font-semibold text-slate-700 flex-1 premium-question-text">{alt.texto}</span>
+                                {showResult && isThisCorrect && <span className="material-symbols-outlined text-emerald-500 animate-in zoom-in text-xl md:text-2xl shrink-0">check_circle</span>}
+                                {showResult && isSelected && !isThisCorrect && <span className="material-symbols-outlined text-red-500 animate-in zoom-in text-xl md:text-2xl shrink-0">cancel</span>}
                             </button>
                         );
                     })}

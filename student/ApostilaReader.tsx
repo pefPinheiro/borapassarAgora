@@ -729,6 +729,36 @@ const ApostilaReader: React.FC = () => {
                     border-bottom: 2px solid #ec4899;
                 }
 
+                /* MOBILE RESPONSIVE TWEAKS */
+                @media (max-width: 768px) {
+                    .apostila-content h1 { font-size: 2rem !important; margin: 2rem 0 1.5rem 0 !important; }
+                    .apostila-content h2 { font-size: 1.4rem !important; margin: 2rem 0 1rem 0 !important; padding-left: 1rem !important; border-left-width: 4px !important; }
+                    .apostila-content h3 { font-size: 1.2rem !important; margin: 1.5rem 0 0.8rem 0 !important; }
+                    .apostila-content p { font-size: 1rem !important; line-height: 1.6 !important; margin-bottom: 1.2rem !important; }
+                    
+                    .custom-tag { margin: 2rem 0 !important; flex-direction: column !important; }
+                    .custom-tag .tag-icon-box { width: 100% !important; height: 50px !important; background: none !important; }
+                    .custom-tag .tag-icon-box::after { display: none !important; }
+                    .custom-tag .tag-icon-box span { font-size: 24px !important; color: inherit; } 
+                    /* Specific fixes for gradient backgrounds on mobile */
+                    .tag-aviso .tag-icon-box { background: #fee2e2 !important; color: #ef4444 !important; }
+                    .tag-importante .tag-icon-box { background: #fef3c7 !important; color: #d97706 !important; }
+                    .tag-lei .tag-icon-box { background: #ede9fe !important; color: #7c3aed !important; }
+                    .tag-link .tag-icon-box { background: #dbeafe !important; color: #2563eb !important; }
+                    .tag-observe .tag-icon-box { background: #cffafe !important; color: #0891b2 !important; }
+                    .tag-frequente .tag-icon-box { background: #ffedd5 !important; color: #ea580c !important; }
+                    .tag-extra .tag-icon-box { background: #ccfbf1 !important; color: #0d9488 !important; }
+                    .tag-novidade .tag-icon-box { background: #fce7f3 !important; color: #db2777 !important; }
+                    .tag-praticar .tag-icon-box { background: #e0e7ff !important; color: #4338ca !important; }
+
+                    .custom-tag .tag-content-wrapper { padding: 1.5rem !important; }
+
+                    .apostila-content blockquote { margin: 2rem 0 !important; padding: 1.5rem !important; }
+                    .apostila-content blockquote p { font-size: 1rem !important; }
+                    
+                    .apostila-content img { margin: 2rem 0 !important; border-radius: 12px !important; }
+                }
+
                 .no-scrollbar::-webkit-scrollbar { display: none; }
 
                 /* PRINT STYLES - MAGAZINE FORMAT */
