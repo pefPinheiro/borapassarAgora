@@ -110,3 +110,19 @@
     padding: 0 !important;
   }
 }
+
+@media (max-width: 768px) {
+  .premium-question-wrapper {
+    margin-left: -1rem !important;
+    margin-right: -1rem !important;
+    width: auto !important;
+    padding: 1rem !important;
+    background-color: #f8fafc;
+  }
+
+  .premium-question-card {
+    padding: 1.25rem !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.1) !important;
+  }
+}

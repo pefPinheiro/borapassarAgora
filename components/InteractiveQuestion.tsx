@@ -184,12 +184,12 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                                 key={alt.id}
                                 disabled={showResult || disabled}
                                 onClick={() => handleAnswer(alt.id)}
-                                className={`w-full flex items-start gap-4 md:gap-5 p-4 md:p-5 transition-all text-left outline-none rounded-2xl md:rounded-3xl border-2 ${wrapperClass}`}
+                                className={`w-full flex items-start gap-4 md:gap-5 p-4 md:p-5 min-h-[3.5rem] transition-all text-left outline-none rounded-2xl md:rounded-3xl border-2 ${wrapperClass}`}
                             >
                                 <div className={`size-8 md:size-9 flex items-center justify-center text-xs md:text-sm font-black transition-all shrink-0 rounded-full border-2 mt-0.5 ${circleClass}`}>
                                     {showAsCorrect ? <span className="material-symbols-outlined text-[18px] md:text-[20px]">check</span> : String.fromCharCode(65 + idx)}
                                 </div>
-                                <span className="text-sm md:text-[15px] font-semibold text-slate-700 flex-1 premium-question-text">{alt.texto}</span>
+                                <span className="text-sm md:text-[15px] font-semibold text-slate-700 flex-1 premium-question-text break-words whitespace-normal min-w-0">{alt.texto}</span>
                                 {showResult && isThisCorrect && <span className="material-symbols-outlined text-emerald-500 animate-in zoom-in text-xl md:text-2xl shrink-0">check_circle</span>}
                                 {showResult && isSelected && !isThisCorrect && <span className="material-symbols-outlined text-red-500 animate-in zoom-in text-xl md:text-2xl shrink-0">cancel</span>}
                             </button>
