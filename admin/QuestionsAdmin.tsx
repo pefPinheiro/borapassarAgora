@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Questao, Alternativa, Disciplina, Assunto, TextBase, Profile } from '../types';
 import TiptapEditor from './TiptapEditor';
+import InteractiveQuestion from '../components/InteractiveQuestion';
 
 // Interfaces extras para os selects
 interface Banca {
@@ -43,7 +44,11 @@ const QuestionsAdmin: React.FC = () => {
   const [editingQuestao, setEditingQuestao] = useState<Questao | null>(null);
   const [saveAsShared, setSaveAsShared] = useState(false);
   const [newSharedTitle, setNewSharedTitle] = useState('');
+
   const fileInputImportRef = useRef<HTMLInputElement>(null);
+
+  // Preview State
+  const [previewQuestion, setPreviewQuestion] = useState<Questao | null>(null);
 
   // Form State
   const [formData, setFormData] = useState<Partial<Questao>>({
@@ -933,6 +938,7 @@ const QuestionsAdmin: React.FC = () => {
                   </td>
                   <td className="px-8 py-6 text-right">
                     <div className="flex justify-end gap-2 transition-all">
+                      <button onClick={() => setPreviewQuestion(q)} className="size-10 flex items-center justify-center text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all" title="Visualizar Questão"><span className="material-symbols-outlined text-[22px]">visibility</span></button>
                       <button onClick={() => handleEdit(q)} className="size-10 flex items-center justify-center text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"><span className="material-symbols-outlined text-[22px]">edit</span></button>
                       <button onClick={() => handleDelete(q.id)} className="size-10 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><span className="material-symbols-outlined text-[22px]">delete</span></button>
                     </div>
@@ -984,6 +990,80 @@ const QuestionsAdmin: React.FC = () => {
             >
               <span className="material-symbols-outlined">chevron_right</span>
             </button>
+          </div>
+        </div>
+      )}
+      {/* Preview Modal */}
+      {previewQuestion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[32px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-black text-slate-800">Visualizar Questão</h3>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Modo de Teste</p>
+              </div>
+              <button
+                onClick={() => setPreviewQuestion(null)}
+                className="size-10 flex items-center justify-center bg-slate-50 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-all"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-slate-50">
+              <InteractiveQuestion
+                question={{
+                  id: previewQuestion.id,
+                  enunciado: previewQuestion.enunciado,
+                  texto_base: previewQuestion.texto_base,
+                  text_bases: previewQuestion.text_bases,
+                  alternativas: (previewQuestion.alternativas || []).map((alt, i) => ({
+                    id: `${previewQuestion.id}-${i}`,
+                    texto: alt.texto,
+                    isCorreta: alt.isCorreta
+                  })),
+                  resposta_professor: previewQuestion.resposta_professor,
+                  bancas: previewQuestion.bancas,
+                  disciplinas: previewQuestion.disciplinas,
+                  assuntos: previewQuestion.assuntos,
+                  ano: previewQuestion.ano
+                }}
+              />
+            </div>
+
+            <div className="p-6 border-t border-slate-100 bg-white flex flex-col md:flex-row justify-between items-center gap-4">
+              <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                <button
+                  onClick={async () => {
+                    await toggleValidation(previewQuestion.id, previewQuestion.is_validada);
+                    setPreviewQuestion(prev => prev ? ({ ...prev, is_validada: !prev.is_validada }) : null);
+                  }}
+                  className={`flex-1 md:flex-none px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${previewQuestion.is_validada ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                >
+                  <span className="material-symbols-outlined text-lg">{previewQuestion.is_validada ? 'check_circle' : 'pending'}</span>
+                  {previewQuestion.is_validada ? 'Validada' : 'Validar Questão'}
+                </button>
+
+                <button
+                  onClick={() => {
+                    const tag = `[QUESTÃO INTERATIVA ID: "${previewQuestion.id}"]`;
+                    navigator.clipboard.writeText(tag);
+                    alert('Tag copiada para a área de transferência!');
+                  }}
+                  className="flex-1 md:flex-none px-6 py-2.5 bg-blue-50 text-blue-600 text-xs font-black uppercase tracking-widest rounded-xl hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-lg">content_copy</span>
+                  Copiar Tag Apostila
+                </button>
+              </div>
+
+              <button
+                onClick={() => setPreviewQuestion(null)}
+                className="w-full md:w-auto px-6 py-2.5 bg-slate-900 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}

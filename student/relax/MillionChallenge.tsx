@@ -90,22 +90,25 @@ const MillionChallenge: React.FC = () => {
             // Fetch Easy
             const { data: easy } = await supabase
                 .from('questions')
-                .select('*')
+                .select('*, bancas!inner(name)')
                 .ilike('dificuldade', 'Fácil')
+                .eq('bancas.name', 'Bora Passar Agora - Relax')
                 .limit(10); // Fetch pool
 
             // Fetch Medium
             const { data: medium } = await supabase
                 .from('questions')
-                .select('*')
+                .select('*, bancas!inner(name)')
                 .ilike('dificuldade', 'Médio')
+                .eq('bancas.name', 'Bora Passar Agora - Relax')
                 .limit(10);
 
             // Fetch Hard
             const { data: hard } = await supabase
                 .from('questions')
-                .select('*')
+                .select('*, bancas!inner(name)')
                 .ilike('dificuldade', 'Difícil')
+                .eq('bancas.name', 'Bora Passar Agora - Relax')
                 .limit(10);
 
             // Helper to shuffle array
@@ -267,8 +270,9 @@ const MillionChallenge: React.FC = () => {
         setLoading(true);
         const { data } = await supabase
             .from('questions')
-            .select('*')
+            .select('*, bancas!inner(name)')
             .ilike('dificuldade', diff)
+            .eq('bancas.name', 'Bora Passar Agora - Relax')
             .neq('id', currentQuestion.id) // Try to avoid duplicate
             .limit(1);
 
