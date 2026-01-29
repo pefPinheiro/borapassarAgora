@@ -97,7 +97,11 @@ const QuestionsStudent: React.FC = () => {
                 setFilteredAssuntos(aRes.data);
             }
             if (bRes.data) {
-                setBancas(bRes.data.filter(b => !b.name.toUpperCase().includes('SIMULADOS - BPA')));
+                const excludedBancas = ['Bora Passar Agora - Relax', 'Bora Passar Agora - Simulado'];
+                setBancas(bRes.data.filter(b =>
+                    !excludedBancas.includes(b.name) &&
+                    !b.name.toUpperCase().includes('SIMULADOS - BPA')
+                ));
             }
         } catch (error) {
             console.error('Error fetching filter data:', error);
@@ -144,8 +148,10 @@ const QuestionsStudent: React.FC = () => {
                 query = query.ilike('modalidade', '%Multipla Escolha%');
             }
 
-            // Exclude Simulados
-            query = query.not('bancas.name', 'ilike', '%SIMULADOS%BPA%');
+            // Exclude Simulados and Relax
+            query = query.not('bancas.name', 'ilike', '%SIMULADOS%BPA%')
+                .neq('bancas.name', 'Bora Passar Agora - Relax')
+                .neq('bancas.name', 'Bora Passar Agora - Simulado');
 
             // Status Filter (Resolved/Unresolved) - Note: Large scale this is bad, but for current scale usually okay.
             // Supabase doesn't support "NOT IN" with subquery easily in JS client without RPC.
