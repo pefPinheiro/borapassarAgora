@@ -37,6 +37,7 @@ const Simulados: React.FC = () => {
         status: 'Ativo',
         questions: []
     });
+    const [disciplineWeights, setDisciplineWeights] = useState<Record<string, number>>({});
 
     useEffect(() => {
         fetchSimulados();
@@ -107,6 +108,17 @@ const Simulados: React.FC = () => {
                 .eq('simulado_id', simulado.id)
                 .order('position', { ascending: true });
 
+            const { data: wData } = await supabase
+                .from('simulado_disciplina_weights')
+                .select('disciplina_id, weight')
+                .eq('simulado_id', simulado.id);
+
+            const wMap: Record<string, number> = {};
+            if (wData) {
+                wData.forEach((w: any) => wMap[w.disciplina_id] = w.weight);
+            }
+            setDisciplineWeights(wMap);
+
             setEditingSimulado(simulado);
             setFormData({
                 ...simulado,
@@ -114,6 +126,7 @@ const Simulados: React.FC = () => {
             });
         } else {
             setEditingSimulado(null);
+            setDisciplineWeights({});
             setFormData({
                 title: '',
                 banca_id: '',
@@ -181,6 +194,18 @@ const Simulados: React.FC = () => {
                 }));
                 const { error: sqError } = await supabase.from('simulado_questions').insert(sqPayload);
                 if (sqError) throw sqError;
+
+                // Save Weights
+                await supabase.from('simulado_disciplina_weights').delete().eq('simulado_id', simuladoId);
+                const wPayload = Object.entries(disciplineWeights).map(([dId, w]) => ({
+                    simulado_id: simuladoId,
+                    disciplina_id: dId,
+                    weight: w
+                }));
+                if (wPayload.length > 0) {
+                    const { error: wError } = await supabase.from('simulado_disciplina_weights').insert(wPayload);
+                    if (wError) throw wError;
+                }
             }
 
             alert('Simulado salvo com sucesso!');
@@ -295,6 +320,46 @@ const Simulados: React.FC = () => {
                                         ))}
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                            <div className="flex items-center gap-2 text-[#137fec]">
+                                <span className="material-symbols-outlined">weight</span>
+                                <h3 className="text-xs font-black uppercase tracking-widest text-slate-900">Pesos por Disciplina</h3>
+                            </div>
+                            <div className="space-y-3">
+                                {(() => {
+                                    const selectedQs = allQuestions.filter(q => formData.questions?.includes(q.id));
+                                    const discIds = Array.from(new Set(selectedQs.map(q => q.disciplina_id))).filter(Boolean);
+
+                                    if (discIds.length === 0) {
+                                        return <p className="text-sm text-slate-400 italic">Adicione questões para configurar os pesos.</p>;
+                                    }
+
+                                    return discIds.map(dId => {
+                                        const discName = disciplinas.find(d => d.id === dId)?.name || 'Desconhecida';
+                                        return (
+                                            <div key={dId} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                                <span className="text-xs font-bold text-slate-700">{discName}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-black uppercase text-slate-400">Pts</span>
+                                                    <input
+                                                        type="number"
+                                                        step="0.1"
+                                                        min="0"
+                                                        value={disciplineWeights[dId] !== undefined ? disciplineWeights[dId] : 1}
+                                                        onChange={e => {
+                                                            const val = parseFloat(e.target.value);
+                                                            setDisciplineWeights(prev => ({ ...prev, [dId]: isNaN(val) ? 0 : val }))
+                                                        }}
+                                                        className="w-16 h-8 px-2 text-center bg-white border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-blue-500"
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    });
+                                })()}
                             </div>
                         </div>
 

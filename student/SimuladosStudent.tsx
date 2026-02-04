@@ -14,6 +14,7 @@ const SimuladosStudent: React.FC = () => {
     const [isFocusMode, setIsFocusMode] = useState(false);
     const [timeLeft, setTimeLeft] = useState(0);
     const [userAnswers, setUserAnswers] = useState<Record<string, number | null>>({});
+    const [disciplineWeights, setDisciplineWeights] = useState<Record<string, number>>({});
     const [showReview, setShowReview] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -65,6 +66,16 @@ const SimuladosStudent: React.FC = () => {
                 .order('position', { ascending: true });
 
             if (qError) throw qError;
+
+            // Fetch Weights
+            const { data: wData } = await supabase
+                .from('simulado_disciplina_weights')
+                .select('*')
+                .eq('simulado_id', id);
+
+            const wMap: Record<string, number> = {};
+            if (wData) wData.forEach((w: any) => wMap[w.disciplina_id] = w.weight);
+            setDisciplineWeights(wMap);
 
             // Map correctly to Questao objects
             const qs = qData.map(item => (item.questao as any));
@@ -153,14 +164,19 @@ const SimuladosStudent: React.FC = () => {
         let wrong = 0;
         let blank = 0;
 
+        let weightedCorrect = 0;
+
         questions.forEach(q => {
             const answer = userAnswers[q.id];
+            const weight = disciplineWeights[q.disciplina_id] || 1;
+
             if (answer === undefined || answer === null) {
                 blank++;
             } else {
                 const correctIdx = q.alternativas.findIndex(a => a.isCorreta);
                 if (answer === correctIdx) {
                     correct++;
+                    weightedCorrect += weight;
                 } else {
                     wrong++;
                 }
@@ -168,7 +184,7 @@ const SimuladosStudent: React.FC = () => {
         });
 
         const penaltyValue = simulado?.penalty || 0;
-        const netScore = Math.max(0, correct - (wrong * penaltyValue));
+        const netScore = Math.max(0, weightedCorrect - (wrong * penaltyValue));
 
         return { correct, wrong, blank, netScore: netScore.toFixed(2) };
     };
@@ -196,18 +212,32 @@ const SimuladosStudent: React.FC = () => {
                         )}
                         <p className="text-xs text-slate-400 font-bold mt-2">{questions.length} Questões</p>
                     </div>
+
+                    {/* Discipline Weights Breakdown */}
+                    {Object.keys(disciplineWeights).length > 0 && (
+                        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 mb-8 text-left max-h-60 overflow-y-auto custom-scrollbar">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 text-center">Distribuição de Pontos</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {Array.from(new Set(questions.map(q => q.disciplina_id))).filter(Boolean).map(dId => {
+                                    const discName = questions.find(q => q.disciplina_id === dId)?.disciplinas?.name || 'Geral';
+                                    const weight = disciplineWeights[dId] || 1;
+                                    return (
+                                        <div key={dId} className="flex justify-between items-center bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-sm">
+                                            <span className="text-[10px] font-bold text-slate-700 truncate max-w-[70%] uppercase">{discName}</span>
+                                            <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{weight} pts</span>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="space-y-4">
                         <button
                             onClick={() => setStatus('running')}
                             className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:scale-[1.02] transition-all shadow-xl"
                         >
                             Começar Agora
-                        </button>
-                        <button
-                            onClick={handlePrint}
-                            className="w-full py-5 bg-blue-50 text-blue-600 border border-blue-100 rounded-2xl font-bold uppercase tracking-widest hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
-                        >
-                            <span className="material-symbols-outlined">print</span> Imprimir Prova
                         </button>
                         <button
                             onClick={() => navigate(-1)}
@@ -365,6 +395,9 @@ const SimuladosStudent: React.FC = () => {
                                         <div className="flex flex-wrap gap-2 mb-6 print:hidden">
                                             <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded font-black text-[9px] uppercase tracking-widest">{q.bancas?.name}</span>
                                             <span className="px-2 py-0.5 bg-blue-50 text-blue-500 rounded font-black text-[9px] uppercase tracking-widest">{q.disciplinas?.name}</span>
+                                            <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded font-black text-[9px] uppercase tracking-widest">
+                                                Valendo {disciplineWeights[q.disciplina_id] || 1} pts
+                                            </span>
                                             {showReview && (
                                                 <span className={`px-2 py-0.5 rounded font-black text-[9px] uppercase tracking-widest ${isCorrect ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
                                                     {isCorrect ? 'Acertou' : 'Errou'}
