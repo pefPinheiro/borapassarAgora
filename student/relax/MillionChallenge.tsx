@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import GameRank from './GameRank';
 
 // Game Constants
 const LEVELS = [
@@ -23,6 +24,7 @@ const MillionChallenge: React.FC = () => {
     const [currentLevelIndex, setCurrentLevelIndex] = useState(0);
     const [currentQuestion, setCurrentQuestion] = useState<any>(null);
     const [questionsStack, setQuestionsStack] = useState<any[]>([]); // All questions pre-fetched or fetched in batches
+    const [showRank, setShowRank] = useState(false);
 
     // Loading & Helpers
     const [loading, setLoading] = useState(false);
@@ -330,7 +332,23 @@ const MillionChallenge: React.FC = () => {
                     >
                         {loading ? 'Carregando Perguntas...' : 'Começar Desafio'}
                     </button>
+                    <button
+                        onClick={() => setShowRank(true)}
+                        className="mt-4 px-12 py-4 bg-white/5 border border-white/10 text-white rounded-2xl font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-transform shadow-lg w-full flex items-center justify-center gap-2"
+                    >
+                        <span className="material-symbols-outlined text-amber-500">leaderboard</span>
+                        Ver Ranking dos Campeões
+                    </button>
                     <button onClick={() => navigate(-1)} className="mt-6 block w-full text-slate-500 text-sm font-bold uppercase hover:text-white transition-colors">Voltar</button>
+
+                    {showRank && (
+                        <GameRank
+                            courseId={courseId || ''}
+                            gameType="million_challenge"
+                            onClose={() => setShowRank(false)}
+                            gameTitle="Desafio do Milhão"
+                        />
+                    )}
                 </div>
             </div>
         );
