@@ -884,6 +884,7 @@ const ApostilasAdmin: React.FC = () => {
                                     content={formData.content || ''}
                                     onChange={(val) => setFormData({ ...formData, content: val })}
                                     minHeight="600px"
+                                    uploadPath={editingApostila ? `apostilas/${editingApostila.id}` : 'apostilas/unassigned'}
                                 />
                             </div>
                         </div>

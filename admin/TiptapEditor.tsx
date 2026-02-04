@@ -29,13 +29,14 @@ interface TiptapEditorProps {
     onChange: (content: string) => void;
     placeholder?: string;
     minHeight?: string;
+    uploadPath?: string;
 }
 
 export interface TiptapRef {
     insertContent: (html: string) => void;
 }
 
-const TiptapEditor = React.forwardRef<TiptapRef, TiptapEditorProps>(({ content, onChange, placeholder, minHeight = '400px' }, ref) => {
+const TiptapEditor = React.forwardRef<TiptapRef, TiptapEditorProps>(({ content, onChange, placeholder, minHeight = '400px', uploadPath = 'apostilas' }, ref) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const extensions = React.useMemo(() => [
@@ -82,15 +83,17 @@ const TiptapEditor = React.forwardRef<TiptapRef, TiptapEditorProps>(({ content, 
             try {
                 const fileExt = file.name.split('.').pop();
                 const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
+                const path = `${uploadPath}/${fileName}`;
+
                 const { error: upError } = await supabase.storage
                     .from('public')
-                    .upload(`apostilas/${fileName}`, file);
+                    .upload(path, file);
 
                 if (upError) throw upError;
 
                 const { data: { publicUrl } } = supabase.storage
                     .from('public')
-                    .getPublicUrl(`apostilas/${fileName}`);
+                    .getPublicUrl(path);
 
                 editor.chain().focus().setImage({ src: publicUrl }).run();
             } catch (error: any) {
