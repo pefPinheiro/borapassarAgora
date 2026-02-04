@@ -36,7 +36,7 @@ export interface TiptapRef {
     insertContent: (html: string) => void;
 }
 
-const TiptapEditor = React.forwardRef<TiptapRef, TiptapEditorProps>(({ content, onChange, placeholder, minHeight = '400px', uploadPath = 'apostilas' }, ref) => {
+const TiptapEditor = React.forwardRef<TiptapRef, TiptapEditorProps>(({ content, onChange, placeholder, minHeight = '400px', uploadPath = '' }, ref) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const extensions = React.useMemo(() => [
@@ -83,7 +83,7 @@ const TiptapEditor = React.forwardRef<TiptapRef, TiptapEditorProps>(({ content, 
             try {
                 const fileExt = file.name.split('.').pop();
                 const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
-                const path = `${uploadPath}/${fileName}`;
+                const path = uploadPath ? `${uploadPath}/${fileName}` : `apostilas/${fileName}`;
 
                 const { error: upError } = await supabase.storage
                     .from('public')
