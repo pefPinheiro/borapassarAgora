@@ -7,12 +7,19 @@ import GameRank from './GameRank';
 const LEVELS = [
     { level: 1, prize: 500, label: '500 B' },
     { level: 2, prize: 1000, label: '1K B' },
-    { level: 3, prize: 5000, label: '5K B' },
-    { level: 4, prize: 10000, label: '10K B' }, // Médio Start
-    { level: 5, prize: 50000, label: '50K B' },
-    { level: 6, prize: 100000, label: '100K B' },
-    { level: 7, prize: 500000, label: '500K B' }, // Difícil Start
-    { level: 8, prize: 1000000, label: '1M B' }
+    { level: 3, prize: 2000, label: '2K B' },
+    { level: 4, prize: 3000, label: '3K B' },
+    { level: 5, prize: 5000, label: '5K B' }, // Safe point 1
+    { level: 6, prize: 10000, label: '10K B' },
+    { level: 7, prize: 20000, label: '20K B' },
+    { level: 8, prize: 40000, label: '40K B' },
+    { level: 9, prize: 60000, label: '60K B' },
+    { level: 10, prize: 100000, label: '100K B' }, // Safe point 2
+    { level: 11, prize: 200000, label: '200K B' },
+    { level: 12, prize: 300000, label: '300K B' },
+    { level: 13, prize: 500000, label: '500K B' },
+    { level: 14, prize: 750000, label: '750K B' },
+    { level: 15, prize: 1000000, label: '1M B' }
 ];
 
 const MillionChallenge: React.FC = () => {
@@ -31,6 +38,7 @@ const MillionChallenge: React.FC = () => {
     const [selectedAlt, setSelectedAlt] = useState<string | null>(null);
     const [isChecking, setIsChecking] = useState(false);
     const [message, setMessage] = useState('');
+    const [finalScore, setFinalScore] = useState(0);
 
     // Lifelines
     const [lifelines, setLifelines] = useState({
@@ -38,12 +46,18 @@ const MillionChallenge: React.FC = () => {
         skip: true,
         cards: true
     });
-    const [activeHelp, setActiveHelp] = useState<'friends' | 'cards' | null>(null);
+    const [activeHelp, setActiveHelp] = useState<'friends' | 'cards' | 'menu' | null>(null);
     const [helpData, setHelpData] = useState<any>(null); // To store generated help data
 
     // Constants for current level
     const currentPrize = LEVELS[currentLevelIndex].prize;
-    const safePrize = currentLevelIndex > 0 ? LEVELS[currentLevelIndex - 1].prize : 0;
+    // Calculate safe prize based on checkpoints
+    const getSafePrize = (levelIdx: number) => {
+        if (levelIdx >= 9) return 100000; // Passed level 10 (index 9)
+        if (levelIdx >= 4) return 5000;   // Passed level 5 (index 4)
+        return 0;
+    };
+    const safePrize = getSafePrize(currentLevelIndex);
 
     // Timer State
     const [timeLeft, setTimeLeft] = useState(120);
@@ -86,64 +100,103 @@ const MillionChallenge: React.FC = () => {
 
     const fetchInitialQuestions = async () => {
         setLoading(true);
-        // Logic to fetch 8 questions: 3 Easy, 3 Medium, 2 Hard
-        // We'll fetch a bit more just in case of skipping
         try {
-            // Fetch Easy
-            const { data: easy } = await supabase
-                .from('questions')
-                .select('*, bancas!inner(name)')
-                .ilike('dificuldade', 'Fácil')
-                .eq('bancas.name', 'Bora Passar Agora - Relax')
-                .limit(10); // Fetch pool
+            // 1. Get Course Structure (Disciplines & Subjects) via Apostilas
+            const { data: items } = await supabase
+                .from('course_items')
+                .select('apostila:apostilas(disciplina_id, assunto_id)')
+                .eq('course_id', courseId);
 
-            // Fetch Medium
-            const { data: medium } = await supabase
-                .from('questions')
-                .select('*, bancas!inner(name)')
-                .ilike('dificuldade', 'Médio')
-                .eq('bancas.name', 'Bora Passar Agora - Relax')
-                .limit(10);
+            const specificSubjects = new Set<string>();
+            const generalDisciplines = new Set<string>();
 
-            // Fetch Hard
-            const { data: hard } = await supabase
-                .from('questions')
-                .select('*, bancas!inner(name)')
-                .ilike('dificuldade', 'Difícil')
-                .eq('bancas.name', 'Bora Passar Agora - Relax')
-                .limit(10);
+            items?.forEach((item: any) => {
+                const aps = item.apostila;
+                if (!aps) return;
+                if (aps.assunto_id) specificSubjects.add(aps.assunto_id);
+                else if (aps.disciplina_id) generalDisciplines.add(aps.disciplina_id);
+            });
 
-            // Helper to shuffle array
-            const shuffle = (array: any[]) => array.sort(() => Math.random() - 0.5);
+            const subjectsArray = Array.from(specificSubjects);
+            const disciplinesArray = Array.from(generalDisciplines);
 
-            const easyQ = shuffle(easy || []).slice(0, 3);
-            const medQ = shuffle(medium || []).slice(0, 3);
-            const hardQ = shuffle(hard || []).slice(0, 2);
+            if (subjectsArray.length === 0 && disciplinesArray.length === 0) {
+                alert('Este curso não possui disciplinas/assuntos vinculados para gerar o jogo.');
+                setLoading(false);
+                return;
+            }
 
-            // Fallback if not enough questions (mock or repeat) - For production should handle better
-            const combined = [...easyQ, ...medQ, ...hardQ];
-            // Format alternatives to 4 options (if DB has more or less, we need to adapt)
-            // Assuming DB structure matches interactive question text/options
+            // Helper to fetch randomized questions
+            const fetchByDiff = async (diff: string, limit: number) => {
+                let query = supabase
+                    .from('questions')
+                    .select('*, bancas!inner(name)')
+                    .eq('bancas.name', 'Bora Passar Agora - Relax')
+                    .ilike('dificuldade', diff);
 
-            const formatted = combined.map(q => ({
-                id: q.id,
-                text: q.enunciado,
-                options: q.alternativas.map((a: any) => a.texto),
-                correctIndex: q.alternativas.findIndex((a: any) => a.isCorreta),
-                difficulty: q.dificuldade
-            }));
+                // Build OR filter for (assunto IN (...) OR disciplina IN (...))
+                // Supabase doesn't easily support mixed AND (OR) logic with fluent API
+                // We use .or() with filter string, which needs to include the column names
+                // Format: "assunto_id.in.(...ids...),disciplina_id.in.(...ids...)"
+                const conditions = [];
+                if (subjectsArray.length > 0) conditions.push(`assunto_id.in.(${subjectsArray.join(',')})`);
+                if (disciplinesArray.length > 0) conditions.push(`disciplina_id.in.(${disciplinesArray.join(',')})`);
+
+                if (conditions.length > 0) {
+                    query = query.or(conditions.join(','));
+                }
+
+                // Fetch a larger pool to randomize
+                const { data } = await query.limit(50);
+
+                // Shuffle and slice
+                return (data || []).sort(() => Math.random() - 0.5).slice(0, limit);
+            };
+
+            const [easy, medium, hard] = await Promise.all([
+                fetchByDiff('Fácil', 7),
+                fetchByDiff('Médio', 6),
+                fetchByDiff('Difícil', 2)
+            ]);
+
+            const combined = [...easy, ...medium, ...hard];
+
+            // Verify if we have enough questions (Strict or Lenient?)
+            // If strictly needed 15 but got less, we might have issues.
+            // For now, let's proceed with what we have, but ideally warn or handle duplicate fallout.
+            if (combined.length < 15) {
+                console.warn('Questions fetched:', combined.length, '/ 15 needed');
+            }
+
+            const formatted = combined.map(q => {
+                const alts = q.alternativas ? [...q.alternativas] : [];
+                // Shuffle alternatives
+                for (let i = alts.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [alts[i], alts[j]] = [alts[j], alts[i]];
+                }
+
+                return {
+                    id: q.id,
+                    text: q.enunciado,
+                    options: alts.map((a: any) => a.texto),
+                    correctIndex: alts.findIndex((a: any) => a.isCorreta), // Relies on internal correct flag
+                    difficulty: q.dificuldade
+                };
+            });
 
             setQuestionsStack(formatted);
         } catch (e) {
             console.error(e);
+            alert('Erro ao carregar questões do desafio.');
         } finally {
             setLoading(false);
         }
     };
 
     const startGame = () => {
-        if (questionsStack.length < 8) {
-            alert('Não há questões suficientes para iniciar o jogo neste momento. Tente novamente mais tarde.');
+        if (questionsStack.length < 15) {
+            alert(`Ops! Encontramos apenas ${questionsStack.length} questões compatíveis com este curso. O jogo precisa de 15.`);
             return;
         }
         setCurrentLevelIndex(0);
@@ -163,7 +216,7 @@ const MillionChallenge: React.FC = () => {
             const isCorrect = idx === currentQuestion.correctIndex;
 
             if (isCorrect) {
-                if (currentLevelIndex === 7) {
+                if (currentLevelIndex === 14) {
                     endGame(true); // Won 1 Million
                 } else {
                     // Correct!
@@ -191,23 +244,21 @@ const MillionChallenge: React.FC = () => {
     };
 
     const endGame = async (won: boolean) => {
-        const finalPrize = won
-            ? 1000000
-            : safePrize;
-
+        const prize = won ? 1000000 : safePrize;
+        setFinalScore(prize);
 
         // Save history and update wallet
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
             // 1. Update Wallet via RPC
-            await supabase.rpc('update_boras_wallet', { p_user_id: user.id, p_amount: finalPrize });
+            await supabase.rpc('update_boras_wallet', { p_user_id: user.id, p_amount: prize });
 
             // 2. Insert Game History
             await supabase.from('relax_game_history').insert({
                 user_id: user.id,
                 course_id: courseId || null,
                 game_type: 'million_challenge',
-                score: finalPrize,
+                score: prize,
                 details: { won, reached_level: currentLevelIndex + 1 }
             });
         }
@@ -216,22 +267,22 @@ const MillionChallenge: React.FC = () => {
     };
 
     const handleStop = async () => {
-        // "se parar ganha até onde acertou" -> safePrize
-        const finalPrize = safePrize;
+        // Se parar, ganha o prêmio do nível anterior (já garantido), ou 0 se estiver no primeiro
+        const stopPrize = currentLevelIndex > 0 ? LEVELS[currentLevelIndex - 1].prize : 0;
+        setFinalScore(stopPrize);
 
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            await supabase.rpc('update_boras_wallet', { p_user_id: user.id, p_amount: finalPrize });
+            await supabase.rpc('update_boras_wallet', { p_user_id: user.id, p_amount: stopPrize });
             await supabase.from('relax_game_history').insert({
                 user_id: user.id,
                 course_id: courseId || null,
                 game_type: 'million_challenge',
-                score: finalPrize,
+                score: stopPrize,
                 details: { stopped: true, reached_level: currentLevelIndex }
             });
         }
-        setGameState('lost'); // Reusing lost screen but with specific message for stop?
-        // Actually lets create a 'stopped' state or modify 'lost' render
+        setGameState('lost');
     };
 
     // Lifeline Logic
@@ -322,7 +373,7 @@ const MillionChallenge: React.FC = () => {
                 <div className="bg-[#1e293b] max-w-2xl w-full rounded-[40px] p-12 border border-slate-700 shadow-2xl relative z-10 text-center">
                     <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500 mb-6 uppercase italic">Desafio do Milhão</h1>
                     <p className="text-slate-400 mb-10 text-lg leading-relaxed">
-                        Prepare-se para enfrentar 8 perguntas de nível crescente.
+                        Prepare-se para enfrentar 15 perguntas de nível crescente.
                         Use sua sabedoria e estratégias para conquistar o prêmio máximo!
                     </p>
                     <button
@@ -362,7 +413,7 @@ const MillionChallenge: React.FC = () => {
                     <div className="flex gap-4">
                         <button onClick={() => navigate(-1)} className="size-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center"><span className="material-symbols-outlined">arrow_back</span></button>
                         <div>
-                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Pergunta {currentLevelIndex + 1}/8</p>
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Pergunta {currentLevelIndex + 1}/15</p>
                             <p className="text-lg font-black text-amber-400">{currentPrize.toLocaleString()} Boras</p>
                         </div>
                     </div>
@@ -380,24 +431,64 @@ const MillionChallenge: React.FC = () => {
                         </button>
                     </div>
 
-                    <div className="flex gap-2">
-                        {/* Lifelines */}
-                        <div className="flex gap-2 p-2 bg-black/30 rounded-2xl">
-                            {[
-                                { id: 'friends', icon: 'public', label: 'Amigos', action: useFriends },
-                                { id: 'skip', icon: 'skip_next', label: 'Pular', action: useSkip },
-                                { id: 'cards', icon: 'style', label: 'Cartas', action: useCards },
-                            ].map(l => (
+                    {/* Mobile Lifelines Toggle */}
+                    <div className="md:hidden">
+                        <button
+                            onClick={() => setActiveHelp(activeHelp === 'menu' ? null : 'menu')}
+                            disabled={currentLevelIndex === 14}
+                            className={`size-10 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30 ${currentLevelIndex === 14 ? 'bg-slate-700 opacity-50 cursor-not-allowed' : 'bg-blue-600 text-white animate-pulse'}`}
+                        >
+                            <span className="material-symbols-outlined">help</span>
+                        </button>
+                    </div>
+
+                    {/* Desktop Lifelines */}
+                    <div className="hidden md:flex gap-4 items-center justify-center">
+                        {[
+                            { id: 'friends', icon: 'public', label: 'Amigos', action: useFriends },
+                            { id: 'skip', icon: 'skip_next', label: 'Pular', action: useSkip },
+                            { id: 'cards', icon: 'style', label: 'Cartas', action: useCards },
+                        ].map(l => (
+                            <div key={l.id} className="flex flex-col items-center gap-1 group">
                                 <button
-                                    key={l.id}
                                     onClick={l.action}
-                                    disabled={!lifelines[l.id as keyof typeof lifelines] || isChecking}
-                                    className={`size-10 rounded-xl flex items-center justify-center transition-all ${lifelines[l.id as keyof typeof lifelines] ? 'bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/20' : 'bg-slate-700 opacity-50 cursor-not-allowed'}`}
-                                    title={l.label}
+                                    disabled={!lifelines[l.id as keyof typeof lifelines] || isChecking || currentLevelIndex === 14}
+                                    className={`size-12 rounded-2xl flex items-center justify-center transition-all ${lifelines[l.id as keyof typeof lifelines] && currentLevelIndex !== 14 ? 'bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/20' : 'bg-slate-700 opacity-50 cursor-not-allowed'}`}
                                 >
-                                    <span className="material-symbols-outlined text-lg">{l.icon}</span>
+                                    <span className="material-symbols-outlined text-xl">{l.icon}</span>
                                 </button>
-                            ))}
+                                <span className={`text-[9px] font-black uppercase tracking-widest transition-colors ${lifelines[l.id as keyof typeof lifelines] ? 'text-blue-400 group-hover:text-blue-300' : 'text-slate-600'}`}>
+                                    {l.label}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Progress Bar & Heat */}
+                <div className="w-full bg-slate-900 border-b border-white/5 relative">
+                    {/* Background Track - Clean, no grid */}
+                    <div className="absolute inset-0 bg-white/5"></div>
+
+                    {/* Dynamic Bar */}
+                    <div
+                        className="h-3 transition-all duration-1000 ease-out relative"
+                        style={{
+                            width: `${((currentLevelIndex + 1) / 15) * 100}%`,
+                            backgroundColor: `hsl(${220 - ((currentLevelIndex / 14) * 220)}, 90%, 50%)`,
+                            boxShadow: `0 0 15px hsl(${220 - ((currentLevelIndex / 14) * 220)}, 90%, 50%)`
+                        }}
+                    >
+                        <div className="absolute right-0 -top-1 size-5 bg-white rounded-full shadow-lg flex items-center justify-center translate-x-1/2">
+                            <div className="size-3 rounded-full animate-pulse" style={{ backgroundColor: `hsl(${220 - ((currentLevelIndex / 14) * 220)}, 90%, 50%)` }}></div>
+                        </div>
+                    </div>
+
+                    {/* Info Labels */}
+                    <div className="px-6 py-3 flex justify-center items-center">
+                        <div className="bg-slate-800/80 px-6 py-2 rounded-full border border-white/10 shadow-lg backdrop-blur-sm flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Acumulado</span>
+                            <span className="text-sm font-black text-white text-shadow-sm">{(currentLevelIndex > 0 ? LEVELS[currentLevelIndex - 1].prize : 0).toLocaleString()} <span className="text-amber-400">B</span></span>
                         </div>
                     </div>
                 </div>
@@ -462,18 +553,46 @@ const MillionChallenge: React.FC = () => {
                                     </span>
                                     <span className="font-medium text-lg">{opt}</span>
 
-                                    {/* Helper Indicators */}
                                     {/* Helper Indicators - Friends (Deprecated inline, moving to bottom) */}
                                 </button>
                             );
                         })}
                     </div>
 
-                    {/* Specialists Overlay Sidebar - Removed */}
+                    {/* Mobile Helpers Menu */}
+                    {activeHelp === 'menu' && (
+                        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end md:hidden animate-in slide-in-from-bottom duration-300">
+                            <div className="w-full bg-[#1e293b] rounded-t-[32px] p-8 border-t border-white/10 pb-12">
+                                <div className="flex justify-between items-center mb-8">
+                                    <h3 className="text-xl font-black uppercase text-white tracking-widest">Ajudas Disponíveis</h3>
+                                    <button onClick={() => setActiveHelp(null)} className="size-10 bg-slate-800 rounded-full flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-slate-400">close</span>
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-3 gap-4">
+                                    {[
+                                        { id: 'friends', icon: 'public', label: 'Amigos', action: useFriends },
+                                        { id: 'skip', icon: 'skip_next', label: 'Pular', action: useSkip },
+                                        { id: 'cards', icon: 'style', label: 'Cartas', action: useCards },
+                                    ].map(l => (
+                                        <button
+                                            key={l.id}
+                                            onClick={() => { l.action(); if (l.id !== 'friends' && l.id !== 'cards') setActiveHelp(null); }}
+                                            disabled={!lifelines[l.id as keyof typeof lifelines] || isChecking || currentLevelIndex === 14}
+                                            className={`flex flex-col items-center gap-3 p-4 rounded-2xl border-2 transition-all ${lifelines[l.id as keyof typeof lifelines] && currentLevelIndex !== 14 ? 'bg-blue-600 border-blue-500 text-white shadow-xl' : 'bg-slate-800 border-slate-700 text-slate-500 opacity-50'}`}
+                                        >
+                                            <span className="material-symbols-outlined text-3xl">{l.icon}</span>
+                                            <span className="text-[10px] font-black uppercase tracking-widest">{l.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Friends Overlay Bottom */}
                     {activeHelp === 'friends' && helpData && (
-                        <div className="mt-8 flex gap-4 animate-in slide-in-from-bottom-4">
+                        <div className="mt-8 flex gap-4 animate-in slide-in-from-bottom-4 flex-wrap justify-center relative z-20">
                             {helpData.map((friend: any, fIdx: number) => (
                                 <div key={fIdx} className="bg-white text-slate-900 px-6 py-3 rounded-2xl shadow-xl flex flex-col items-center gap-2 border-b-4 border-amber-500">
                                     <div className="flex items-center gap-2">
@@ -492,7 +611,7 @@ const MillionChallenge: React.FC = () => {
                             <div className={`px-12 py-6 rounded-3xl shadow-2xl border-2 transform scale-110 ${message === 'Resposta Correta!' ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-red-500 border-red-400 text-white'}`}>
                                 <div className="flex flex-col items-center gap-2">
                                     <span className="material-symbols-outlined text-5xl mb-2">{message === 'Resposta Correta!' ? 'check_circle' : 'cancel'}</span>
-                                    <h3 className="text-2xl font-black uppercase tracking-widest">{message}</h3>
+                                    <h3 className="text-2xl font-black uppercase tracking-widest text-center">{message}</h3>
                                 </div>
                             </div>
                         </div>
@@ -500,19 +619,19 @@ const MillionChallenge: React.FC = () => {
 
                     {/* Cards Overlay */}
                     {activeHelp === 'cards' && !helpData && (
-                        <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center">
-                            <div className="grid grid-cols-3 gap-8">
+                        <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+                            <div className="grid grid-cols-3 gap-4 md:gap-8 w-full max-w-2xl">
                                 {[1, 2, 3].map(i => (
                                     <button
                                         key={i}
                                         onClick={() => handleCardClick(i)}
-                                        className="w-32 h-48 bg-gradient-to-br from-red-600 to-red-900 rounded-xl border-4 border-white shadow-2xl transform hover:-translate-y-4 transition-all flex items-center justify-center"
+                                        className="aspect-[2/3] bg-gradient-to-br from-red-600 to-red-900 rounded-xl border-4 border-white shadow-2xl transform hover:-translate-y-4 transition-all flex items-center justify-center"
                                     >
-                                        <span className="material-symbols-outlined text-6xl text-white/50">style</span>
+                                        <span className="material-symbols-outlined text-4xl md:text-6xl text-white/50">style</span>
                                     </button>
                                 ))}
                             </div>
-                            <p className="absolute bottom-20 text-white font-black uppercase tracking-widest animate-pulse">Escolha uma carta</p>
+                            <p className="absolute bottom-20 text-white font-black uppercase tracking-widest animate-pulse text-center w-full px-4">Escolha uma carta</p>
                         </div>
                     )}
                 </div>
@@ -522,15 +641,16 @@ const MillionChallenge: React.FC = () => {
                     <button
                         onClick={handleStop}
                         disabled={isChecking}
-                        className="px-8 py-3 bg-red-500/10 text-red-500 border border-red-500/30 rounded-xl font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all"
+                        className="px-8 py-3 bg-red-500/10 text-red-500 border border-red-500/30 rounded-xl font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all w-full md:w-auto"
                     >
-                        Parar (Garantir {safePrize.toLocaleString()})
+                        Parar (Garantir {(currentLevelIndex > 0 ? LEVELS[currentLevelIndex - 1].prize : 0).toLocaleString()})
                     </button>
                 </div>
             </div>
         );
     }
 
+    // Won/Lost Screen
     return (
         <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white p-8 text-center">
             <div className="size-24 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mb-8 shadow-2xl shadow-orange-500/50">
@@ -541,7 +661,7 @@ const MillionChallenge: React.FC = () => {
             <p className="text-slate-400 text-lg mb-8">Você conquistou</p>
 
             <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-500 mb-12">
-                {(gameState === 'won' ? 1000000 : safePrize).toLocaleString()} <span className="text-2xl text-white">Boras</span>
+                {finalScore.toLocaleString()} <span className="text-2xl text-white">Boras</span>
             </div>
 
             <button
