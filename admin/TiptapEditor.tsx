@@ -83,7 +83,7 @@ const TiptapEditor = React.forwardRef<TiptapRef, TiptapEditorProps>(({ content, 
             try {
                 const fileExt = file.name.split('.').pop();
                 const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
-                const path = uploadPath ? `${uploadPath}/${fileName}` : `apostilas/${fileName}`;
+                const path = uploadPath ? `${uploadPath}/${fileName}` : `uploads/${fileName}`;
 
                 const { error: upError } = await supabase.storage
                     .from('public')
