@@ -133,7 +133,7 @@ const QuestionsStudent: React.FC = () => {
             // 2. Build Query
             let query = supabase
                 .from('questions')
-                .select('*, disciplinas(name), bancas!inner(name), text_bases(content, title), assuntos(name)', { count: 'exact' });
+                .select('*, disciplinas(name), bancas!inner(name, sigla), text_bases(content, title), assuntos(name)', { count: 'exact' });
 
             // Apply Filters
             if (filterDisciplina) query = query.eq('disciplina_id', filterDisciplina);

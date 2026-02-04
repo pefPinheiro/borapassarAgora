@@ -152,7 +152,7 @@ const QuestionsAdmin: React.FC = () => {
           *,
           disciplinas (name),
           assuntos (name),
-          bancas (name),
+          bancas (name, sigla),
           text_bases (content, title),
           validator:profiles!validator_id (full_name)
         `, { count: 'exact' });

@@ -14,7 +14,7 @@ export interface InteractiveQuestionProps {
             isCorreta: boolean;
         }[];
         resposta_professor?: string | null;
-        bancas?: { name: string } | null;
+        bancas?: { name: string; sigla?: string } | null;
         disciplinas?: { name: string } | null;
         assuntos?: { name: string } | null;
         ano?: string | number | null;
@@ -41,7 +41,7 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                 try {
                     const { data, error } = await supabase
                         .from('questions')
-                        .select('*, bancas(name), disciplinas(name), text_bases(content, title)')
+                        .select('*, bancas(name, sigla), disciplinas(name), text_bases(content, title)')
                         .eq('id', id)
                         .single();
                     if (data) setLocalQuestion(data);
@@ -122,7 +122,7 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                                 )}
                                 {activeQuestion.bancas?.name && (
                                     <span className="premium-tag-banca text-[9px] font-black uppercase tracking-[0.15em] px-2.5 py-1 rounded-sm shadow-sm border border-blue-100">
-                                        {activeQuestion.bancas.name}
+                                        {activeQuestion.bancas.sigla || activeQuestion.bancas.name}
                                     </span>
                                 )}
                                 {activeQuestion.ano && (
