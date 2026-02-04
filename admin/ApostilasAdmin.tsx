@@ -512,7 +512,7 @@ const ApostilasAdmin: React.FC = () => {
         }
     };
 
-    const insertTag = (tagType: 'question' | 'video' | 'image' | 'math') => {
+    const insertTag = (tagType: 'question' | 'video' | 'image' | 'math' | 'exemplo' | 'lei') => {
         if (tagType === 'question') {
             setIsQuestionModalOpen(true);
             return;
@@ -520,6 +520,16 @@ const ApostilasAdmin: React.FC = () => {
 
         if (tagType === 'image') {
             imageInputRef.current?.click();
+            return;
+        }
+
+        if (tagType === 'exemplo') {
+            editorRef.current?.insertContent('<p>[--EXEMPLO--] Exemplo prático... [/--EXEMPLO--]</p>');
+            return;
+        }
+
+        if (tagType === 'lei') {
+            editorRef.current?.insertContent('<p>[--LEI--] Texto da lei... [/--LEI--]</p>');
             return;
         }
 
@@ -839,6 +849,17 @@ const ApostilasAdmin: React.FC = () => {
                                                 <button onClick={() => insertTag('image')} className="flex items-center gap-2 px-4 py-2.5 bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg shadow-indigo-500/20 active:scale-95">
                                                     <span className="material-symbols-outlined text-[18px]">image</span>
                                                     <span className="hidden md:inline">Imagem</span>
+                                                </button>
+
+                                                <div className="h-6 w-px bg-slate-200 mx-2"></div>
+
+                                                <button onClick={() => insertTag('exemplo')} className="flex items-center gap-2 px-4 py-2.5 bg-lime-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-lime-600 transition-all shadow-lg shadow-lime-500/20 active:scale-95">
+                                                    <span className="material-symbols-outlined text-[18px]">lightbulb</span>
+                                                    <span className="hidden md:inline">Exemplo</span>
+                                                </button>
+                                                <button onClick={() => insertTag('lei')} className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-600 transition-all shadow-lg shadow-amber-500/20 active:scale-95">
+                                                    <span className="material-symbols-outlined text-[18px]">gavel</span>
+                                                    <span className="hidden md:inline">Lei</span>
                                                 </button>
                                             </div>
 

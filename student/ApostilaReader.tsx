@@ -189,7 +189,8 @@ const ApostilaReader: React.FC = () => {
             .replace(/\[--FREQUENTE--\]([\s\S]*?)\[\/--FREQUENTE--\]/g, '<div class="custom-tag tag-frequente"><div class="tag-icon-box"><span class="material-symbols-outlined">local_fire_department</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Cai com Frequência</strong></div><div class="tag-text">$1</div></div></div>')
             .replace(/\[--EXTRA--\]([\s\S]*?)\[\/--EXTRA--\]/g, '<div class="custom-tag tag-extra"><div class="tag-icon-box"><span class="material-symbols-outlined">add_circle</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Conteúdo Extra</strong></div><div class="tag-text">$1</div></div></div>')
             .replace(/\[--NOVIDADE--\]([\s\S]*?)\[\/--NOVIDADE--\]/g, '<div class="custom-tag tag-novidade"><div class="tag-icon-box"><span class="material-symbols-outlined">auto_awesome</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Novidade</strong></div><div class="tag-text">$1</div></div></div>')
-            .replace(/\[--BORA-PRATICAR--\]([\s\S]*?)\[\/--BORA-PRATICAR--\]/g, '<div class="custom-tag tag-praticar"><div class="tag-icon-box"><span class="material-symbols-outlined">fitness_center</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Bora Praticar!</strong></div><div class="tag-text">$1</div></div></div>')
+            .replace(/\[--EXEMPLO--\]([\s\S]*?)\[\/--EXEMPLO--\]/g, '<div class="custom-tag tag-exemplo"><div class="tag-icon-box"><span class="material-symbols-outlined">lightbulb</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Exemplo</strong></div><div class="tag-text">$1</div></div></div>')
+            .replace(/\[--BORA-PRATICAR--\]([\s\S]*?)\[\/--BORA-PRATICAR--\]/g, '<div class="custom-tag tag-praticar"><div class="tag-icon-box"><span class="material-symbols-outlined">fitness_center</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Bora Praticar Agora!</strong></div><div class="tag-text">$1</div></div></div>')
             .replace(/\[--TITULO--\]([\s\S]*?)\[\/--TITULO--\]/g, '<div class="custom-tag tag-titulo"><div class="tag-content-wrapper"><div class="tag-text">$1</div></div></div>');
 
 
@@ -461,6 +462,11 @@ const ApostilaReader: React.FC = () => {
                 .tag-novidade { border-left: 0; border-right: 4px solid #be185d; }
                 .tag-novidade .tag-icon-box { background: linear-gradient(135deg, #f472b6 0%, #db2777 100%); color: white; }
                 .tag-novidade .tag-body strong { color: #be185d; }
+
+                /* Variante EXEMPLO (Yellow/Lime) */
+                .tag-exemplo { border-left: 0; border-right: 4px solid #84cc16; }
+                .tag-exemplo .tag-icon-box { background: linear-gradient(135deg, #a3e635 0%, #65a30d 100%); color: white; }
+                .tag-exemplo .tag-body strong { color: #4d7c0f; }
 
                 /* Variante BORA PRATICAR (Indigo/Violet) */
                 .tag-praticar { border-left: 0; border-right: 4px solid #4338ca; }
@@ -749,6 +755,7 @@ const ApostilaReader: React.FC = () => {
                     .tag-frequente .tag-icon-box { background: #ffedd5 !important; color: #ea580c !important; }
                     .tag-extra .tag-icon-box { background: #ccfbf1 !important; color: #0d9488 !important; }
                     .tag-novidade .tag-icon-box { background: #fce7f3 !important; color: #db2777 !important; }
+                    .tag-exemplo .tag-icon-box { background: #ecfccb !important; color: #65a30d !important; }
                     .tag-praticar .tag-icon-box { background: #e0e7ff !important; color: #4338ca !important; }
 
                     .custom-tag .tag-content-wrapper { padding: 1.5rem !important; }

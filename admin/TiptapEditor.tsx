@@ -170,8 +170,9 @@ const TiptapEditor = React.forwardRef<TiptapRef, TiptapEditorProps>(({ content, 
                 <MenuButton onClick={() => editor.chain().focus().insertContent('<p>[--OBSERVE--] Sua observação aqui... [/--OBSERVE--]</p>').run()} icon="visibility" label="Inserir Observação" />
                 <MenuButton onClick={() => editor.chain().focus().insertContent('<p>[--FREQUENTE--] Conteúdo frequente aqui... [/--FREQUENTE--]</p>').run()} icon="local_fire_department" label="Inserir Frequente" />
                 <MenuButton onClick={() => editor.chain().focus().insertContent('<p>[--EXTRA--] Conteúdo extra aqui... [/--EXTRA--]</p>').run()} icon="add_circle" label="Inserir Extra" />
+                <MenuButton onClick={() => editor.chain().focus().insertContent('<p>[--EXEMPLO--] Exemplo prático... [/--EXEMPLO--]</p>').run()} icon="lightbulb" label="Inserir Exemplo" />
                 <MenuButton onClick={() => editor.chain().focus().insertContent('<p>[--NOVIDADE--] Novidade aqui... [/--NOVIDADE--]</p>').run()} icon="auto_awesome" label="Inserir Novidade" />
-                <MenuButton onClick={() => editor.chain().focus().insertContent('<p>[--BORA-PRATICAR--] Hora de praticar... [/--BORA-PRATICAR--]</p>').run()} icon="fitness_center" label="Inserir Bora Praticar" />
+                <MenuButton onClick={() => editor.chain().focus().insertContent('<p>[--BORA-PRATICAR--] Hora de praticar agora... [/--BORA-PRATICAR--]</p>').run()} icon="fitness_center" label="Inserir Bora Praticar Agora" />
                 <MenuButton onClick={() => editor.chain().focus().insertContent('<p>[--TITULO--] TÍTULO DO CAPÍTULO [/--TITULO--]</p>').run()} icon="subject" label="Inserir Título" />
 
                 <div className="w-px h-6 bg-slate-200 mx-2" />
