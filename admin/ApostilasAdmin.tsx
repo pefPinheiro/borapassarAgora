@@ -884,7 +884,18 @@ const ApostilasAdmin: React.FC = () => {
                                     content={formData.content || ''}
                                     onChange={(val) => setFormData({ ...formData, content: val })}
                                     minHeight="600px"
-                                    uploadPath={editingApostila ? `apostilas/${editingApostila.id}` : 'apostilas/unassigned'}
+                                    uploadPath={(() => {
+                                        const disc = disciplinas.find(d => d.id === formData.disciplina_id);
+                                        const sub = assuntos.find(a => a.id === formData.assunto_id);
+                                        const sanitize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+
+                                        if (disc) {
+                                            const discPath = sanitize(disc.name);
+                                            const subPath = sub ? sanitize(sub.name) : 'sem_assunto';
+                                            return `apostilas/${discPath}/${subPath}`;
+                                        }
+                                        return editingApostila ? `apostilas/${editingApostila.id}` : 'apostilas/sem_disciplina';
+                                    })()}
                                 />
                             </div>
                         </div>
