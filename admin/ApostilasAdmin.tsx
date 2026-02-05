@@ -378,11 +378,34 @@ const ApostilasAdmin: React.FC = () => {
     const imageInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileUpload = async (file: File) => {
+        if (!formData.disciplina_id) {
+            alert('Para manter a organização dos arquivos, por favor selecione a Disciplina antes de fazer o upload de imagens.');
+            return;
+        }
+
         setUploading(true);
         try {
+            const discObj = disciplinas.find(d => d.id === formData.disciplina_id);
+            const subObj = assuntos.find(a => a.id === formData.assunto_id);
+
+            const discName = discObj?.name || 'sem_disciplina';
+            const subName = subObj?.name || 'sem_assunto';
+
+            const sanitize = (str: string) => {
+                return str
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]/g, "_")
+                    .replace(/_+/g, "_");
+            };
+
+            const safeDisc = sanitize(discName);
+            const safeSub = sanitize(subName);
+
             const fileExt = file.name.split('.').pop();
             const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-            const filePath = `apostilas/${fileName}`;
+            const filePath = `apostilas/${safeDisc}/${safeSub}/${fileName}`;
 
             const { error: uploadError } = await supabase.storage
                 .from('public')
@@ -566,6 +589,13 @@ const ApostilasAdmin: React.FC = () => {
             ref={editorRef}
             content={formData.content || ''}
             onChange={(val) => setFormData({ ...formData, content: val })}
+            uploadPath={(() => {
+                const s = (str: string) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_");
+                if (!formData.disciplina_id) return '';
+                const d = disciplinas.find(x => x.id === formData.disciplina_id);
+                const a = assuntos.find(x => x.id === formData.assunto_id);
+                return `apostilas/${s(d?.name || 'sem_disciplina')}/${s(a?.name || 'sem_assunto')}`;
+            })()}
         />
     </div>
 
@@ -892,9 +922,9 @@ const ApostilasAdmin: React.FC = () => {
                                         if (disc) {
                                             const discPath = sanitize(disc.name);
                                             const subPath = sub ? sanitize(sub.name) : 'geral';
-                                            return `${discPath}/${subPath}`;
+                                            return `apostilas/${discPath}/${subPath}`;
                                         }
-                                        return editingApostila ? `editando/${editingApostila.id}` : 'novos/sem_disciplina';
+                                        return editingApostila ? `apostilas/${editingApostila.id}` : 'apostilas/sem_disciplina';
                                     })()}
                                 />
                             </div>
