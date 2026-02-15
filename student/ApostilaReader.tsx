@@ -191,6 +191,7 @@ const ApostilaReader: React.FC = () => {
             .replace(/\[--NOVIDADE--\]([\s\S]*?)\[\/--NOVIDADE--\]/g, '<div class="custom-tag tag-novidade"><div class="tag-icon-box"><span class="material-symbols-outlined">auto_awesome</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Novidade</strong></div><div class="tag-text">$1</div></div></div>')
             .replace(/\[--EXEMPLO--\]([\s\S]*?)\[\/--EXEMPLO--\]/g, '<div class="custom-tag tag-exemplo"><div class="tag-icon-box"><span class="material-symbols-outlined">lightbulb</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Exemplo</strong></div><div class="tag-text">$1</div></div></div>')
             .replace(/\[--BORA-PRATICAR--\]([\s\S]*?)\[\/--BORA-PRATICAR--\]/g, '<div class="custom-tag tag-praticar"><div class="tag-icon-box"><span class="material-symbols-outlined">fitness_center</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Bora Praticar Agora!</strong></div><div class="tag-text">$1</div></div></div>')
+            .replace(/\[--CORRECAO--\]([\s\S]*?)\[\/--CORRECAO--\]/g, '<div class="custom-tag tag-correcao"><div class="tag-icon-box"><span class="material-symbols-outlined">edit_note</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Correção Necessária</strong></div><div class="tag-text">$1</div></div></div>')
             .replace(/\[--TITULO--\]([\s\S]*?)\[\/--TITULO--\]/g, '<div class="custom-tag tag-titulo"><div class="tag-content-wrapper"><div class="tag-text">$1</div></div></div>');
 
 
@@ -462,6 +463,11 @@ const ApostilaReader: React.FC = () => {
                 .tag-novidade { border-left: 0; border-right: 4px solid #be185d; }
                 .tag-novidade .tag-icon-box { background: linear-gradient(135deg, #f472b6 0%, #db2777 100%); color: white; }
                 .tag-novidade .tag-body strong { color: #be185d; }
+
+                /* Variante CORREÇÃO (Red/Rose - Correction) */
+                .tag-correcao { border-left: 0; border-right: 4px solid #e11d48; }
+                .tag-correcao .tag-icon-box { background: linear-gradient(135deg, #f43f5e 0%, #be123c 100%); color: white; }
+                .tag-correcao .tag-body strong { color: #be123c; }
 
                 /* Variante EXEMPLO (Yellow/Lime) */
                 .tag-exemplo { border-left: 0; border-right: 4px solid #84cc16; }
@@ -1105,7 +1111,7 @@ const ApostilaReader: React.FC = () => {
                         </div>
                         {/* Logo Transparente no Canto Inferior Direito */}
                         {/* Logo Transparente no Canto Inferior Direito */}
-                        <div className="absolute bottom-8 right-8 z-20 opacity-90 banner-logo-container flex items-center gap-3">
+                        <div className="absolute top-8 right-8 z-20 opacity-90 banner-logo-container flex items-center gap-3">
                             <span className="hidden print:block banner-logo-text text-white font-bold uppercase tracking-wider text-xs shadow-black drop-shadow-md">
                                 {apostila.disciplina?.name}
                             </span>

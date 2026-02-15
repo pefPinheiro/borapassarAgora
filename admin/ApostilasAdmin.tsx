@@ -57,7 +57,7 @@ const ApostilasAdmin: React.FC = () => {
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
-    const ITEMS_PER_PAGE = 20;
+    const ITEMS_PER_PAGE = 10;
 
     const [formData, setFormData] = useState<any>({
         title: '',
@@ -167,7 +167,17 @@ const ApostilasAdmin: React.FC = () => {
                 .range(from, to);
 
             if (error) throw error;
-            setApostilas(data || []);
+
+            if (currentPage === 1) {
+                setApostilas(data || []);
+            } else {
+                setApostilas(prev => {
+                    const newItems = data || [];
+                    const combined = [...prev, ...newItems];
+                    const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+                    return unique;
+                });
+            }
             setTotalCount(count || 0);
         } catch (error: any) {
             console.error('Error fetching apostilas:', error);
@@ -535,7 +545,7 @@ const ApostilasAdmin: React.FC = () => {
         }
     };
 
-    const insertTag = (tagType: 'question' | 'video' | 'image' | 'math' | 'exemplo' | 'lei') => {
+    const insertTag = (tagType: 'question' | 'video' | 'image' | 'math' | 'exemplo' | 'lei' | 'correcao') => {
         if (tagType === 'question') {
             setIsQuestionModalOpen(true);
             return;
@@ -553,6 +563,11 @@ const ApostilasAdmin: React.FC = () => {
 
         if (tagType === 'lei') {
             editorRef.current?.insertContent('<p>[--LEI--] Texto da lei... [/--LEI--]</p>');
+            return;
+        }
+
+        if (tagType === 'correcao') {
+            editorRef.current?.insertContent('<p>[--CORRECAO--] Observação para correção... [/--CORRECAO--]</p>');
             return;
         }
 
@@ -890,6 +905,10 @@ const ApostilasAdmin: React.FC = () => {
                                                 <button onClick={() => insertTag('lei')} className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-600 transition-all shadow-lg shadow-amber-500/20 active:scale-95">
                                                     <span className="material-symbols-outlined text-[18px]">gavel</span>
                                                     <span className="hidden md:inline">Lei</span>
+                                                </button>
+                                                <button onClick={() => insertTag('correcao')} className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-500/20 active:scale-95">
+                                                    <span className="material-symbols-outlined text-[18px]">edit_note</span>
+                                                    <span className="hidden md:inline">Correção</span>
                                                 </button>
                                             </div>
 
@@ -1379,30 +1398,26 @@ const ApostilasAdmin: React.FC = () => {
                     </table>
                 </div>
                 {/* Pagination Controls */}
-                {totalCount > ITEMS_PER_PAGE && (
-                    <div className="flex items-center justify-between px-10 py-6 bg-slate-50 border-t border-slate-100">
-                        <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                            Exibindo {apostilas.length} de {totalCount} obras
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <button
-                                disabled={currentPage === 1}
-                                onClick={() => setCurrentPage(prev => prev - 1)}
-                                className="size-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-blue-600 disabled:opacity-30 disabled:hover:text-slate-400 transition-all font-black"
-                            >
-                                <span className="material-symbols-outlined">chevron_left</span>
-                            </button>
-                            <div className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black text-slate-900 uppercase tracking-widest">
-                                Página {currentPage} de {Math.ceil(totalCount / ITEMS_PER_PAGE)}
-                            </div>
-                            <button
-                                disabled={currentPage * ITEMS_PER_PAGE >= totalCount}
-                                onClick={() => setCurrentPage(prev => prev + 1)}
-                                className="size-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-blue-600 disabled:opacity-30 disabled:hover:text-slate-400 transition-all font-black"
-                            >
-                                <span className="material-symbols-outlined">chevron_right</span>
-                            </button>
-                        </div>
+                {/* Pagination Controls */}
+                {apostilas.length < totalCount && (
+                    <div className="flex justify-center px-10 py-6 bg-slate-50 border-t border-slate-100">
+                        <button
+                            onClick={() => setCurrentPage(prev => prev + 1)}
+                            disabled={loading}
+                            className="flex items-center gap-3 px-8 py-4 bg-white border border-slate-200 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:border-blue-500 hover:text-blue-600 shadow-sm transition-all active:scale-95 disabled:opacity-50"
+                        >
+                            {loading ? (
+                                <>
+                                    <span className="material-symbols-outlined animate-spin">refresh</span>
+                                    Carregando...
+                                </>
+                            ) : (
+                                <>
+                                    <span className="material-symbols-outlined">add_circle</span>
+                                    Carregar Mais ({totalCount - apostilas.length} restantes)
+                                </>
+                            )}
+                        </button>
                     </div>
                 )}
             </div>
