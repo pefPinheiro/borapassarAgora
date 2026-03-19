@@ -50,6 +50,14 @@ export interface Assunto {
   created_at: string;
 }
 
+export interface Subassunto {
+  id: string;
+  name: string;
+  assunto_id: string;
+  status: 'Ativo' | 'Inativo';
+  created_at?: string;
+}
+
 export interface Alternativa {
   id: string;
   texto: string;
