@@ -47,6 +47,8 @@ const ApostilasAdmin: React.FC = () => {
     const [bancas, setBancas] = useState<Banca[]>([]);
     const [disciplinas, setDisciplinas] = useState<Disciplina[]>([]);
     const [assuntos, setAssuntos] = useState<Assunto[]>([]);
+    const [subassuntos, setSubassuntos] = useState<any[]>([]);
+    const [subsubassuntos, setSubsubassuntos] = useState<any[]>([]);
     const [admins, setAdmins] = useState<Profile[]>([]);
 
     // Filters
@@ -73,7 +75,9 @@ const ApostilasAdmin: React.FC = () => {
             disciplina_id: '',
             assunto_id: '',
             modalidade: '',
-            ano: ''
+            ano: '',
+            subassuntos_ids: [],
+            subsubassuntos_ids: []
         },
         commission_valid_until: ''
     });
@@ -188,15 +192,19 @@ const ApostilasAdmin: React.FC = () => {
 
     const fetchAuxData = async () => {
         try {
-            const [bRes, dRes, aRes, admRes] = await Promise.all([
+            const [bRes, dRes, aRes, subRes, subsubRes, admRes] = await Promise.all([
                 supabase.from('bancas').select('id, name').order('name'),
                 supabase.from('disciplinas').select('*').order('name'),
                 supabase.from('assuntos').select('*').order('name'),
+                supabase.from('subassuntos').select('id, name, assunto_id').order('name'),
+                supabase.from('subsubassuntos').select('id, name, subassunto_id').order('name'),
                 supabase.from('profiles').select('*').in('role', ['admin', 'super']).order('full_name'),
             ]);
             if (bRes.data) setBancas(bRes.data);
             if (dRes.data) setDisciplinas(dRes.data);
             if (aRes.data) setAssuntos(aRes.data);
+            if (subRes.data) setSubassuntos(subRes.data);
+            if (subsubRes.data) setSubsubassuntos(subsubRes.data);
             if (admRes.data) setAdmins(admRes.data);
 
             // Busca inicial de questões (vazias ou recentes)
@@ -257,7 +265,9 @@ const ApostilasAdmin: React.FC = () => {
                     disciplina_id: '',
                     assunto_id: '',
                     modalidade: '',
-                    ano: ''
+                    ano: '',
+                    subassuntos_ids: apostila.filters?.subassuntos_ids || [],
+                    subsubassuntos_ids: apostila.filters?.subsubassuntos_ids || []
                 },
                 commission_valid_until: apostila.commission_valid_until || ''
             });
@@ -279,7 +289,9 @@ const ApostilasAdmin: React.FC = () => {
                     disciplina_id: '',
                     assunto_id: '',
                     modalidade: '',
-                    ano: ''
+                    ano: '',
+                    subassuntos_ids: [],
+                    subsubassuntos_ids: []
                 },
                 commission_valid_until: ''
             });
@@ -974,13 +986,108 @@ const ApostilasAdmin: React.FC = () => {
                                     <select
                                         disabled={!formData.disciplina_id}
                                         value={formData.assunto_id || ''}
-                                        onChange={e => setFormData({ ...formData, assunto_id: e.target.value || null })}
+                                        onChange={e => setFormData({ ...formData, assunto_id: e.target.value || null, filters: { ...formData.filters, subassuntos_ids: [], subsubassuntos_ids: [] } })}
                                         className="w-full h-14 px-6 bg-white/5 border border-white/10 rounded-2xl outline-none font-black text-xs text-white disabled:opacity-20 transition-all"
                                     >
                                         <option value="" className="text-slate-900">Selecione o tópico...</option>
                                         {assuntos.filter(a => a.disciplina_id === formData.disciplina_id).map(a => <option key={a.id} value={a.id} className="text-slate-900">{a.name}</option>)}
                                     </select>
                                 </div>
+
+                                {formData.assunto_id && subassuntos.filter(s => s.assunto_id === formData.assunto_id).length > 0 && (
+                                    <div className="space-y-3 p-5 bg-white/5 border border-white/10 rounded-3xl max-h-64 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Árvore de Subtópicos</label>
+                                        <div className="space-y-3">
+                                            {subassuntos.filter(s => s.assunto_id === formData.assunto_id).map(sub => {
+                                                const subsubList = subsubassuntos.filter(ss => ss.subassunto_id === sub.id);
+                                                const isSubSelected = formData.filters?.subassuntos_ids?.includes(sub.id);
+                                                
+                                                return (
+                                                    <div key={sub.id} className="space-y-2">
+                                                        <label className="flex items-center gap-3 cursor-pointer group">
+                                                            <div className="relative flex items-center justify-center">
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    className="peer appearance-none size-5 rounded-md bg-white/10 border-2 border-white/20 checked:bg-blue-500 checked:border-blue-500 transition-all cursor-pointer"
+                                                                    checked={isSubSelected}
+                                                                    onChange={(e) => {
+                                                                        const checked = e.target.checked;
+                                                                        let newSubIds = [...(formData.filters?.subassuntos_ids || [])];
+                                                                        let newSubsubIds = [...(formData.filters?.subsubassuntos_ids || [])];
+                                                                        
+                                                                        if (checked) {
+                                                                            newSubIds.push(sub.id);
+                                                                            subsubList.forEach(ss => {
+                                                                                if (!newSubsubIds.includes(ss.id)) newSubsubIds.push(ss.id);
+                                                                            });
+                                                                        } else {
+                                                                            newSubIds = newSubIds.filter(id => id !== sub.id);
+                                                                            const idsToRemove = subsubList.map(ss => ss.id);
+                                                                            newSubsubIds = newSubsubIds.filter(id => !idsToRemove.includes(id));
+                                                                        }
+                                                                        
+                                                                        setFormData({
+                                                                            ...formData,
+                                                                            filters: {
+                                                                                ...formData.filters,
+                                                                                subassuntos_ids: newSubIds,
+                                                                                subsubassuntos_ids: newSubsubIds
+                                                                            }
+                                                                        });
+                                                                    }}
+                                                                />
+                                                                <span className="material-symbols-outlined text-[14px] text-white absolute inset-0 m-auto pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity">check</span>
+                                                            </div>
+                                                            <span className="text-xs font-bold text-slate-300 group-hover:text-white transition-colors">{sub.name}</span>
+                                                        </label>
+                                                        
+                                                        {subsubList.length > 0 && (
+                                                            <div className="pl-8 space-y-2 border-l border-white/10 ml-[9px]">
+                                                                {subsubList.map(ss => {
+                                                                    const isSsSelected = formData.filters?.subsubassuntos_ids?.includes(ss.id);
+                                                                    return (
+                                                                        <label key={ss.id} className="flex items-center gap-3 cursor-pointer group">
+                                                                            <div className="relative flex items-center justify-center">
+                                                                                <input 
+                                                                                    type="checkbox" 
+                                                                                    className="peer appearance-none size-4 rounded bg-white/5 border border-white/20 checked:bg-indigo-500 checked:border-indigo-500 transition-all cursor-pointer"
+                                                                                    checked={isSsSelected}
+                                                                                    onChange={(e) => {
+                                                                                        const checked = e.target.checked;
+                                                                                        let newSubsubIds = [...(formData.filters?.subsubassuntos_ids || [])];
+                                                                                        let newSubIds = [...(formData.filters?.subassuntos_ids || [])];
+                                                                                        
+                                                                                        if (checked) {
+                                                                                            newSubsubIds.push(ss.id);
+                                                                                            if (!newSubIds.includes(sub.id)) newSubIds.push(sub.id);
+                                                                                        } else {
+                                                                                            newSubsubIds = newSubsubIds.filter(id => id !== ss.id);
+                                                                                        }
+                                                                                        
+                                                                                        setFormData({
+                                                                                            ...formData,
+                                                                                            filters: {
+                                                                                                ...formData.filters,
+                                                                                                subassuntos_ids: newSubIds,
+                                                                                                subsubassuntos_ids: newSubsubIds
+                                                                                            }
+                                                                                        });
+                                                                                    }}
+                                                                                />
+                                                                                <span className="material-symbols-outlined text-[12px] text-white absolute inset-0 m-auto pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity">check</span>
+                                                                            </div>
+                                                                            <span className="text-[10px] font-medium text-slate-400 group-hover:text-indigo-300 transition-colors">{ss.name}</span>
+                                                                        </label>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {currentUser?.role === 'super' && (
                                     <div className="space-y-3 p-6 bg-blue-500/5 border border-blue-500/20 rounded-3xl">
