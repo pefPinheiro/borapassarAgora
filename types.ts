@@ -58,6 +58,14 @@ export interface Subassunto {
   created_at?: string;
 }
 
+export interface Subsubassunto {
+  id: string;
+  name: string;
+  subassunto_id: string;
+  status: 'Ativo' | 'Inativo';
+  created_at?: string;
+}
+
 export interface Alternativa {
   id: string;
   texto: string;

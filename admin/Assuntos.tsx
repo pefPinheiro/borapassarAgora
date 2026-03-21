@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Disciplina, Assunto, Subassunto } from '../types';
+import { Disciplina, Assunto, Subassunto, Subsubassunto } from '../types';
 
 interface AssuntoExtended extends Assunto {
     disciplina_name?: string;
@@ -27,6 +27,14 @@ const Assuntos: React.FC = () => {
     const [subassuntosLoading, setSubassuntosLoading] = useState(false);
     const [newSubassunto, setNewSubassunto] = useState({ name: '', status: 'Ativo' });
     const [editingSubassuntoId, setEditingSubassuntoId] = useState<string | null>(null);
+
+    // Subsubassuntos State
+    const [isSubsubassuntosModalOpen, setIsSubsubassuntosModalOpen] = useState(false);
+    const [selectedSubassuntoForSubsubassuntos, setSelectedSubassuntoForSubsubassuntos] = useState<Subassunto | null>(null);
+    const [subsubassuntosList, setSubsubassuntosList] = useState<Subsubassunto[]>([]);
+    const [subsubassuntosLoading, setSubsubassuntosLoading] = useState(false);
+    const [newSubsubassunto, setNewSubsubassunto] = useState({ name: '', status: 'Ativo' });
+    const [editingSubsubassuntoId, setEditingSubsubassuntoId] = useState<string | null>(null);
 
     // Filtros e Paginação
     const [searchQuery, setSearchQuery] = useState('');
@@ -236,6 +244,88 @@ const Assuntos: React.FC = () => {
     const cancelEditingSubassunto = () => {
         setEditingSubassuntoId(null);
         setNewSubassunto({ name: '', status: 'Ativo' });
+    };
+
+    const handleOpenSubsubassuntosModal = (subassunto: Subassunto) => {
+        setSelectedSubassuntoForSubsubassuntos(subassunto);
+        setIsSubsubassuntosModalOpen(true);
+        fetchSubsubassuntos(subassunto.id);
+    };
+
+    const handleCloseSubsubassuntosModal = () => {
+        setIsSubsubassuntosModalOpen(false);
+        setSelectedSubassuntoForSubsubassuntos(null);
+        setSubsubassuntosList([]);
+        setNewSubsubassunto({ name: '', status: 'Ativo' });
+        setEditingSubsubassuntoId(null);
+    };
+
+    const fetchSubsubassuntos = async (subassuntoId: string) => {
+        setSubsubassuntosLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('subsubassuntos')
+                .select('*')
+                .eq('subassunto_id', subassuntoId)
+                .order('name');
+            if (error) throw error;
+            setSubsubassuntosList(data || []);
+        } catch (error) {
+            console.error('Error fetching subsubassuntos:', error);
+            alert('Erro ao carregar subsubassuntos');
+        } finally {
+            setSubsubassuntosLoading(false);
+        }
+    };
+
+    const handleSaveSubsubassunto = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (!selectedSubassuntoForSubsubassuntos || !newSubsubassunto.name.trim()) return;
+
+        try {
+            const payload: any = {
+                name: newSubsubassunto.name,
+                subassunto_id: selectedSubassuntoForSubsubassuntos.id,
+                status: newSubsubassunto.status,
+            };
+            if (editingSubsubassuntoId) {
+                payload.id = editingSubsubassuntoId;
+            }
+            
+            const { error } = await supabase.from('subsubassuntos').upsert(payload);
+            if (error) throw error;
+            
+            setNewSubsubassunto({ name: '', status: 'Ativo' });
+            setEditingSubsubassuntoId(null);
+            fetchSubsubassuntos(selectedSubassuntoForSubsubassuntos.id);
+        } catch (error) {
+            console.error('Error saving subsubassunto:', error);
+            alert('Erro ao salvar subsubassunto');
+        }
+    };
+
+    const handleDeleteSubsubassunto = async (id: string) => {
+        if (!selectedSubassuntoForSubsubassuntos) return;
+        if (window.confirm('Deseja realmente excluir este subsubassunto?')) {
+            try {
+                const { error } = await supabase.from('subsubassuntos').delete().eq('id', id);
+                if (error) throw error;
+                fetchSubsubassuntos(selectedSubassuntoForSubsubassuntos.id);
+            } catch (error) {
+                console.error('Error deleting subsubassunto:', error);
+                alert('Erro ao excluir subsubassunto');
+            }
+        }
+    };
+
+    const startEditingSubsubassunto = (subsub: Subsubassunto) => {
+        setEditingSubsubassuntoId(subsub.id);
+        setNewSubsubassunto({ name: subsub.name, status: subsub.status });
+    };
+
+    const cancelEditingSubsubassunto = () => {
+        setEditingSubsubassuntoId(null);
+        setNewSubsubassunto({ name: '', status: 'Ativo' });
     };
 
     return (
@@ -566,6 +656,13 @@ const Assuntos: React.FC = () => {
                                                 </div>
                                                 <div className="flex items-center gap-1 transition-opacity">
                                                     <button
+                                                        onClick={() => handleOpenSubsubassuntosModal(sub)}
+                                                        className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-all"
+                                                        title="Gerenciar Subsubassuntos"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[18px]">account_tree</span>
+                                                    </button>
+                                                    <button
                                                         onClick={() => startEditingSubassunto(sub)}
                                                         className="p-2 text-slate-400 hover:text-[#137fec] hover:bg-blue-50 rounded-lg transition-all"
                                                         title="Editar"
@@ -574,6 +671,116 @@ const Assuntos: React.FC = () => {
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteSubassunto(sub.id)}
+                                                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                        title="Excluir"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                    </button>
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Subsubassuntos Modal */}
+            {isSubsubassuntosModalOpen && selectedSubassuntoForSubsubassuntos && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={handleCloseSubsubassuntosModal}></div>
+                    <div className="relative bg-white w-full max-w-2xl max-h-[90vh] flex flex-col rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-[#f8fafc] shrink-0">
+                            <div>
+                                <h3 className="text-xl font-black text-[#111418]">Subsubassuntos</h3>
+                                <p className="text-sm text-slate-500 font-medium">Pertencentes a <strong className="text-slate-700">{selectedSubassuntoForSubsubassuntos.name}</strong></p>
+                            </div>
+                            <button onClick={handleCloseSubsubassuntosModal} className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-full">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                        
+                        <div className="p-8 overflow-y-auto flex-1 bg-slate-50/50">
+                            {/* Formulário Subsubassunto */}
+                            <form onSubmit={handleSaveSubsubassunto} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-6">
+                                <h4 className="text-sm font-black text-slate-800 mb-4 uppercase tracking-wider">
+                                    {editingSubsubassuntoId ? 'Editar Subsubassunto' : 'Novo Subsubassunto'}
+                                </h4>
+                                <div className="flex flex-col md:flex-row gap-4 items-end">
+                                    <div className="flex-1 space-y-2 w-full">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Nome do Subsubassunto</label>
+                                        <input
+                                            required
+                                            type="text"
+                                            value={newSubsubassunto.name}
+                                            onChange={e => setNewSubsubassunto({ ...newSubsubassunto, name: e.target.value })}
+                                            placeholder="Ex: Artigo 5º"
+                                            className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#137fec]/20 focus:border-[#137fec] outline-none transition-all font-medium text-sm"
+                                        />
+                                    </div>
+                                    <div className="w-full md:w-36 space-y-2 shrink-0">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Status</label>
+                                        <select
+                                            value={newSubsubassunto.status}
+                                            onChange={e => setNewSubsubassunto({ ...newSubsubassunto, status: e.target.value })}
+                                            className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#137fec]/20 focus:border-[#137fec] outline-none transition-all font-bold text-slate-700 text-sm"
+                                        >
+                                            <option value="Ativo">🟢 Ativo</option>
+                                            <option value="Inativo">⚪ Inativo</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex gap-2 w-full md:w-auto shrink-0 mt-4 md:mt-0">
+                                        {editingSubsubassuntoId && (
+                                            <button 
+                                                type="button" 
+                                                onClick={cancelEditingSubsubassunto}
+                                                className="h-11 px-4 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                                            >
+                                                Cancelar
+                                            </button>
+                                        )}
+                                        <button 
+                                            type="submit" 
+                                            disabled={!newSubsubassunto.name.trim()}
+                                            className="h-11 px-6 bg-[#137fec] text-white font-black rounded-xl hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                                        >
+                                            {editingSubsubassuntoId ? 'Atualizar' : 'Adicionar'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+
+                            {/* Lista de Subsubassuntos */}
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                {subsubassuntosLoading ? (
+                                    <div className="p-8 text-center text-slate-500 font-medium italic">Carregando subsubassuntos...</div>
+                                ) : subsubassuntosList.length === 0 ? (
+                                    <div className="p-8 text-center text-slate-400 font-medium italic">Nenhum subsubassunto cadastrado.</div>
+                                ) : (
+                                    <ul className="divide-y divide-slate-100">
+                                        {subsubassuntosList.map(subsub => (
+                                            <li key={subsub.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold text-slate-800 text-sm">{subsub.name}</span>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${subsub.status === 'Ativo' ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
+                                                            <div className={`size-1.5 rounded-full ${subsub.status === 'Ativo' ? 'bg-green-500' : 'bg-slate-400'}`}></div>
+                                                            <span className={subsub.status === 'Ativo' ? 'text-green-600' : 'text-slate-500'}>{subsub.status}</span>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1 transition-opacity">
+                                                    <button
+                                                        onClick={() => startEditingSubsubassunto(subsub)}
+                                                        className="p-2 text-slate-400 hover:text-[#137fec] hover:bg-blue-50 rounded-lg transition-all"
+                                                        title="Editar"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[18px]">edit</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteSubsubassunto(subsub.id)}
                                                         className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                                         title="Excluir"
                                                     >
