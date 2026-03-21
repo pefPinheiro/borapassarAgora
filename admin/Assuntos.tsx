@@ -6,6 +6,11 @@ import { Disciplina, Assunto, Subassunto, Subsubassunto } from '../types';
 interface AssuntoExtended extends Assunto {
     disciplina_name?: string;
     quantidade_questoes?: number;
+    quantidade_subassuntos?: number;
+}
+
+interface SubassuntoExtended extends Subassunto {
+    quantidade_subsubassuntos?: number;
 }
 
 const Assuntos: React.FC = () => {
@@ -23,7 +28,7 @@ const Assuntos: React.FC = () => {
     // Subassuntos State
     const [isSubassuntosModalOpen, setIsSubassuntosModalOpen] = useState(false);
     const [selectedAssuntoForSubassuntos, setSelectedAssuntoForSubassuntos] = useState<Assunto | null>(null);
-    const [subassuntosList, setSubassuntosList] = useState<Subassunto[]>([]);
+    const [subassuntosList, setSubassuntosList] = useState<SubassuntoExtended[]>([]);
     const [subassuntosLoading, setSubassuntosLoading] = useState(false);
     const [newSubassunto, setNewSubassunto] = useState({ name: '', status: 'Ativo' });
     const [editingSubassuntoId, setEditingSubassuntoId] = useState<string | null>(null);
@@ -71,7 +76,7 @@ const Assuntos: React.FC = () => {
         try {
             let query = supabase
                 .from('assuntos')
-                .select('*, disciplinas(name)', { count: 'exact' });
+                .select('*, disciplinas(name), subassuntos(count)', { count: 'exact' });
 
             if (searchQuery) {
                 query = query.ilike('name', `%${searchQuery}%`);
@@ -92,7 +97,8 @@ const Assuntos: React.FC = () => {
             setAssuntos(data.map(a => ({
                 ...a,
                 disciplina_name: (a.disciplinas as any)?.name || 'N/A',
-                quantidade_questoes: 0
+                quantidade_questoes: 0,
+                quantidade_subassuntos: (a.subassuntos as any)?.[0]?.count || 0
             })));
             setTotalCount(count || 0);
         } catch (error) {
@@ -183,11 +189,14 @@ const Assuntos: React.FC = () => {
         try {
             const { data, error } = await supabase
                 .from('subassuntos')
-                .select('*')
+                .select('*, subsubassuntos(count)')
                 .eq('assunto_id', assuntoId)
                 .order('name');
             if (error) throw error;
-            setSubassuntosList(data || []);
+            setSubassuntosList(data?.map((s: any) => ({
+                ...s,
+                quantidade_subsubassuntos: s.subsubassuntos?.[0]?.count || 0
+            })) || []);
         } catch (error) {
             console.error('Error fetching subassuntos:', error);
             alert('Erro ao carregar subassuntos');
@@ -383,6 +392,7 @@ const Assuntos: React.FC = () => {
                                 <tr className="bg-[#f8fafc] text-[#64748b] text-[10px] font-black uppercase tracking-widest border-b border-[#f1f5f9]">
                                     <th className="px-8 py-5">Assunto / Tópico</th>
                                     <th className="px-8 py-5">Disciplina</th>
+                                    <th className="px-8 py-5 text-center">Subtópicos</th>
                                     <th className="px-8 py-5 text-center">Questões</th>
                                     <th className="px-8 py-5 text-center">Status</th>
                                     <th className="px-8 py-5 text-right">Ações</th>
@@ -405,6 +415,10 @@ const Assuntos: React.FC = () => {
                                                 <span className="px-3 py-1.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded-lg uppercase">
                                                     {assunto.disciplina_name}
                                                 </span>
+                                            </td>
+                                            <td className="px-8 py-5 text-center">
+                                                <span className="text-sm font-black text-[#111418]">{assunto.quantidade_subassuntos}</span>
+                                                <p className="text-[9px] text-slate-400 font-bold uppercase">Cadastrados</p>
                                             </td>
                                             <td className="px-8 py-5 text-center">
                                                 <span className="text-sm font-black text-[#111418]">{assunto.quantidade_questoes}</span>
@@ -651,6 +665,10 @@ const Assuntos: React.FC = () => {
                                                         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${sub.status === 'Ativo' ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
                                                             <div className={`size-1.5 rounded-full ${sub.status === 'Ativo' ? 'bg-green-500' : 'bg-slate-400'}`}></div>
                                                             <span className={sub.status === 'Ativo' ? 'text-green-600' : 'text-slate-500'}>{sub.status}</span>
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                                            <span className="material-symbols-outlined text-[12px]">account_tree</span>
+                                                            {sub.quantidade_subsubassuntos} níveis
                                                         </span>
                                                     </div>
                                                 </div>
