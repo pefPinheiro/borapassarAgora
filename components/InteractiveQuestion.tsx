@@ -120,11 +120,15 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                                         {activeQuestion.assuntos.name}
                                     </span>
                                 )}
-                                {activeQuestion.bancas?.name && (
-                                    <span className="premium-tag-banca text-[9px] font-black uppercase tracking-[0.15em] px-2.5 py-1 rounded-sm shadow-sm border border-blue-100">
-                                        {activeQuestion.bancas.sigla || activeQuestion.bancas.name}
-                                    </span>
-                                )}
+                                {(() => {
+                                    const b = Array.isArray(activeQuestion.bancas) ? activeQuestion.bancas[0] : activeQuestion.bancas;
+                                    if (!b?.name) return null;
+                                    return (
+                                        <span className="premium-tag-banca text-[9px] font-bold uppercase tracking-[0.1em] px-2.5 py-1 rounded-sm shadow-sm border border-blue-100 bg-blue-50/50 text-blue-600">
+                                            {b.sigla ? `${b.sigla} - ${b.name}` : b.name}
+                                        </span>
+                                    );
+                                })()}
                                 {activeQuestion.ano && (
                                     <span className="premium-tag-ano text-[9px] font-black uppercase tracking-[0.15em] px-2.5 py-1 rounded-sm shadow-sm border border-slate-200">
                                         {activeQuestion.ano}

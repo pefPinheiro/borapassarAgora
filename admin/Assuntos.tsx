@@ -3,14 +3,16 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Disciplina, Assunto, Subassunto, Subsubassunto } from '../types';
 
+interface SubassuntoExtended extends Subassunto {
+    quantidade_subsubassuntos?: number;
+    subsubassuntos?: Subsubassunto[];
+}
+
 interface AssuntoExtended extends Assunto {
     disciplina_name?: string;
     quantidade_questoes?: number;
     quantidade_subassuntos?: number;
-}
-
-interface SubassuntoExtended extends Subassunto {
-    quantidade_subsubassuntos?: number;
+    subassuntos?: SubassuntoExtended[];
 }
 
 const Assuntos: React.FC = () => {
@@ -48,6 +50,18 @@ const Assuntos: React.FC = () => {
     const [totalCount, setTotalCount] = useState(0);
     const pageSize = 10;
 
+    // Tree state
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+    const toggleExpand = (id: string) => {
+        setExpandedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
     useEffect(() => {
         fetchDisciplinas();
     }, []);
@@ -74,33 +88,62 @@ const Assuntos: React.FC = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
+            // Se houver busca, trazemos tudo para filtrar localmente ou usamos uma busca no banco
+            // Para árvore, é melhor trazer a estrutura e filtrar localmente se não for um volume absurdo
             let query = supabase
                 .from('assuntos')
-                .select('*, disciplinas(name), subassuntos(count)', { count: 'exact' });
+                .select('*, disciplinas(name), subassuntos(*, subsubassuntos(*))', { count: 'exact' });
 
-            if (searchQuery) {
-                query = query.ilike('name', `%${searchQuery}%`);
-            }
             if (filterDisciplina) {
                 query = query.eq('disciplina_id', filterDisciplina);
             }
 
-            const from = (currentPage - 1) * pageSize;
-            const to = from + pageSize - 1;
+            // Se pesquisar, removemos a paginação para mostrar os resultados em árvore
+            if (!searchQuery) {
+                const from = (currentPage - 1) * pageSize;
+                const to = from + pageSize - 1;
+                query = query.range(from, to);
+            }
 
-            const { data, error, count } = await query
-                .order('name')
-                .range(from, to);
+            const { data, error, count } = await query.order('name');
 
             if (error) throw error;
 
-            setAssuntos(data.map(a => ({
+            const mappedData = data.map(a => ({
                 ...a,
                 disciplina_name: (a.disciplinas as any)?.name || 'N/A',
                 quantidade_questoes: 0,
-                quantidade_subassuntos: (a.subassuntos as any)?.[0]?.count || 0
-            })));
+                quantidade_subassuntos: a.subassuntos?.length || 0,
+                subassuntos: a.subassuntos?.map((s: any) => ({
+                    ...s,
+                    quantidade_subsubassuntos: s.subsubassuntos?.length || 0
+                })) || []
+            }));
+
+            setAssuntos(mappedData);
             setTotalCount(count || 0);
+
+            // Auto-expandir se houver pesquisa
+            if (searchQuery) {
+                const newExpanded = new Set<string>();
+                const checkNode = (nodes: any[], parentIds: string[]) => {
+                    nodes.forEach(node => {
+                        const nameMatches = node.name.toLowerCase().includes(searchQuery.toLowerCase());
+                        const children = node.subassuntos || node.subsubassuntos || [];
+                        const childHasMatch = children.some((c: any) => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || (c.subsubassuntos?.some((ss: any) => ss.name.toLowerCase().includes(searchQuery.toLowerCase()))));
+                        
+                        if (nameMatches || childHasMatch) {
+                            parentIds.forEach(id => newExpanded.add(id));
+                        }
+                        if (children.length > 0) {
+                            checkNode(children, [...parentIds, node.id]);
+                        }
+                    });
+                };
+                checkNode(mappedData, []);
+                setExpandedIds(newExpanded);
+            }
+
         } catch (error) {
             console.error('Error fetching data:', error);
             alert('Erro ao carregar dados');
@@ -224,7 +267,8 @@ const Assuntos: React.FC = () => {
             
             setNewSubassunto({ name: '', status: 'Ativo' });
             setEditingSubassuntoId(null);
-            fetchSubassuntos(selectedAssuntoForSubassuntos.id);
+            if (selectedAssuntoForSubassuntos) fetchSubassuntos(selectedAssuntoForSubassuntos.id);
+            fetchData();
         } catch (error) {
             console.error('Error saving subassunto:', error);
             alert('Erro ao salvar subassunto');
@@ -237,7 +281,8 @@ const Assuntos: React.FC = () => {
             try {
                 const { error } = await supabase.from('subassuntos').delete().eq('id', id);
                 if (error) throw error;
-                fetchSubassuntos(selectedAssuntoForSubassuntos.id);
+                if (selectedAssuntoForSubassuntos) fetchSubassuntos(selectedAssuntoForSubassuntos.id);
+                fetchData();
             } catch (error) {
                 console.error('Error deleting subassunto:', error);
                 alert('Erro ao excluir subassunto');
@@ -306,7 +351,8 @@ const Assuntos: React.FC = () => {
             
             setNewSubsubassunto({ name: '', status: 'Ativo' });
             setEditingSubsubassuntoId(null);
-            fetchSubsubassuntos(selectedSubassuntoForSubsubassuntos.id);
+            if (selectedSubassuntoForSubsubassuntos) fetchSubsubassuntos(selectedSubassuntoForSubsubassuntos.id);
+            fetchData();
         } catch (error) {
             console.error('Error saving subsubassunto:', error);
             alert('Erro ao salvar subsubassunto');
@@ -319,7 +365,8 @@ const Assuntos: React.FC = () => {
             try {
                 const { error } = await supabase.from('subsubassuntos').delete().eq('id', id);
                 if (error) throw error;
-                fetchSubsubassuntos(selectedSubassuntoForSubsubassuntos.id);
+                if (selectedSubassuntoForSubsubassuntos) fetchSubsubassuntos(selectedSubassuntoForSubsubassuntos.id);
+                fetchData();
             } catch (error) {
                 console.error('Error deleting subsubassunto:', error);
                 alert('Erro ao excluir subsubassunto');
@@ -337,6 +384,47 @@ const Assuntos: React.FC = () => {
         setNewSubsubassunto({ name: '', status: 'Ativo' });
     };
 
+    const handleExportText = () => {
+        if (assuntos.length === 0) {
+            alert('Não há dados para exportar.');
+            return;
+        }
+
+        let text = `LISTA DE ASSUNTOS - BORA PASSAR AGORA\n`;
+        text += `Data: ${new Date().toLocaleDateString()}\n`;
+        
+        if (filterDisciplina) {
+            const disc = disciplinas.find(d => d.id === filterDisciplina);
+            text += `Disciplina: ${disc?.name || 'N/A'}\n`;
+        }
+        text += `-------------------------------------------\n\n`;
+
+        const formatNode = (nodes: any[], level = 0): string => {
+            return nodes.map(node => {
+                const indent = '    '.repeat(level);
+                const children = node.subassuntos || node.subsubassuntos || [];
+                let nodeText = `${indent}${level === 0 ? '' : '↳ '}${node.name}\n`;
+                if (children.length > 0) {
+                    nodeText += formatNode(children, level + 1);
+                }
+                return nodeText;
+            }).join('');
+        };
+
+        text += formatNode(assuntos);
+
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const discName = filterDisciplina ? disciplinas.find(d => d.id === filterDisciplina)?.name?.replace(/\s+/g, '_') : 'Geral';
+        link.download = `Assuntos_${discName}_${new Date().toISOString().split('T')[0]}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
     return (
         <div className="flex flex-col gap-8 pb-10 animate-in fade-in duration-500">
             {/* Header */}
@@ -345,13 +433,22 @@ const Assuntos: React.FC = () => {
                     <h2 className="text-[#111418] text-3xl font-black tracking-tight">Assuntos</h2>
                     <p className="text-[#617589] font-medium">Gerencie os tópicos específicos de cada disciplina.</p>
                 </div>
-                <button
-                    onClick={() => handleOpenModal()}
-                    className="flex items-center gap-2 px-6 py-3 bg-[#137fec] text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-600 transition-all active:scale-95"
-                >
-                    <span className="material-symbols-outlined">add</span>
-                    Novo Assunto
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={handleExportText}
+                        className="flex items-center gap-2 px-5 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-all active:scale-95"
+                    >
+                        <span className="material-symbols-outlined">download</span>
+                        Exportar TXT
+                    </button>
+                    <button
+                        onClick={() => handleOpenModal()}
+                        className="flex items-center gap-2 px-6 py-3 bg-[#137fec] text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-600 transition-all active:scale-95"
+                    >
+                        <span className="material-symbols-outlined">add</span>
+                        Novo Assunto
+                    </button>
+                </div>
             </div>
 
             {/* Filtros */}
@@ -390,7 +487,7 @@ const Assuntos: React.FC = () => {
                         <table className="w-full text-left">
                             <thead>
                                 <tr className="bg-[#f8fafc] text-[#64748b] text-[10px] font-black uppercase tracking-widest border-b border-[#f1f5f9]">
-                                    <th className="px-8 py-5">Assunto / Tópico</th>
+                                    <th className="px-8 py-5">Hierarquia do Assunto / Tópico</th>
                                     <th className="px-8 py-5">Disciplina</th>
                                     <th className="px-8 py-5 text-center">Subtópicos</th>
                                     <th className="px-8 py-5 text-center">Questões</th>
@@ -401,63 +498,155 @@ const Assuntos: React.FC = () => {
                             <tbody className="divide-y divide-[#f1f5f9]">
                                 {assuntos.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-8 py-10 text-center text-slate-400 font-medium italic">
+                                        <td colSpan={6} className="px-8 py-10 text-center text-slate-400 font-medium italic">
                                             Nenhum assunto encontrado.
                                         </td>
                                     </tr>
                                 ) : (
-                                    assuntos.map((assunto) => (
-                                        <tr key={assunto.id} className="hover:bg-[#f8fafc] transition-colors group">
-                                            <td className="px-8 py-5 font-black text-[#111418] text-sm">
-                                                {assunto.name}
-                                            </td>
-                                            <td className="px-8 py-5">
-                                                <span className="px-3 py-1.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded-lg uppercase">
-                                                    {assunto.disciplina_name}
-                                                </span>
-                                            </td>
-                                            <td className="px-8 py-5 text-center">
-                                                <span className="text-sm font-black text-[#111418]">{assunto.quantidade_subassuntos}</span>
-                                                <p className="text-[9px] text-slate-400 font-bold uppercase">Cadastrados</p>
-                                            </td>
-                                            <td className="px-8 py-5 text-center">
-                                                <span className="text-sm font-black text-[#111418]">{assunto.quantidade_questoes}</span>
-                                                <p className="text-[9px] text-slate-400 font-bold uppercase">Cadastradas</p>
-                                            </td>
-                                            <td className="px-8 py-5 text-center">
-                                                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider ${assunto.status === 'Ativo' ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'
-                                                    }`}>
-                                                    <div className={`size-1.5 rounded-full ${assunto.status === 'Ativo' ? 'bg-green-500' : 'bg-slate-400'}`}></div>
-                                                    {assunto.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-8 py-5">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <button
-                                                        onClick={() => handleOpenSubassuntosModal(assunto)}
-                                                        className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-all"
-                                                        title="Gerenciar Subassuntos"
-                                                    >
-                                                        <span className="material-symbols-outlined text-[20px]">account_tree</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleOpenModal(assunto)}
-                                                        className="p-2 text-slate-400 hover:text-[#137fec] hover:bg-blue-50 rounded-lg transition-all"
-                                                        title="Editar"
-                                                    >
-                                                        <span className="material-symbols-outlined text-[20px]">edit</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(assunto.id)}
-                                                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                                        title="Excluir"
-                                                    >
-                                                        <span className="material-symbols-outlined text-[20px]">delete</span>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
+                                    (() => {
+                                        const filterNodes = (nodes: any[], query: string): any[] => {
+                                            if (!query) return nodes;
+                                            return nodes.filter(node => {
+                                                const matchesSelf = node.name.toLowerCase().includes(query.toLowerCase());
+                                                const children = node.subassuntos || node.subsubassuntos || [];
+                                                const filteredChildren = filterNodes(children, query);
+                                                return matchesSelf || filteredChildren.length > 0;
+                                            });
+                                        };
+
+                                        const visibleAssuntos = filterNodes(assuntos, searchQuery);
+
+                                        const renderRows = (nodes: any[], level = 0, parentNode?: any): React.ReactElement[] => {
+                                            return nodes.flatMap((node) => {
+                                                const isExpanded = expandedIds.has(node.id);
+                                                const children = node.subassuntos || node.subsubassuntos || [];
+                                                const hasChildren = children.length > 0;
+                                                const type = level === 0 ? 'assunto' : (level === 1 ? 'subassunto' : 'subsubassunto');
+                                                
+                                                const typeIcon = type === 'assunto' ? 'folder' : (type === 'subassunto' ? 'folder_open' : 'description');
+                                                const typeColor = type === 'assunto' ? 'text-blue-500' : (type === 'subassunto' ? 'text-indigo-400' : 'text-slate-400');
+
+                                                const content = [
+                                                    <tr key={node.id} className={`hover:bg-[#f8fafc] transition-colors group ${level > 0 ? 'bg-slate-50/30' : ''}`}>
+                                                        <td className="px-8 py-4 font-black text-[#111418] text-sm">
+                                                            <div className="flex items-center gap-2" style={{ paddingLeft: `${level * 24}px` }}>
+                                                                {hasChildren ? (
+                                                                    <button 
+                                                                        onClick={(e) => { e.stopPropagation(); toggleExpand(node.id); }}
+                                                                        className="size-6 flex items-center justify-center rounded-md hover:bg-slate-200 transition-colors"
+                                                                    >
+                                                                        <span className="material-symbols-outlined text-[18px]">
+                                                                            {isExpanded ? 'expand_more' : 'chevron_right'}
+                                                                        </span>
+                                                                    </button>
+                                                                ) : (
+                                                                    <div className="size-6" />
+                                                                )}
+                                                                <span className={`material-symbols-outlined text-[18px] ${typeColor}`}>
+                                                                    {typeIcon}
+                                                                </span>
+                                                                <span className={level > 0 ? 'font-bold text-slate-700' : ''}>
+                                                                    {node.name}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-8 py-4">
+                                                            {level === 0 ? (
+                                                                <span className="px-3 py-1.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded-lg uppercase">
+                                                                    {node.disciplina_name}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] text-slate-400 italic">Sub-item</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-8 py-4 text-center">
+                                                            {hasChildren ? (
+                                                                <>
+                                                                    <span className="text-sm font-black text-[#111418]">{children.length}</span>
+                                                                    <p className="text-[9px] text-slate-400 font-bold uppercase">Nível {level + 1}</p>
+                                                                </>
+                                                            ) : (
+                                                                <span className="text-[10px] text-slate-300">Folha</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-8 py-4 text-center">
+                                                            <span className="text-sm font-black text-[#111418]">{node.quantidade_questoes || 0}</span>
+                                                            <p className="text-[9px] text-slate-400 font-bold uppercase">Questões</p>
+                                                        </td>
+                                                        <td className="px-8 py-4 text-center">
+                                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider ${node.status === 'Ativo' ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'
+                                                                }`}>
+                                                                <div className={`size-1.5 rounded-full ${node.status === 'Ativo' ? 'bg-green-500' : 'bg-slate-400'}`}></div>
+                                                                {node.status || 'Ativo'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-8 py-4">
+                                                            <div className="flex items-center justify-end gap-1">
+                                                                {type === 'assunto' && (
+                                                                    <button
+                                                                        onClick={() => handleOpenSubassuntosModal(node)}
+                                                                        className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-all"
+                                                                        title="Gerenciar Subassuntos"
+                                                                    >
+                                                                        <span className="material-symbols-outlined text-[20px]">account_tree</span>
+                                                                    </button>
+                                                                )}
+                                                                {type === 'subassunto' && (
+                                                                    <button
+                                                                        onClick={() => handleOpenSubsubassuntosModal(node)}
+                                                                        className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-all"
+                                                                        title="Gerenciar Subsubassuntos"
+                                                                    >
+                                                                        <span className="material-symbols-outlined text-[20px]">account_tree</span>
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (type === 'assunto') handleOpenModal(node);
+                                                                        else if (type === 'subassunto') {
+                                                                            handleOpenSubassuntosModal(parentNode);
+                                                                            startEditingSubassunto(node);
+                                                                        } else {
+                                                                            handleOpenSubsubassuntosModal(parentNode);
+                                                                            startEditingSubsubassunto(node);
+                                                                        }
+                                                                    }}
+                                                                    className="p-2 text-slate-400 hover:text-[#137fec] hover:bg-blue-50 rounded-lg transition-all"
+                                                                    title="Editar"
+                                                                >
+                                                                    <span className="material-symbols-outlined text-[20px]">edit</span>
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (type === 'assunto') handleDelete(node.id);
+                                                                        else if (type === 'subassunto') {
+                                                                            setSelectedAssuntoForSubassuntos(parentNode);
+                                                                            handleDeleteSubassunto(node.id);
+                                                                        } else {
+                                                                            setSelectedSubassuntoForSubsubassuntos(parentNode);
+                                                                            handleDeleteSubsubassunto(node.id);
+                                                                        }
+                                                                    }}
+                                                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                                    title="Excluir"
+                                                                >
+                                                                    <span className="material-symbols-outlined text-[20px]">delete</span>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ];
+
+                                                if (isExpanded && hasChildren) {
+                                                    content.push(...renderRows(children, level + 1, node));
+                                                }
+
+                                                return content;
+                                            });
+                                        };
+
+                                        return renderRows(visibleAssuntos);
+                                    })()
                                 )}
                             </tbody>
                         </table>

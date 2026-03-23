@@ -96,6 +96,8 @@ export interface Questao {
   resposta_professor?: string;
   disciplina_id: string;
   assunto_id: string;
+  subassunto_id?: string;
+  subsubassunto_id?: string;
   banca_id: string;
   ano: string;
   dificuldade: 'Fácil' | 'Médio' | 'Difícil';
@@ -107,7 +109,9 @@ export interface Questao {
   // Joins
   disciplinas?: { name: string };
   assuntos?: { name: string };
-  bancas?: { name: string };
+  subassuntos?: { name: string };
+  subsubassuntos?: { name: string };
+  bancas?: { name: string; sigla?: string };
   text_bases?: { content: string; title?: string };
   validator?: { full_name: string };
 }
@@ -120,7 +124,7 @@ export interface Simulado {
   status: 'Ativo' | 'Inativo';
   created_at: string;
   // Joins
-  bancas?: { name: string };
+  bancas?: { name: string; sigla?: string };
   questions_count?: number;
 }
 
