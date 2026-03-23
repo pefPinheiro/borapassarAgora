@@ -78,7 +78,7 @@ const QuestionsAdmin: React.FC = () => {
     ano: new Date().getFullYear().toString(),
     dificuldade: 'Médio',
     modalidade: 'Multipla Escolha (5)',
-    is_validada: false,
+    is_validada: true,
     validator_id: '',
     subassunto_id: '',
     subsubassunto_id: '',
@@ -244,7 +244,7 @@ const QuestionsAdmin: React.FC = () => {
       ano: new Date().getFullYear().toString(),
       dificuldade: 'Médio',
       modalidade: 'Multipla Escolha (5)',
-      is_validada: false,
+      is_validada: true,
       validator_id: '',
       subassunto_id: '',
       subsubassunto_id: '',
@@ -456,7 +456,7 @@ EXEMPLO DE ALTERNATIVAS:
                   texto: alt.texto || '',
                   isCorreta: !!alt.isCorreta
                 })),
-                is_validada: false,
+                is_validada: true,
                 validator_id: currentUser?.id || null
               });
             }
