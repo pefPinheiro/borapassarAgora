@@ -467,6 +467,14 @@ EXEMPLO DE ALTERNATIVAS:
             return;
           }
 
+          // Tela de confirmação antes de importar
+          const confirmed = window.confirm(`Deseja importar as ${processedQuestions.length} questões encontradas no arquivo?`);
+          if (!confirmed) {
+            if (fileInputImportRef.current) fileInputImportRef.current.value = '';
+            return;
+          }
+
+          setLoading(true);
           const { error } = await supabase.from('questions').insert(processedQuestions);
           if (error) throw error;
 
@@ -475,6 +483,9 @@ EXEMPLO DE ALTERNATIVAS:
         } catch (err) {
           console.error('Import Error:', err);
           alert('Erro ao processar arquivo JSON.');
+        } finally {
+          setLoading(false);
+          if (fileInputImportRef.current) fileInputImportRef.current.value = '';
         }
       };
       reader.readAsText(file);
