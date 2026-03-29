@@ -53,7 +53,7 @@ const QuestionsAdmin: React.FC = () => {
   // Paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const pageSize = 15;
+  const pageSize = 50;
 
   const [editingQuestao, setEditingQuestao] = useState<Questao | null>(null);
   const [saveAsShared, setSaveAsShared] = useState(false);
