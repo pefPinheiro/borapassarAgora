@@ -29,10 +29,21 @@ const CadernoView: React.FC = () => {
     const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
     const [showFeedback, setShowFeedback] = useState(false);
     const [direction, setDirection] = useState<'right' | 'left'>('right');
+    const [correctCount, setCorrectCount] = useState(0);
+    const [isFinished, setIsFinished] = useState(false);
 
     useEffect(() => {
         if (id) fetchNotebookData();
     }, [id]);
+
+    const shuffleArray = (array: any[]) => {
+        const newArray = [...array];
+        for (let i = newArray.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+        }
+        return newArray;
+    };
 
     const fetchNotebookData = async () => {
         setLoading(true);
@@ -53,7 +64,14 @@ const CadernoView: React.FC = () => {
                 .order('order_index', { ascending: true });
 
             if (qsError) throw qsError;
-            setQuestions(qs || []);
+            
+            // Shuffle options for each question
+            const shuffledQs = (qs || []).map(q => ({
+                ...q,
+                options: shuffleArray(q.options)
+            }));
+
+            setQuestions(shuffledQs);
 
         } catch (error) {
             console.error('Error:', error);
@@ -67,6 +85,11 @@ const CadernoView: React.FC = () => {
         if (showFeedback) return;
         setSelectedOptionIndex(idx);
         setShowFeedback(true);
+        
+        const currentQ = questions[currentIndex];
+        if (currentQ.options[idx] === currentQ.correct_answer) {
+            setCorrectCount(prev => prev + 1);
+        }
     };
 
     const handleNext = () => {
@@ -80,8 +103,7 @@ const CadernoView: React.FC = () => {
                 setLoading(false);
             }, 50);
         } else {
-            alert('Parabéns! Você finalizou este caderno.');
-            navigate(-1);
+            setIsFinished(true);
         }
     };
 
@@ -97,6 +119,78 @@ const CadernoView: React.FC = () => {
             <button onClick={() => navigate(-1)} className="text-[#137fec] hover:underline font-bold">Voltar</button>
         </div>
     );
+
+    if (isFinished) {
+        const total = questions.length;
+        const percent = (correctCount / total) * 100;
+        
+        let feedbackTitle = "";
+        let feedbackMessage = "";
+        let feedbackColor = "";
+
+        if (percent < 60) {
+            feedbackTitle = "(Ruim)";
+            feedbackMessage = "Recomenda-se ler ATENTAMENTE a apostila novamente.";
+            feedbackColor = "text-red-500";
+        } else if (percent <= 75) {
+            feedbackTitle = "(Bom)";
+            feedbackMessage = "Recomenda-se ler a apostila novamente.";
+            feedbackColor = "text-blue-500";
+        } else if (percent <= 90) {
+            feedbackTitle = "(Excelente)";
+            feedbackMessage = "Recomenda-se REVISAR a apostila novamente.";
+            feedbackColor = "text-emerald-500";
+        } else {
+            feedbackTitle = "(Excepcional)";
+            feedbackMessage = "Você demonstrou um domínio incrível! Pronto para o próximo desafio.";
+            feedbackColor = "text-purple-600";
+        }
+
+        return (
+            <div className="h-screen bg-[#f0f4f8] flex flex-col items-center justify-center p-4 md:p-8 font-sans overflow-hidden relative">
+                <div className="w-full max-w-lg bg-white rounded-[32px] shadow-2xl p-10 text-center animate-in zoom-in-95 duration-500">
+                    <div className="size-20 bg-blue-50 text-[#137fec] rounded-full flex items-center justify-center mx-auto mb-6">
+                        <span className="material-symbols-outlined text-4xl">emoji_events</span>
+                    </div>
+                    <h2 className="text-2xl font-black text-slate-800 mb-2">Caderno Finalizado!</h2>
+                    <p className="text-slate-500 mb-8 font-medium">Confira seu desempenho abaixo:</p>
+                    
+                    <div className="grid grid-cols-2 gap-4 mb-8">
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                            <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Acertos</span>
+                            <span className="text-2xl font-black text-emerald-500">{correctCount}</span>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                            <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Erros</span>
+                            <span className="text-2xl font-black text-red-400">{total - correctCount}</span>
+                        </div>
+                    </div>
+
+                    <div className="mb-8 pb-8 border-b border-slate-100">
+                        <div className="flex justify-between items-end mb-2">
+                            <span className="text-xs font-black text-slate-400 uppercase">Precisão</span>
+                            <span className="text-lg font-black text-slate-800">{percent.toFixed(0)}%</span>
+                        </div>
+                        <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full bg-[#137fec] transition-all duration-1000`} style={{ width: `${percent}%` }}></div>
+                        </div>
+                    </div>
+
+                    <div className="mb-10">
+                        <h3 className={`text-lg font-black mb-2 ${feedbackColor}`}>{feedbackTitle}</h3>
+                        <p className="text-sm font-bold text-slate-600 leading-relaxed italic">"{feedbackMessage}"</p>
+                    </div>
+
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="w-full py-4 bg-[#111418] text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl active:scale-95 transition-all"
+                    >
+                        Voltar para Cadernos
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     const currentQ = questions[currentIndex];
     const isCorrect = selectedOptionIndex !== null && currentQ.options[selectedOptionIndex] === currentQ.correct_answer;

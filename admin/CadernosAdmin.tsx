@@ -103,6 +103,9 @@ const CadernosAdmin: React.FC = () => {
     const [previewNotebook, setPreviewNotebook] = useState<Notebook | null>(null);
     const [previewQuestions, setPreviewQuestions] = useState<any[]>([]);
 
+    const [isEditing, setIsEditing] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
+
     useEffect(() => {
         fetchInitialData();
     }, []);
@@ -143,7 +146,40 @@ const CadernosAdmin: React.FC = () => {
         }
     };
 
-    // ... existing functions ...
+    const handleEdit = (notebook: Notebook) => {
+        setIsEditing(true);
+        setEditingId(notebook.id);
+        setTitle(notebook.title);
+        setDescription(notebook.description || '');
+        setSelectedDiscipline(notebook.discipline_id);
+        setSelectedSubject(notebook.subject_id);
+        setIsModalOpen(true);
+    };
+
+    const handleDelete = async (id: string, title: string) => {
+        if (!window.confirm(`Tem certeza que deseja excluir o caderno "${title}"? Esta ação não pode ser desfeita.`)) {
+            return;
+        }
+
+        try {
+            setLoading(true);
+            // Delete questions first (if no cascade)
+            await supabase.from('notebook_questions').delete().eq('notebook_id', id);
+            
+            // Delete notebook
+            const { error } = await supabase.from('notebooks').delete().eq('id', id);
+            
+            if (error) throw error;
+
+            alert('Caderno excluído com sucesso!');
+            fetchInitialData();
+        } catch (error: any) {
+            console.error('Error deleting notebook:', error);
+            alert('Erro ao excluir caderno: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleDownloadModel = () => {
         const model = [
@@ -173,71 +209,108 @@ const CadernosAdmin: React.FC = () => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            // 1. Read JSON
-            if (!jsonFile) { // Check file existence
-                alert('Selecione um arquivo JSON.');
-                setIsSubmitting(false);
-                return;
+            // 1. Read JSON (Only if creating new or if file is provided)
+            let formattedQuestions: any[] = [];
+            if (!isEditing || jsonFile) {
+                if (!jsonFile) {
+                    alert('Selecione um arquivo JSON para as questões.');
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                const text = await jsonFile.text();
+                let questions = [];
+                try {
+                    questions = JSON.parse(text);
+                } catch (err) {
+                    alert('Erro ao ler JSON. Verifique a formatação.');
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                if (!Array.isArray(questions) || questions.length === 0) {
+                    alert('O arquivo JSON deve conter uma lista de questões (array não vazio).');
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                // Validate basic structure of first item
+                if (!questions[0].text && !questions[0].question) {
+                    alert('Formato inválido. As questões devem ter o campo "text" ou "question".');
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                formattedQuestions = questions.map((q: any, i: number) => ({
+                    question_text: q.text || q.question || 'Questão sem texto',
+                    options: Array.isArray(q.options) ? q.options : [],
+                    correct_answer: q.answer || q.correct_answer || 'Sem gabarito',
+                    explanation: q.explanation || '',
+                    order_index: i + 1
+                }));
             }
 
-            const text = await jsonFile.text();
-            let questions = [];
-            try {
-                questions = JSON.parse(text);
-            } catch (err) {
-                alert('Erro ao ler JSON. Verifique a formatação.');
-                setIsSubmitting(false);
-                return;
+            if (isEditing && editingId) {
+                // Update Notebook
+                const { error: nbError } = await supabase
+                    .from('notebooks')
+                    .update({
+                        title,
+                        description,
+                        discipline_id: selectedDiscipline,
+                        subject_id: selectedSubject
+                    })
+                    .eq('id', editingId);
+
+                if (nbError) throw new Error('Erro ao atualizar caderno: ' + nbError.message);
+
+                // Update Questions if new file provided
+                if (jsonFile && formattedQuestions.length > 0) {
+                    // Delete old questions
+                    await supabase.from('notebook_questions').delete().eq('notebook_id', editingId);
+                    
+                    // Insert new questions
+                    const questionsToInsert = formattedQuestions.map(q => ({
+                        ...q,
+                        notebook_id: editingId
+                    }));
+                    const { error: qError } = await supabase.from('notebook_questions').insert(questionsToInsert);
+                    if (qError) throw new Error('Erro ao atualizar questões: ' + qError.message);
+                }
+
+                alert('Caderno atualizado com sucesso!');
+            } else {
+                // 2. Create Notebook
+                const { data: nb, error: nbError } = await supabase
+                    .from('notebooks')
+                    .insert({
+                        title,
+                        description,
+                        discipline_id: selectedDiscipline,
+                        subject_id: selectedSubject
+                    })
+                    .select()
+                    .single();
+
+                if (nbError) throw new Error('Erro ao criar caderno: ' + nbError.message);
+                if (!nb) throw new Error('Caderno criado mas nenhum dado retornado.');
+
+                // 3. Create Questions
+                const questionsToInsert = formattedQuestions.map(q => ({
+                    ...q,
+                    notebook_id: nb.id
+                }));
+
+                const { error: qError } = await supabase.from('notebook_questions').insert(questionsToInsert);
+
+                if (qError) {
+                    console.error('Erro ao salvar questões:', qError);
+                    await supabase.from('notebooks').delete().eq('id', nb.id);
+                    throw new Error('Erro ao salvar questões (Rollback executado): ' + qError.message);
+                }
+
+                alert(`Caderno criado com sucesso com ${formattedQuestions.length} questões!`);
             }
-
-            if (!Array.isArray(questions) || questions.length === 0) {
-                alert('O arquivo JSON deve conter uma lista de questões (array não vazio).');
-                setIsSubmitting(false);
-                return;
-            }
-
-            // Validate basic structure of first item
-            if (!questions[0].text && !questions[0].question) {
-                alert('Formato inválido. As questões devem ter o campo "text" ou "question".');
-                setIsSubmitting(false);
-                return;
-            }
-
-            // 2. Create Notebook
-            const { data: nb, error: nbError } = await supabase
-                .from('notebooks')
-                .insert({
-                    title,
-                    description,
-                    discipline_id: selectedDiscipline,
-                    subject_id: selectedSubject
-                })
-                .select()
-                .single();
-
-            if (nbError) throw new Error('Erro ao criar caderno: ' + nbError.message);
-            if (!nb) throw new Error('Caderno criado mas nenhum dado retornado.');
-
-            // 3. Create Questions
-            const formattedQuestions = questions.map((q: any, i: number) => ({
-                notebook_id: nb.id,
-                question_text: q.text || q.question || 'Questão sem texto',
-                options: Array.isArray(q.options) ? q.options : [], // Ensure array
-                correct_answer: q.answer || q.correct_answer || 'Sem gabarito',
-                explanation: q.explanation || '',
-                order_index: i + 1
-            }));
-
-            const { error: qError } = await supabase.from('notebook_questions').insert(formattedQuestions);
-
-            if (qError) {
-                // If questions fail, we might want to delete the notebook or warn the user.
-                console.error('Erro ao salvar questões:', qError);
-                await supabase.from('notebooks').delete().eq('id', nb.id); // Rollback
-                throw new Error('Erro ao salvar questões (Rollback executado): ' + qError.message + ' ' + qError.details);
-            }
-
-            alert(`Caderno criado com sucesso com ${formattedQuestions.length} questões!`);
             setIsModalOpen(false);
             resetForm();
             fetchInitialData();
@@ -255,6 +328,8 @@ const CadernosAdmin: React.FC = () => {
         setSelectedDiscipline('');
         setSelectedSubject('');
         setJsonFile(null);
+        setIsEditing(false);
+        setEditingId(null);
     };
 
 
@@ -283,7 +358,10 @@ const CadernosAdmin: React.FC = () => {
                         <span>Baixar Modelo</span>
                     </button>
                     <button
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={() => {
+                            resetForm();
+                            setIsModalOpen(true);
+                        }}
                         className="flex items-center gap-2 rounded-xl h-12 px-6 bg-[#137fec] text-white text-sm font-bold shadow-lg shadow-blue-100 hover:bg-blue-600 transition-all active:scale-95"
                     >
                         <span className="material-symbols-outlined">add</span>
@@ -332,7 +410,18 @@ const CadernosAdmin: React.FC = () => {
                                                 >
                                                     <span className="material-symbols-outlined">visibility</span>
                                                 </button>
-                                                <button className="text-slate-400 hover:text-red-500 transition-colors" title="Excluir">
+                                                <button
+                                                    onClick={() => handleEdit(nb)}
+                                                    className="text-slate-400 hover:text-blue-500 transition-colors"
+                                                    title="Editar"
+                                                >
+                                                    <span className="material-symbols-outlined">edit</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(nb.id, nb.title)}
+                                                    className="text-slate-400 hover:text-red-500 transition-colors"
+                                                    title="Excluir"
+                                                >
                                                     <span className="material-symbols-outlined">delete</span>
                                                 </button>
                                             </div>
@@ -351,7 +440,7 @@ const CadernosAdmin: React.FC = () => {
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
                     <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl p-8 animate-in zoom-in-95">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-black text-[#111418]">Novo Caderno</h3>
+                            <h3 className="text-xl font-black text-[#111418]">{isEditing ? 'Editar Caderno' : 'Novo Caderno'}</h3>
                             <button onClick={() => setIsModalOpen(false)}><span className="material-symbols-outlined text-slate-400">close</span></button>
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-5">
@@ -390,15 +479,15 @@ const CadernosAdmin: React.FC = () => {
                             <div className="space-y-2">
                                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">Arquivo JSON (Questões)</label>
                                 <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center hover:bg-slate-50 transition-colors cursor-pointer relative">
-                                    <input type="file" required accept=".json" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                                    <input type="file" required={!isEditing} accept=".json" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                                     <span className="material-symbols-outlined text-3xl text-slate-300 mb-2">upload_file</span>
-                                    <p className="text-sm font-bold text-slate-500">{jsonFile ? jsonFile.name : 'Clique para selecionar o JSON'}</p>
+                                    <p className="text-sm font-bold text-slate-500">{jsonFile ? jsonFile.name : (isEditing ? 'Clique para trocar o JSON (opcional)' : 'Clique para selecionar o JSON')}</p>
                                 </div>
                                 <p className="text-[10px] text-slate-400">O arquivo deve conter um array de objetos com: text, options, answer.</p>
                             </div>
 
                             <button type="submit" disabled={isSubmitting} className="w-full h-12 bg-[#137fec] text-white rounded-xl font-black shadow-lg shadow-blue-100 hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50">
-                                {isSubmitting ? 'Criando...' : 'Criar Caderno'}
+                                {isSubmitting ? (isEditing ? 'Salvando...' : 'Criando...') : (isEditing ? 'Salvar Alterações' : 'Criar Caderno')}
                             </button>
                         </form>
                     </div>
