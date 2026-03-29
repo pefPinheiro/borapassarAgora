@@ -34,6 +34,14 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
 
     const activeQuestion = propQuestion || localQuestion;
 
+    // Process custom BPA tags (specifically [--OBSERVE--] as requested)
+    const processContent = (text: string | null | undefined) => {
+        if (!text) return '';
+        return text.replace(/\[--OBSERVE--\]([\s\S]*?)\[\/--OBSERVE--\]/gi, (match, content) => {
+            return `<div class="custom-tag tag-observe"><div class="tag-icon-box"><span class="material-symbols-outlined">visibility</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Observe</strong></div><div class="tag-text">${content}</div></div></div>`;
+        });
+    };
+
     useEffect(() => {
         if (id && !propQuestion) {
             const fetchQuestion = async () => {
@@ -160,7 +168,7 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                 )}
 
                 {/* Enunciado */}
-                <div className="text-base md:text-lg font-bold text-slate-800 leading-relaxed mb-8 md:mb-10 premium-question-text break-words" dangerouslySetInnerHTML={{ __html: activeQuestion.enunciado }} />
+                <div className="text-base md:text-lg font-bold text-slate-800 leading-relaxed mb-8 md:mb-10 premium-question-text break-words" dangerouslySetInnerHTML={{ __html: processContent(activeQuestion.enunciado) }} />
 
                 {/* Alternativas */}
                 <div className="space-y-3 md:space-y-4">
@@ -213,7 +221,7 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                                 <p className="text-[10px] text-slate-400 font-bold m-0 uppercase mt-0.5">Análise do Especialista</p>
                             </div>
                         </div>
-                        <div className="text-[15px] text-slate-600 leading-relaxed bg-emerald-50/30 p-8 border-l-4 border-emerald-500 premium-question-text" dangerouslySetInnerHTML={{ __html: activeQuestion.resposta_professor }} />
+                        <div className="text-[15px] text-slate-600 leading-relaxed bg-emerald-50/30 p-8 border-l-4 border-emerald-500 premium-question-text" dangerouslySetInnerHTML={{ __html: processContent(activeQuestion.resposta_professor) }} />
                     </div>
                 )}
 
@@ -231,6 +239,13 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                     </div>
                 </div>
             </div>
+            <style>{`
+                .premium-question-wrapper .custom-tag { margin: 2rem 0; background: #fff; border: 1px solid rgba(0,0,0,0.03); display: flex; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.08); overflow: hidden; }
+                .premium-question-wrapper .tag-icon-box { min-width: 60px; display: flex; justify-content: center; align-items: center; background: linear-gradient(135deg, #22d3ee 0%, #0e7490 100%); color: white; }
+                .premium-question-wrapper .tag-content-wrapper { padding: 1.5rem; flex: 1; }
+                .premium-question-wrapper .tag-body strong { display: block; text-transform: uppercase; font-size: 0.8rem; margin-bottom: 0.5rem; color: #0e7490; }
+                .premium-question-wrapper .tag-observe { border-right: 4px solid #0891b2; }
+            `}</style>
         </div>
     );
 };

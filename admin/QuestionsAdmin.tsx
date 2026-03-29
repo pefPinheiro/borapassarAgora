@@ -63,6 +63,14 @@ const QuestionsAdmin: React.FC = () => {
   const [previewQuestion, setPreviewQuestion] = useState<Questao | null>(null);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkFormData, setBulkFormData] = useState({
+    disciplina_id: '',
+    assunto_id: '',
+    subassunto_id: '',
+    subsubassunto_id: '',
+    is_validada: undefined as boolean | undefined
+  });
 
   const fileInputImportRef = useRef<HTMLInputElement>(null);
 
@@ -282,6 +290,51 @@ const QuestionsAdmin: React.FC = () => {
       } finally {
         setLoading(false);
       }
+    }
+  };
+
+  const handleBulkUpdate = async () => {
+    if (selectedIds.size === 0) return;
+    
+    setLoading(true);
+    try {
+      const updates: any = {};
+      if (bulkFormData.disciplina_id) updates.disciplina_id = bulkFormData.disciplina_id;
+      if (bulkFormData.assunto_id) updates.assunto_id = bulkFormData.assunto_id;
+      if (bulkFormData.subassunto_id) updates.subassunto_id = bulkFormData.subassunto_id;
+      if (bulkFormData.subsubassunto_id) updates.subsubassunto_id = bulkFormData.subsubassunto_id;
+      if (bulkFormData.is_validada !== undefined) updates.is_validada = bulkFormData.is_validada;
+
+      if (Object.keys(updates).length === 0) {
+        alert('Nenhuma alteração selecionada.');
+        setLoading(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('questions')
+        .update(updates)
+        .in('id', Array.from(selectedIds));
+      
+      if (error) throw error;
+      
+      alert(`${selectedIds.size} questões atualizadas com sucesso.`);
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
+      setIsBulkModalOpen(false);
+      setBulkFormData({
+        disciplina_id: '',
+        assunto_id: '',
+        subassunto_id: '',
+        subsubassunto_id: '',
+        is_validada: undefined
+      });
+      fetchQuestions();
+    } catch (error) {
+      console.error('Error updating multiple questions:', error);
+      alert('Erro ao atualizar algumas questões.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -956,13 +1009,22 @@ EXEMPLO DE ALTERNATIVAS:
           </button>
 
           {isSelectionMode && selectedIds.size > 0 && (
-            <button
-              onClick={handleBulkDelete}
-              className="flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-100 uppercase text-xs tracking-widest animate-in zoom-in-50 duration-300"
-            >
-              <span className="material-symbols-outlined">delete_sweep</span>
-              Excluir ({selectedIds.size})
-            </button>
+            <div className="flex gap-2 animate-in slide-in-from-right-4 duration-300">
+              <button
+                onClick={() => setIsBulkModalOpen(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 transition-all shadow-lg shadow-blue-100 uppercase text-xs tracking-widest"
+              >
+                <span className="material-symbols-outlined">edit_note</span>
+                Editar ({selectedIds.size})
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-100 uppercase text-xs tracking-widest"
+              >
+                <span className="material-symbols-outlined">delete_sweep</span>
+                Excluir
+              </button>
+            </div>
           )}
 
           {!isSelectionMode && (
@@ -1405,6 +1467,124 @@ EXEMPLO DE ALTERNATIVAS:
                 className="w-full md:w-auto px-6 py-2.5 bg-slate-900 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all"
               >
                 Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Bulk Edit Modal */}
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-xl rounded-[32px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-black text-slate-800">Ação em Massa</h3>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">{selectedIds.size} questões selecionadas</p>
+              </div>
+              <button
+                onClick={() => setIsBulkModalOpen(false)}
+                className="size-10 flex items-center justify-center bg-slate-50 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-all"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="p-8 space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-blue-600 mb-2">
+                  <span className="material-symbols-outlined">category</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest">Mover para Disciplina/Assunto</span>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-3">
+                  <select
+                    value={bulkFormData.disciplina_id}
+                    onChange={e => setBulkFormData({ ...bulkFormData, disciplina_id: e.target.value, assunto_id: '', subassunto_id: '', subsubassunto_id: '' })}
+                    className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none"
+                  >
+                    <option value="">Manter Disciplina Atual</option>
+                    {disciplinas.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+
+                  <select
+                    value={bulkFormData.assunto_id}
+                    onChange={e => setBulkFormData({ ...bulkFormData, assunto_id: e.target.value, subassunto_id: '', subsubassunto_id: '' })}
+                    disabled={!bulkFormData.disciplina_id}
+                    className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none disabled:opacity-50"
+                  >
+                    <option value="">Manter Assunto Atual</option>
+                    {assuntos.filter(a => a.disciplina_id === bulkFormData.disciplina_id).map(a => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+
+                  {bulkFormData.assunto_id && (
+                    <select
+                      value={bulkFormData.subassunto_id}
+                      onChange={e => setBulkFormData({ ...bulkFormData, subassunto_id: e.target.value, subsubassunto_id: '' })}
+                      className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none"
+                    >
+                      <option value="">Selecione Subassunto (Opcional)</option>
+                      {(assuntos.find(a => a.id === bulkFormData.assunto_id) as any)?.subassuntos?.map((sa: any) => (
+                        <option key={sa.id} value={sa.id}>{sa.name}</option>
+                      ))}
+                    </select>
+                  )}
+
+                  {bulkFormData.subassunto_id && (
+                    <select
+                      value={bulkFormData.subsubassunto_id}
+                      onChange={e => setBulkFormData({ ...bulkFormData, subsubassunto_id: e.target.value })}
+                      className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none"
+                    >
+                      <option value="">Selecione Sub-subassunto (Opcional)</option>
+                      {(assuntos.find(a => a.id === bulkFormData.assunto_id) as any)?.subassuntos
+                        ?.find((sa: any) => sa.id === bulkFormData.subassunto_id)?.subsubassuntos?.map((ssa: any) => (
+                          <option key={ssa.id} value={ssa.id}>{ssa.name}</option>
+                        ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100">
+                <div className="flex items-center gap-2 text-emerald-600 mb-4">
+                  <span className="material-symbols-outlined">rule</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest">Alterar Status de Validação</span>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setBulkFormData({ ...bulkFormData, is_validada: bulkFormData.is_validada === true ? undefined : true })}
+                    className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${bulkFormData.is_validada === true ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                  >
+                    Validada
+                  </button>
+                  <button
+                    onClick={() => setBulkFormData({ ...bulkFormData, is_validada: bulkFormData.is_validada === false ? undefined : false })}
+                    className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${bulkFormData.is_validada === false ? 'bg-amber-500 text-white shadow-lg shadow-amber-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                  >
+                    Pendente
+                  </button>
+                </div>
+                <p className="text-[9px] text-slate-400 mt-2 text-center font-bold italic">* Selecione para alterar ou deixe desmarcado para manter o status original.</p>
+              </div>
+            </div>
+
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
+              <button
+                onClick={() => setIsBulkModalOpen(false)}
+                className="flex-1 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-black uppercase tracking-[0.2em] transition-all hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleBulkUpdate}
+                disabled={loading}
+                className="flex-1 py-3 bg-[#137fec] text-white rounded-xl text-xs font-black uppercase tracking-[0.2em] transition-all hover:bg-blue-600 shadow-lg shadow-blue-100 flex items-center justify-center gap-2"
+              >
+                {loading ? <div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <span className="material-symbols-outlined text-[18px]">done_all</span>}
+                Aplicar Alterações
               </button>
             </div>
           </div>

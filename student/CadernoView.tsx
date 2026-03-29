@@ -107,6 +107,14 @@ const CadernoView: React.FC = () => {
         }
     };
 
+    // Process custom BPA tags (specifically [--OBSERVE--] as requested)
+    const processContent = (text: string | null | undefined) => {
+        if (!text) return '';
+        return text.replace(/\[--OBSERVE--\]([\s\S]*?)\[\/--OBSERVE--\]/gi, (match, content) => {
+            return `<div class="custom-tag tag-observe"><div class="tag-icon-box"><span class="material-symbols-outlined">visibility</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Observe</strong></div><div class="tag-text">${content}</div></div></div>`;
+        });
+    };
+
     if (loading && !notebook) return (
         <div className="h-screen flex flex-col items-center justify-center gap-4 bg-[#f8fafc]">
             <div className="size-10 border-4 border-slate-100 border-t-[#137fec] rounded-full animate-spin"></div>
@@ -234,7 +242,7 @@ const CadernoView: React.FC = () => {
                                 )}
                             </div>
                             <div className="prose prose-slate prose-p:font-medium prose-p:text-slate-700 max-w-none">
-                                <p className="text-lg md:text-xl font-bold text-slate-900 leading-relaxed">{currentQ.question_text}</p>
+                                <div className="text-lg md:text-xl font-bold text-slate-900 leading-relaxed" dangerouslySetInnerHTML={{ __html: processContent(currentQ.question_text) }} />
                             </div>
                         </div>
 
@@ -282,9 +290,7 @@ const CadernoView: React.FC = () => {
                                         <span className="material-symbols-outlined text-sm">lightbulb</span>
                                         <span className="text-[10px] font-black uppercase tracking-widest">Explicação</span>
                                     </div>
-                                    <p className="text-sm text-slate-600 font-medium leading-relaxed">
-                                        {currentQ.explanation || 'Sem explicação disponível para esta questão.'}
-                                    </p>
+                                    <div className="text-sm text-slate-600 font-medium leading-relaxed" dangerouslySetInnerHTML={{ __html: processContent(currentQ.explanation || 'Sem explicação disponível para esta questão.') }} />
                                 </div>
                                 <button
                                     onClick={handleNext}
@@ -307,3 +313,18 @@ const CadernoView: React.FC = () => {
 };
 
 export default CadernoView;
+
+// BPA Custom Tags Styles
+const tagStyles = `
+    .custom-tag { margin: 2rem 0; background: #fff; border: 1px solid rgba(0,0,0,0.03); display: flex; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.08); overflow: hidden; border-radius: 12px; }
+    .tag-icon-box { min-width: 60px; display: flex; justify-content: center; align-items: center; background: linear-gradient(135deg, #22d3ee 0%, #0e7490 100%); color: white; }
+    .tag-content-wrapper { padding: 1.5rem; flex: 1; }
+    .tag-body strong { display: block; text-transform: uppercase; font-size: 0.8rem; margin-bottom: 0.5rem; color: #0e7490; }
+    .tag-observe { border-right: 4px solid #0891b2; }
+    .tag-text p { margin-bottom: 0.5rem; font-size: 1rem; line-height: 1.6; color: #475569; }
+    .tag-text p:last-child { margin-bottom: 0; }
+`;
+
+const styleElement = document.createElement('style');
+styleElement.innerHTML = tagStyles;
+document.head.appendChild(styleElement);

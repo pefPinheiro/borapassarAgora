@@ -261,7 +261,7 @@ const CourseView: React.FC = () => {
       .replace(/\[--IMPORTANTE--\]([\s\S]*?)\[\/--IMPORTANTE--\]/g, '<div class="custom-tag tag-importante"><div class="tag-icon-box"><span class="material-symbols-outlined">priority_high</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Importante</strong></div><div class="tag-text">$1</div></div></div>')
       .replace(/\[--LEI--\]([\s\S]*?)\[\/--LEI--\]/g, '<div class="custom-tag tag-lei"><div class="tag-icon-box"><span class="material-symbols-outlined">gavel</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Lei Seca / Jurisprudência</strong></div><div class="tag-text">$1</div></div></div>')
       .replace(/\[--LINK--\]([\s\S]*?)\[\/--LINK--\]/g, '<div class="custom-tag tag-link"><div class="tag-icon-box"><span class="material-symbols-outlined">link</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Recurso Extra</strong></div><div class="tag-text">$1</div></div></div>')
-      .replace(/\[--OBSERVE--\]([\s\S]*?)\[\/--OBSERVE--\]/g, '<div class="custom-tag tag-observe"><div class="tag-icon-box"><span class="material-symbols-outlined">visibility</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Observe</strong></div><div class="tag-text">$1</div></div></div>')
+      .replace(/\[--OBSERVE--\]([\s\S]*?)\[\/--OBSERVE--\]/gi, '<div class="custom-tag tag-observe"><div class="tag-icon-box"><span class="material-symbols-outlined">visibility</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Observe</strong></div><div class="tag-text">$1</div></div></div>')
       .replace(/\[--FREQUENTE--\]([\s\S]*?)\[\/--FREQUENTE--\]/g, '<div class="custom-tag tag-frequente"><div class="tag-icon-box"><span class="material-symbols-outlined">local_fire_department</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Cai com Frequência</strong></div><div class="tag-text">$1</div></div></div>')
       .replace(/\[--EXTRA--\]([\s\S]*?)\[\/--EXTRA--\]/g, '<div class="custom-tag tag-extra"><div class="tag-icon-box"><span class="material-symbols-outlined">add_circle</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Conteúdo Extra</strong></div><div class="tag-text">$1</div></div></div>')
       .replace(/\[--NOVIDADE--\]([\s\S]*?)\[\/--NOVIDADE--\]/g, '<div class="custom-tag tag-novidade"><div class="tag-icon-box"><span class="material-symbols-outlined">auto_awesome</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Novidade</strong></div><div class="tag-text">$1</div></div></div>')
@@ -329,6 +329,8 @@ const CourseView: React.FC = () => {
             .course-view-page .tag-importante .tag-icon-box { background: #fef3c7; color: #d97706; }
             .course-view-page .tag-link { border-right: 4px solid #3b82f6; }
             .course-view-page .tag-link .tag-icon-box { background: #dbeafe; color: #2563eb; }
+            .course-view-page .tag-observe { border-right: 4px solid #0891b2; }
+            .course-view-page .tag-observe .tag-icon-box { background: #cffafe; color: #0891b2; }
 
             .course-view-page .ql-editor p { margin-bottom: 1em; line-height: 1.6; }
             .course-view-page .ql-editor img { max-width: 100%; border-radius: 12px; margin: 1em 0; }
