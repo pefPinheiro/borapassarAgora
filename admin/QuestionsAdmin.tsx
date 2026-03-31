@@ -129,7 +129,9 @@ const QuestionsAdmin: React.FC = () => {
     filterModalidade,
     filterStatus,
     filterSearch,
-    currentPage
+    currentPage,
+    sortBy,
+    sortAsc
   ]);
 
   // Reset pagination when filters change
