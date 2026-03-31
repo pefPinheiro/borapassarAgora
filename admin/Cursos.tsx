@@ -37,6 +37,7 @@ interface CourseDb {
     pix_discount?: number;
     commission_percentage?: number;
     investor_percentage?: number;
+    coupons_json?: { name: string, discount_type: 'valor' | 'porcentagem', discount_value: number }[];
 }
 
 interface MaterialItem {
@@ -73,7 +74,8 @@ const Cursos: React.FC = () => {
         is_notice_open: false,
         test_date: '',
         pix_discount: 0,
-        commission_percentage: 50
+        commission_percentage: 50,
+        coupons_json: []
     });
 
     // Content States
@@ -779,131 +781,194 @@ const Cursos: React.FC = () => {
                     )}
 
                     {activeTab === 'financeiro' && (
-                        <div className="grid grid-cols-2 gap-8">
-                            <div className="bg-slate-900 p-8 rounded-[32px] text-white space-y-4">
-                                <label className="text-[9px] font-black uppercase text-slate-500">Configuração de Preço</label>
-                                <div className="space-y-4">
-                                    <div className="flex flex-col gap-2">
-                                        <span className="text-[10px] text-slate-400 font-black uppercase">Preço de Tabela (R$)</span>
-                                        <input type="number" step="0.01" value={formData.price_base} onChange={e => handlePricingChange('price_base', e.target.value)} className="w-full h-11 bg-white/5 border border-white/10 rounded-xl px-4 font-black" />
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                        <span className="text-[10px] text-slate-400 font-black uppercase">Preço com Oferta (R$)</span>
-                                        <div className="relative">
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                value={formData.price_offer}
-                                                readOnly
-                                                className="w-full h-14 bg-white/10 border border-white/20 rounded-2xl px-4 font-black text-2xl text-emerald-400 outline-none focus:border-emerald-500/50 transition-all"
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            {/* Coluna Esquerda: Escura (Configuração de Preço e Ganhos) */}
+                            <div className="bg-[#111827] p-10 rounded-[40px] text-white shadow-2xl space-y-10">
+                                <section className="space-y-6">
+                                    <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Configuração de Preço</h3>
+                                    
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-slate-400">Preço de Tabela (R$)</label>
+                                            <input 
+                                                type="number" 
+                                                step="0.01" 
+                                                value={formData.price_base} 
+                                                onChange={e => handlePricingChange('price_base', e.target.value)} 
+                                                className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-6 font-black text-xl text-slate-300 outline-none focus:border-blue-500/50 transition-all" 
                                             />
-                                            <div className="absolute top-1/2 right-4 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
-                                                <span className="px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded text-[9px] font-bold uppercase tracking-widest">Calculado</span>
-                                            </div>
-                                        </div>
-                                        <p className="text-[10px] text-slate-500 font-medium">O preço final é calculado automaticamente com base no desconto informado.</p>
-                                    </div>
-
-                                    {/* Preview Earnings */}
-                                    <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50 space-y-4">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="material-symbols-outlined text-emerald-400 text-sm">payments</span>
-                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Simulação de Ganhos (Por Venda)</h4>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-1">
-                                                <p className="text-[9px] font-bold text-slate-500 uppercase">Por Apostila</p>
-                                                <p className="text-xl font-black text-emerald-400">
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                                                        selectedApostilas.length > 0
-                                                            ? (formData.price_offer! * ((formData.commission_percentage || 50) / 100)) / (selectedApostilas.length + (totalGeneralCommissionReceivers > 0 ? 1 : 0))
-                                                            : 0
-                                                    )}
-                                                </p>
-                                                <p className="text-[8px] text-slate-600">Considerando {selectedApostilas.length} apostilas + Part. Geral.</p>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-slate-400">Preço com Oferta (R$)</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    value={formData.price_offer}
+                                                    readOnly
+                                                    className="w-full h-14 bg-white/10 border border-white/20 rounded-2xl px-6 font-black text-2xl text-emerald-400 outline-none"
+                                                />
+                                                <div className="absolute top-1/2 right-4 -translate-y-1/2">
+                                                    <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-emerald-500/30">Calculado</span>
+                                                </div>
                                             </div>
-                                            <div className="space-y-1 border-l border-slate-700 pl-4">
-                                                <p className="text-[9px] font-bold text-slate-500 uppercase">Por Cota (Investidor)</p>
-                                                <p className="text-xl font-black text-blue-400">
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                                                        totalActiveQuotas > 0
-                                                            ? (formData.price_offer! * ((formData.investor_percentage || 10) / 100)) / totalActiveQuotas
-                                                            : 0
-                                                    )}
-                                                </p>
-                                                <p className="text-[8px] text-slate-600">Baseado em {totalActiveQuotas} cotas ativas no sistema.</p>
-                                            </div>
+                                            <p className="text-[10px] text-slate-500 font-bold italic">O preço final é calculado automaticamente com base no desconto informado.</p>
                                         </div>
                                     </div>
-                                </div>
+                                </section>
+
+                                <section className="pt-10 border-t border-white/5 space-y-6">
+                                    <div className="flex items-center gap-3">
+                                        <span className="material-symbols-outlined text-emerald-400">analytics</span>
+                                        <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Simulação de Ganhos (Por Venda)</h3>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-8">
+                                        <div className="space-y-1">
+                                            <p className="text-[9px] font-black text-slate-500 uppercase">Por Apostila</p>
+                                            <p className="text-3xl font-black text-[#00c58e]">
+                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                                    selectedApostilas.length > 0 ? (formData.price_offer! * (formData.commission_percentage || 50) / 100) / (selectedApostilas.length + (totalGeneralCommissionReceivers > 0 ? 1 : 0)) : 0
+                                                )}
+                                            </p>
+                                            <p className="text-[8px] text-slate-600 font-bold uppercase italic">Considerando {selectedApostilas.length} apostilas + Part. Geral.</p>
+                                        </div>
+                                        <div className="space-y-1 border-l border-white/5 pl-8">
+                                            <p className="text-[9px] font-black text-slate-500 uppercase">Por Cota (Investidor)</p>
+                                            <p className="text-3xl font-black text-blue-400">
+                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                                    totalActiveQuotas > 0 ? (formData.price_offer! * (formData.investor_percentage || 10) / 100) / totalActiveQuotas : 0
+                                                )}
+                                            </p>
+                                            <p className="text-[8px] text-slate-600 font-bold uppercase italic">baseado em {totalActiveQuotas} cotas ativas no sistema.</p>
+                                        </div>
+                                    </div>
+                                </section>
                             </div>
 
-                            <div className="bg-white p-8 rounded-[32px] border border-slate-200 space-y-6">
-                                <label className="text-[9px] font-black uppercase text-slate-400">Cupom & Promoção</label>
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Nome do Cupom</label>
-                                        <input type="text" value={formData.coupon_name} onChange={e => setFormData({ ...formData, coupon_name: e.target.value.toUpperCase() })} className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl font-bold" placeholder="EX: BORA10" />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tipo de Desconto</label>
-                                            <select value={formData.discount_type} onChange={e => handlePricingChange('discount_type', e.target.value)} className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none">
-                                                <option value="valor">R$ Fixo</option>
-                                                <option value="porcentagem">% Percentual</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Valor do Desconto</label>
-                                            <input type="number" value={formData.discount_value} onChange={e => handlePricingChange('discount_value', Number(e.target.value))} className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Desconto no Pix (%)</label>
-                                        <input type="number" value={formData.pix_discount} onChange={e => setFormData({ ...formData, pix_discount: Number(e.target.value) })} className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl font-bold" />
+                            {/* Coluna Direita: Branca (Cupons, Descontos e Taxas) */}
+                            <div className="space-y-8 py-4">
+                                <section className="space-y-6">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">Cupom & Promoção</h3>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setFormData({...formData, coupons_json: [...(formData.coupons_json || []), {name: '', discount_type: 'porcentagem', discount_value: 0}]})} 
+                                            className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all"
+                                        >
+                                            + Adicionar
+                                        </button>
                                     </div>
 
-                                    <div className="pt-6 border-t border-slate-100">
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-amber-500">payments</span>
-                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Porcentagem de Rateio / Comissão (%)</label>
+                                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                        {(!formData.coupons_json || formData.coupons_json.length === 0) ? (
+                                            <div className="p-6 bg-slate-50 border border-slate-100 rounded-[24px]">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase text-center tracking-widest">Nenhum cupom cadastrado</p>
                                             </div>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                value={formData.commission_percentage}
-                                                onChange={e => setFormData({ ...formData, commission_percentage: Number(e.target.value) })}
-                                                className="w-full h-12 px-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl font-black outline-none focus:ring-2 focus:ring-amber-500/20"
-                                            />
-                                            <p className="text-[9px] text-slate-400 font-bold leading-tight">
-                                                Porcentagem do valor total da venda que será destinada ao pote de comissões (Autores + Colaboradores).
-                                                <br />O restante fica para a plataforma/empresa.
-                                            </p>
-                                        </div>
-
-                                        <div className="space-y-2 pt-4 border-t border-slate-100">
-                                            <div className="flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-purple-500">volunteer_activism</span>
-                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Porcentagem para Investidores (%)</label>
-                                            </div>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                value={formData.investor_percentage || 0}
-                                                onChange={e => setFormData({ ...formData, investor_percentage: Number(e.target.value) })}
-                                                className="w-full h-12 px-4 bg-purple-50 border border-purple-200 text-purple-900 rounded-xl font-black outline-none focus:ring-2 focus:ring-purple-500/20"
-                                            />
-                                            <p className="text-[9px] text-slate-400 font-bold leading-tight">
-                                                Parte do valor da venda destinada ao fundo de Investidores (Cotistas).
-                                                <br />Este valor é separado antes ou em conjunto com a comissão de autores.
-                                            </p>
-                                        </div>
+                                        ) : (
+                                            formData.coupons_json.map((c, idx) => (
+                                                <div key={idx} className="bg-white border border-slate-200 rounded-3xl p-5 space-y-4 shadow-sm relative group">
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => setFormData({...formData, coupons_json: (formData.coupons_json || []).filter((_, i) => i !== idx)})} 
+                                                        className="absolute top-3 right-3 size-6 bg-slate-50 text-slate-400 hover:text-red-500 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+                                                    >
+                                                        <span className="material-symbols-outlined text-sm">close</span>
+                                                    </button>
+                                                    <div className="space-y-1">
+                                                        <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Nome do Cupom</label>
+                                                        <input 
+                                                            type="text" 
+                                                            value={c.name} 
+                                                            onChange={e => {
+                                                                const next = [...(formData.coupons_json || [])];
+                                                                next[idx].name = e.target.value.toUpperCase();
+                                                                setFormData({...formData, coupons_json: next});
+                                                            }} 
+                                                            className="w-full h-12 bg-slate-50 border border-slate-100 rounded-2xl px-5 text-sm font-black uppercase text-slate-700 outline-none focus:border-blue-500/50" 
+                                                            placeholder="EX: BORA10" 
+                                                        />
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="space-y-1">
+                                                            <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Tipo</label>
+                                                            <select 
+                                                                value={c.discount_type} 
+                                                                onChange={e => {
+                                                                    const next = [...(formData.coupons_json || [])];
+                                                                    next[idx].discount_type = e.target.value as any;
+                                                                    setFormData({...formData, coupons_json: next});
+                                                                }} 
+                                                                className="w-full h-11 bg-slate-50 border border-slate-100 rounded-[14px] px-4 text-[10px] font-black text-slate-600 outline-none appearance-none"
+                                                            >
+                                                                <option value="porcentagem">PORCENTAGEM (%)</option>
+                                                                <option value="valor">R$ FIXO (VALOR)</option>
+                                                            </select>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-[8px] font-black uppercase text-slate-400 ml-1">Valor do Desconto</label>
+                                                            <input 
+                                                                type="number" 
+                                                                value={c.discount_value} 
+                                                                onChange={e => {
+                                                                    const next = [...(formData.coupons_json || [])];
+                                                                    next[idx].discount_value = Number(e.target.value);
+                                                                    setFormData({...formData, coupons_json: next});
+                                                                }} 
+                                                                className="w-full h-11 bg-slate-50 border border-slate-100 rounded-[14px] px-4 text-[10px] font-black text-slate-700 outline-none" 
+                                                                placeholder="0" 
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
-                                </div>
+
+                                    <div className="space-y-2 mt-8">
+                                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">Desconto no Pix (%)</label>
+                                        <input 
+                                            type="number" 
+                                            value={formData.pix_discount} 
+                                            onChange={e => setFormData({...formData, pix_discount: Number(e.target.value)})} 
+                                            className="w-full h-14 bg-slate-50 border border-slate-100 rounded-[20px] px-6 text-sm font-black text-slate-700 outline-none" 
+                                        />
+                                    </div>
+                                </section>
+
+                                <section className="space-y-6 pt-6">
+                                    <div className="bg-amber-50/50 border border-amber-100 rounded-[32px] p-8 space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <span className="material-symbols-outlined text-amber-500 text-lg">payments</span>
+                                            <h4 className="text-[9px] font-black uppercase text-amber-700 tracking-[0.2em]">Porcentagem de Rateio / Comissão (%)</h4>
+                                        </div>
+                                        <input 
+                                            type="number" 
+                                            value={formData.commission_percentage} 
+                                            onChange={e => setFormData({...formData, commission_percentage: Number(e.target.value)})} 
+                                            className="w-full h-14 bg-white border border-amber-200 rounded-[20px] px-6 text-xl font-black text-amber-900 outline-none focus:ring-4 focus:ring-amber-500/10" 
+                                        />
+                                        <p className="text-[8px] text-amber-600 font-bold leading-tight">
+                                            Porcentagem do valor total da venda que será destinada ao pote de comissões (Autores + Colaboradores).<br />O restante fica para a plataforma/empresa.
+                                        </p>
+                                    </div>
+
+                                    <div className="bg-purple-50/50 border border-purple-100 rounded-[32px] p-8 space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <span className="material-symbols-outlined text-purple-400 text-lg">volunteer_activism</span>
+                                            <h4 className="text-[9px] font-black uppercase text-purple-700 tracking-[0.2em]">Porcentagem para Investidores (%)</h4>
+                                        </div>
+                                        <input 
+                                            type="number" 
+                                            value={formData.investor_percentage || 0} 
+                                            onChange={e => setFormData({...formData, investor_percentage: Number(e.target.value)})} 
+                                            className="w-full h-14 bg-white border border-purple-200 rounded-[20px] px-6 text-xl font-black text-purple-900 outline-none focus:ring-4 focus:ring-purple-500/10" 
+                                        />
+                                        <p className="text-[8px] text-purple-500 font-bold leading-tight">
+                                            Parte do valor da venda destinada ao fundo de Investidores (Cotistas).<br />Este valor é separado antes ou em conjunto com a comissão de autores.
+                                        </p>
+                                    </div>
+                                </section>
                             </div>
                         </div>
                     )}

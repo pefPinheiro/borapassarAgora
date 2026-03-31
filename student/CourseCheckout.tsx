@@ -25,6 +25,11 @@ const CourseCheckout: React.FC = () => {
     const [showTerms, setShowTerms] = useState(false);
     const [agreed, setAgreed] = useState(false);
 
+    // Coupon State
+    const [couponCode, setCouponCode] = useState('');
+    const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+    const [discountAmount, setDiscountAmount] = useState(0);
+
     useEffect(() => {
         if (id) {
             fetchCourse();
@@ -37,6 +42,35 @@ const CourseCheckout: React.FC = () => {
         if (data) setCourse(data);
         setLoading(false);
     };
+
+    const applyCoupon = () => {
+        if (!course || !couponCode.trim()) return;
+        
+        const coupons = course.coupons_json || [];
+        const found = coupons.find((c: any) => c.name.toUpperCase() === couponCode.trim().toUpperCase());
+        
+        if (found) {
+            let discount = 0;
+            if (found.discount_type === 'porcentagem') {
+                discount = (course.price_offer * found.discount_value) / 100;
+            } else {
+                discount = found.discount_value;
+            }
+            
+            // Limit discount to price_offer
+            discount = Math.min(discount, course.price_offer);
+            
+            setAppliedCoupon(found);
+            setDiscountAmount(discount);
+            alert(`Cupom "${found.name}" aplicado com sucesso!`);
+        } else {
+            setAppliedCoupon(null);
+            setDiscountAmount(0);
+            alert('Cupom inválido ou expirado.');
+        }
+    };
+
+    const finalPrice = course ? (course.price_offer - discountAmount) : 0;
 
     const fetchUser = async () => {
         const { data: { session } } = await supabase.auth.getSession();
@@ -75,11 +109,6 @@ const CourseCheckout: React.FC = () => {
             }).eq('id', session.user.id);
 
             // 2. Criar Matrícula PENDENTE (Reserva)
-            const finalPrice = course.price_offer; // MP aplicará descontos ou lógica extra se configurado lá, ou aqui.
-            // Nota: Se quiser aplicar desconto PIX no checkout, teria que criar preferencia customizada.
-            // Para simplicidade, vamos mandar o preço cheio e o MP gerencia métodos, ou mandamos já com desconto se o user escolheu PIX (mas MP Checkout é global).
-            // Vamos mandar o preço de oferta padrão.
-
             const { data: enrollment, error: enrollError } = await supabase
                 .from('enrollments')
                 .insert([{
@@ -87,8 +116,10 @@ const CourseCheckout: React.FC = () => {
                     profile_id: session.user.id,
                     status: 'Pendente',
                     progress: 0,
-                    amount_paid: finalPrice, // Valor nominal, confirmação real virá no webhook
-                    payment_method: 'mercadopago_checkout'
+                    amount_paid: finalPrice, 
+                    amount_discount: discountAmount,
+                    payment_method: 'mercadopago_checkout',
+                    coupon_applied: appliedCoupon?.name || null
                 }])
                 .select()
                 .single();
@@ -107,7 +138,7 @@ const CourseCheckout: React.FC = () => {
                     enrollment_id: enrollment.id,
                     course_id: id,
                     payer_email: session.user.email,
-                    payer_name: cpf // Ou nome se tiver no profile
+                    payer_name: cpf 
                 })
             });
 
@@ -145,7 +176,7 @@ const CourseCheckout: React.FC = () => {
                     </div>
                     <div className="text-right">
                         <p className="text-sm text-slate-400 font-bold uppercase">Valor Total</p>
-                        <p className="text-3xl font-black text-[#137fec]">R$ {course.price_offer?.toFixed(2).replace('.', ',')}</p>
+                        <p className="text-3xl font-black text-[#137fec]">R$ {finalPrice.toFixed(2).replace('.', ',')}</p>
                     </div>
                 </div>
 
@@ -171,14 +202,44 @@ const CourseCheckout: React.FC = () => {
                     <div className="space-y-6 flex flex-col justify-between">
                         <div>
                             <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase tracking-wide text-sm mb-4"><span className="material-symbols-outlined">verified_user</span> Resumo</h3>
-                            <ul className="space-y-3 text-sm text-slate-600">
-                                <li className="flex items-center gap-2"><span className="text-emerald-500 material-symbols-outlined text-lg">check_circle</span> Acesso Imediato (após aprovação)</li>
-                                <li className="flex items-center gap-2"><span className="text-emerald-500 material-symbols-outlined text-lg">check_circle</span> Garantia de 7 dias</li>
-                                <li className="flex items-center gap-2"><span className="text-emerald-500 material-symbols-outlined text-lg">check_circle</span> Pagamento via Mercado Pago</li>
-                            </ul>
+                            <div className="space-y-4 p-5 bg-slate-50 border border-slate-100 rounded-2xl">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-500">Subtotal</span>
+                                    <span className="font-bold text-slate-700">R$ {course.price_offer?.toFixed(2).replace('.', ',')}</span>
+                                </div>
+                                {discountAmount > 0 && (
+                                    <div className="flex justify-between text-sm text-emerald-600">
+                                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm">sell</span> Desconto ({appliedCoupon?.name})</span>
+                                        <span className="font-bold">- R$ {discountAmount.toFixed(2).replace('.', ',')}</span>
+                                    </div>
+                                )}
+                                <div className="pt-3 border-t border-slate-200 flex justify-between items-center">
+                                    <span className="text-xs font-black uppercase text-slate-400">Total a Pagar</span>
+                                    <span className="text-xl font-black text-[#137fec]">R$ {finalPrice.toFixed(2).replace('.', ',')}</span>
+                                </div>
+                            </div>
+
+                            <div className="mt-6 space-y-3">
+                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest pl-1">Possui um Cupom?</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        value={couponCode} 
+                                        onChange={e => setCouponCode(e.target.value)} 
+                                        className="flex-1 h-11 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold uppercase outline-none focus:border-blue-500" 
+                                        placeholder="CÓDIGO" 
+                                    />
+                                    <button 
+                                        onClick={applyCoupon}
+                                        className="px-4 h-11 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#137fec] transition-all"
+                                    >
+                                        Aplicar
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
-                        <button onClick={handlePreSubmit} className="w-full py-4 bg-[#009ee3] hover:bg-[#0081b9] text-white rounded-xl font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2">
+                        <button onClick={handlePreSubmit} className="w-full mt-4 py-4 bg-[#009ee3] hover:bg-[#0081b9] text-white rounded-xl font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2">
                             Pagar com Mercado Pago
                             <span className="material-symbols-outlined">open_in_new</span>
                         </button>

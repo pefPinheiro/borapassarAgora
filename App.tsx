@@ -55,8 +55,8 @@ import AdminLogin from './admin/AdminLogin';
 import AdminRegister from './admin/AdminRegister';
 import CadernosAdmin from './admin/CadernosAdmin';
 import InvestidoresAdmin from './admin/InvestidoresAdmin';
-import StudentRedirect from './student/StudentRedirect';
 import FinancialBalance from './admin/FinancialBalance';
+import StudentRedirect from './student/StudentRedirect';
 
 import RelaxHub from './student/relax/RelaxHub';
 import MillionChallenge from './student/relax/MillionChallenge';

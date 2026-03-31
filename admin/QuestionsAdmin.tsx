@@ -50,6 +50,10 @@ const QuestionsAdmin: React.FC = () => {
   const [isTreeFilterOpen, setIsTreeFilterOpen] = useState(false);
   const [treeExpandedIds, setTreeExpandedIds] = useState<Set<string>>(new Set());
 
+  // Sorting
+  const [sortBy, setSortBy] = useState<'created_at' | 'enunciado'>('created_at');
+  const [sortAsc, setSortAsc] = useState(false);
+
   // Paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -141,7 +145,9 @@ const QuestionsAdmin: React.FC = () => {
     filterDificuldade,
     filterModalidade,
     filterStatus,
-    filterSearch
+    filterSearch,
+    sortBy,
+    sortAsc
   ]);
 
   // Atualiza assuntos filtrados quando a disciplina muda no formulário
@@ -220,7 +226,7 @@ const QuestionsAdmin: React.FC = () => {
       const to = from + pageSize - 1;
 
       const { data, error, count } = await query
-        .order('created_at', { ascending: false })
+        .order(sortBy, { ascending: sortAsc })
         .range(from, to);
 
       if (error) throw error;
@@ -1297,6 +1303,20 @@ EXEMPLO DE ALTERNATIVAS:
               )}
               <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Enunciado</th>
               <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Metadados</th>
+              <th 
+                className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-500 transition-colors group"
+                onClick={() => {
+                  if (sortBy === 'created_at') setSortAsc(!sortAsc);
+                  else { setSortBy('created_at'); setSortAsc(false); }
+                }}
+              >
+                <div className="flex items-center gap-1">
+                  Inclusão
+                  <span className={`material-symbols-outlined text-[14px] transition-all ${sortBy === 'created_at' ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`}>
+                    {sortBy === 'created_at' ? (sortAsc ? 'arrow_upward' : 'arrow_downward') : 'swap_vert'}
+                  </span>
+                </div>
+              </th>
               <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
               <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Ações</th>
             </tr>
@@ -1331,6 +1351,16 @@ EXEMPLO DE ALTERNATIVAS:
                       <span className="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black border border-blue-100 uppercase tracking-wider">{q.bancas?.sigla || q.bancas?.name}</span>
                       <span className="px-2.5 py-1 bg-slate-50 text-slate-400 rounded-lg text-[9px] font-bold uppercase tracking-wider">{q.ano}</span>
                       <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${q.dificuldade === 'Fácil' ? 'bg-green-50 text-green-600' : q.dificuldade === 'Médio' ? 'bg-yellow-50 text-yellow-600' : 'bg-red-50 text-red-600'}`}>{q.dificuldade}</span>
+                    </div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-600 uppercase">
+                        {q.created_at ? new Date(q.created_at).toLocaleDateString('pt-BR') : '---'}
+                      </span>
+                      <span className="text-[8px] font-bold text-slate-400 mt-0.5">
+                        {q.created_at ? new Date(q.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </span>
                     </div>
                   </td>
                   <td className="px-8 py-6">
