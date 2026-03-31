@@ -213,7 +213,11 @@ const QuestionsAdmin: React.FC = () => {
         query = query.or(subjectFilters.join(','));
       }
 
-      if (filterBanca) query = query.eq('banca_id', filterBanca);
+      if (filterBanca === 'none') {
+        query = query.is('banca_id', null);
+      } else if (filterBanca) {
+        query = query.eq('banca_id', filterBanca);
+      }
       if (filterAno) query = query.eq('ano', filterAno);
       if (filterDificuldade) query = query.eq('dificuldade', filterDificuldade);
       if (filterModalidade) query = query.eq('modalidade', filterModalidade);
@@ -1238,6 +1242,7 @@ EXEMPLO DE ALTERNATIVAS:
           className="h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none"
         >
           <option value="">Bancas (Todas)</option>
+          <option value="none">Sem Banca (Nenhuma)</option>
           {bancas.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
         <input
