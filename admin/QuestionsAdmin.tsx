@@ -73,6 +73,7 @@ const QuestionsAdmin: React.FC = () => {
     assunto_id: '',
     subassunto_id: '',
     subsubassunto_id: '',
+    banca_id: '',
     is_validada: undefined as boolean | undefined
   });
 
@@ -309,6 +310,7 @@ const QuestionsAdmin: React.FC = () => {
       if (bulkFormData.assunto_id) updates.assunto_id = bulkFormData.assunto_id;
       if (bulkFormData.subassunto_id) updates.subassunto_id = bulkFormData.subassunto_id;
       if (bulkFormData.subsubassunto_id) updates.subsubassunto_id = bulkFormData.subsubassunto_id;
+      if (bulkFormData.banca_id) updates.banca_id = bulkFormData.banca_id;
       if (bulkFormData.is_validada !== undefined) updates.is_validada = bulkFormData.is_validada;
 
       if (Object.keys(updates).length === 0) {
@@ -333,6 +335,7 @@ const QuestionsAdmin: React.FC = () => {
         assunto_id: '',
         subassunto_id: '',
         subsubassunto_id: '',
+        banca_id: '',
         is_validada: undefined
       });
       fetchQuestions();
@@ -1575,6 +1578,22 @@ EXEMPLO DE ALTERNATIVAS:
                     </select>
                   )}
                 </div>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <div className="flex items-center gap-2 text-indigo-600 mb-2">
+                  <span className="material-symbols-outlined">corporate_fare</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest">Alterar Banca</span>
+                </div>
+                
+                <select
+                  value={bulkFormData.banca_id}
+                  onChange={e => setBulkFormData({ ...bulkFormData, banca_id: e.target.value })}
+                  className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none"
+                >
+                  <option value="">Manter Banca Atual</option>
+                  {bancas.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
               </div>
 
               <div className="pt-4 border-t border-slate-100">
