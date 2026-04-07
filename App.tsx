@@ -56,6 +56,7 @@ import AdminRegister from './admin/AdminRegister';
 import CadernosAdmin from './admin/CadernosAdmin';
 import InvestidoresAdmin from './admin/InvestidoresAdmin';
 import FinancialBalance from './admin/FinancialBalance';
+import ProfessorsAdmin from './admin/ProfessorsAdmin';
 import StudentRedirect from './student/StudentRedirect';
 
 import RelaxHub from './student/relax/RelaxHub';
@@ -128,6 +129,7 @@ const App: React.FC = () => {
 
           {/* User Management */}
           <Route path="colaboradores" element={<CollaboratorAdmin />} />
+          <Route path="professores" element={<ProfessorsAdmin />} />
 
           {/* Support */}
           <Route path="faq" element={<FaqAdmin />} />

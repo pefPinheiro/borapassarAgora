@@ -84,6 +84,7 @@ const AdminLayout: React.FC = () => {
       icon: 'admin_panel_settings',
       items: [
         { id: 'colaboradores', icon: 'badge', label: 'Colaboradores', path: '/admin/colaboradores' },
+        { id: 'professores', icon: 'school', label: 'Professores', path: '/admin/professores' },
       ]
     },
     {

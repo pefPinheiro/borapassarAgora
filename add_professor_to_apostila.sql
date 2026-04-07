@@ -1,0 +1,1 @@
+ALTER TABLE apostilas ADD COLUMN IF NOT EXISTS professor_id UUID REFERENCES teachers(id) ON DELETE SET NULL;

@@ -157,6 +157,8 @@ export interface Apostila {
     assunto_id: string | null;
     modalidade: string | null;
     ano: string | null;
+    subassuntos_ids?: string[];
+    subsubassuntos_ids?: string[];
   };
   created_at: string;
   updated_at: string;
@@ -166,15 +168,28 @@ export interface Apostila {
   assigned_editor?: { full_name: string };
   disciplinas?: { name: string };
   commission_valid_until?: string;
+  professor_id?: string;
+  teacher?: Teacher;
+  validation?: {
+    structure: boolean;
+    images: boolean;
+    notebooks: boolean;
+    questions: boolean;
+  };
 }
 
-export interface ApostilaUnit {
+export interface Teacher {
   id: string;
-  apostila_id: string;
-  title: string;
-  content: string;
-  position: number;
+  name: string;
+  description?: string;
+  disciplines_ids: string[];
+  ad_images: string[];
+  avatar_url?: string;
+  status: 'Ativo' | 'Inativo';
   created_at: string;
+  updated_at: string;
+  // Joins
+  disciplinas?: Disciplina[];
 }
 
 

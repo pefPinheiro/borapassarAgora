@@ -14,7 +14,7 @@ import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { supabase } from '../lib/supabase';
-import { Apostila, Disciplina, Assunto, Profile } from '../types';
+import { Apostila, Disciplina, Assunto, Profile, Teacher } from '../types';
 import TiptapEditor, { TiptapRef } from './TiptapEditor';
 
 interface Banca {
@@ -43,6 +43,11 @@ const ApostilasAdmin: React.FC = () => {
     const [editingApostila, setEditingApostila] = useState<Apostila | null>(null);
     const [isToolbarMinimized, setIsToolbarMinimized] = useState(false);
 
+    // Validation State
+    const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
+    const [validatingApostila, setValidatingApostila] = useState<Apostila | null>(null);
+    const [isSavingValidation, setIsSavingValidation] = useState(false);
+
     // Auxiliary Data
     const [bancas, setBancas] = useState<Banca[]>([]);
     const [disciplinas, setDisciplinas] = useState<Disciplina[]>([]);
@@ -50,6 +55,7 @@ const ApostilasAdmin: React.FC = () => {
     const [subassuntos, setSubassuntos] = useState<any[]>([]);
     const [subsubassuntos, setSubsubassuntos] = useState<any[]>([]);
     const [admins, setAdmins] = useState<Profile[]>([]);
+    const [teachers, setTeachers] = useState<Teacher[]>([]);
 
     // Filters
     const [filterSearch, setFilterSearch] = useState('');
@@ -78,7 +84,7 @@ const ApostilasAdmin: React.FC = () => {
             ano: '',
             subassuntos_ids: [],
             subsubassuntos_ids: []
-        },
+        } as any,
         commission_valid_until: ''
     });
 
@@ -150,7 +156,8 @@ const ApostilasAdmin: React.FC = () => {
                     *,
                     author:profiles!author_id (full_name),
                     assigned_editor:profiles!assigned_editor_id (full_name),
-                    disciplinas (name)
+                    disciplinas (name),
+                    teacher:teachers(*)
                 `, { count: 'exact' });
 
             if (filterSearch) {
@@ -192,13 +199,14 @@ const ApostilasAdmin: React.FC = () => {
 
     const fetchAuxData = async () => {
         try {
-            const [bRes, dRes, aRes, subRes, subsubRes, admRes] = await Promise.all([
+            const [bRes, dRes, aRes, subRes, subsubRes, admRes, tRes] = await Promise.all([
                 supabase.from('bancas').select('id, name').order('name'),
                 supabase.from('disciplinas').select('*').order('name'),
                 supabase.from('assuntos').select('*').order('name'),
                 supabase.from('subassuntos').select('id, name, assunto_id').order('name'),
                 supabase.from('subsubassuntos').select('id, name, subassunto_id').order('name'),
                 supabase.from('profiles').select('*').in('role', ['admin', 'super']).order('full_name'),
+                supabase.from('teachers').select('*').order('name'),
             ]);
             if (bRes.data) setBancas(bRes.data);
             if (dRes.data) setDisciplinas(dRes.data);
@@ -206,6 +214,7 @@ const ApostilasAdmin: React.FC = () => {
             if (subRes.data) setSubassuntos(subRes.data);
             if (subsubRes.data) setSubsubassuntos(subsubRes.data);
             if (admRes.data) setAdmins(admRes.data);
+            if (tRes.data) setTeachers(tRes.data);
 
             // Busca inicial de questões (vazias ou recentes)
             handleSearchQuestions('');
@@ -605,6 +614,90 @@ const ApostilasAdmin: React.FC = () => {
         editorRef.current?.insertContent(tag);
         setIsQuestionModalOpen(false);
         setSearchQ('');
+    };
+
+    const handleOpenValidationModal = (apostila: Apostila) => {
+        setValidatingApostila(apostila);
+        setIsValidationModalOpen(true);
+    };
+
+    const handleToggleValidation = async (field: keyof NonNullable<Apostila['validation']>) => {
+        if (!validatingApostila) return;
+
+        const currentValidation = validatingApostila.validation || {
+            structure: false,
+            images: false,
+            notebooks: false,
+            questions: false
+        };
+
+        const newValidation = {
+            ...currentValidation,
+            [field]: !currentValidation[field]
+        };
+
+        setIsSavingValidation(true);
+        try {
+            const { error } = await supabase
+                .from('apostilas')
+                .update({ validation: newValidation })
+                .eq('id', validatingApostila.id);
+
+            if (error) throw error;
+
+            // Update local state
+            setValidatingApostila({ ...validatingApostila, validation: newValidation });
+            setApostilas(prev => prev.map(a => a.id === validatingApostila.id ? { ...a, validation: newValidation } : a));
+        } catch (e: any) {
+            console.error(e);
+            alert('Erro ao atualizar validação: ' + e.message);
+        } finally {
+            setIsSavingValidation(false);
+        }
+    };
+
+    const handleSetProfessor = async (professorId: string | null) => {
+        if (!validatingApostila) return;
+
+        setIsSavingValidation(true);
+        try {
+            const { error } = await supabase
+                .from('apostilas')
+                .update({ professor_id: professorId })
+                .eq('id', validatingApostila.id);
+
+            if (error) throw error;
+
+            // Update local state
+            const updatedTeacher = teachers.find(t => t.id === professorId) || undefined;
+            setValidatingApostila({ 
+                ...validatingApostila, 
+                professor_id: professorId || undefined, 
+                teacher: updatedTeacher 
+            });
+            setApostilas(prev => prev.map(a => 
+                a.id === validatingApostila.id 
+                ? { ...a, professor_id: professorId || undefined, teacher: updatedTeacher } 
+                : a
+            ));
+        } catch (error: any) {
+            console.error('Error saving professor:', error);
+            alert('Erro ao salvar professor: ' + error.message);
+        } finally {
+            setIsSavingValidation(false);
+        }
+    };
+
+    const getValidationProgress = (validation?: any) => {
+        if (!validation || typeof validation !== 'object') return 0;
+        const values = [
+            validation.structure === true,
+            validation.images === true,
+            validation.notebooks === true,
+            validation.questions === true
+        ];
+        const checked = values.filter(v => v).length;
+        return Math.round((checked / values.length) * 100);
     };
 
     // Filter Logic - (unchanged code skipped for brevity)
@@ -1404,6 +1497,7 @@ const ApostilasAdmin: React.FC = () => {
                             <tr className="bg-slate-50/50 border-b border-slate-100 text-[#64748b] text-[10px] font-black uppercase tracking-[0.2em]">
                                 <th className="px-10 py-6">Conteúdo / Metadata</th>
                                 <th className="px-10 py-6">Curadoria</th>
+                                <th className="px-10 py-6 text-center">Qualidade</th>
                                 <th className="px-10 py-6 text-center">Exibição</th>
                                 <th className="px-10 py-6 text-right">Controle Ações</th>
                             </tr>
@@ -1412,7 +1506,7 @@ const ApostilasAdmin: React.FC = () => {
                             {Object.entries(grouped).map(([discName, items]) => (
                                 <React.Fragment key={discName}>
                                     <tr className="bg-slate-50/20">
-                                        <td colSpan={4} className="px-10 py-3 border-b border-slate-100/50">
+                                        <td colSpan={5} className="px-10 py-3 border-b border-slate-100/50">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500 ring-4 ring-blue-50"></div>
                                                 <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">{discName}</span>
@@ -1442,6 +1536,21 @@ const ApostilasAdmin: React.FC = () => {
                                                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Publicado em: {new Date(a.created_at).toLocaleDateString()}</span>
                                                         </div>
                                                     </div>
+                                                </td>
+                                                <td className="px-10 py-8 text-center">
+                                                    <button
+                                                        onClick={() => handleOpenValidationModal(a)}
+                                                        className={`group/qual relative px-4 py-2 rounded-2xl transition-all border-2 flex items-center gap-3 mx-auto ${getValidationProgress(a.validation) === 100 ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : getValidationProgress(a.validation) > 0 ? 'bg-amber-50 border-amber-300 text-amber-600' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-300'}`}
+                                                    >
+                                                        <span className={`material-symbols-outlined text-[20px] ${getValidationProgress(a.validation) > 0 && getValidationProgress(a.validation) < 100 ? 'animate-pulse' : ''}`}>
+                                                            {getValidationProgress(a.validation) === 100 ? 'verified' : 'verified_user'}
+                                                        </span>
+                                                        <span className="text-[10px] font-black uppercase tracking-widest">{getValidationProgress(a.validation)}%</span>
+                                                        
+                                                        {getValidationProgress(a.validation) > 0 && getValidationProgress(a.validation) < 100 && (
+                                                            <div className="absolute -top-1 -right-1 size-3 bg-amber-500 rounded-full border-2 border-white"></div>
+                                                        )}
+                                                    </button>
                                                 </td>
                                                 <td className="px-10 py-8 text-center">
                                                     <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${a.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
@@ -1528,6 +1637,111 @@ const ApostilasAdmin: React.FC = () => {
                     </div>
                 )}
             </div>
+            {/* Modal de Validação */}
+            {isValidationModalOpen && validatingApostila && (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-md rounded-[32px] shadow-2xl overflow-hidden flex flex-col scale-in-center animate-in zoom-in-95 max-h-[90vh]">
+                        {/* Header */}
+                        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <div className="flex items-center gap-3">
+                                <div className="size-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/20">
+                                    <span className="material-symbols-outlined text-[20px]">verified</span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <h3 className="text-base font-black text-slate-900 uppercase leading-none">Verificação</h3>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">Qualidade do Conteúdo</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsValidationModalOpen(false)} className="size-8 rounded-full hover:bg-slate-200 flex items-center justify-center transition-all">
+                                <span className="material-symbols-outlined text-[20px]">close</span>
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
+                            {/* Professor Selector */}
+                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 block mb-2">Responsável</span>
+                                <div className="flex items-center gap-3">
+                                    <div className="size-10 rounded-xl bg-white border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center shadow-sm">
+                                        {validatingApostila.teacher?.avatar_url ? (
+                                            <img src={validatingApostila.teacher.avatar_url} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <span className="material-symbols-outlined text-slate-300 text-[24px]">account_circle</span>
+                                        )}
+                                    </div>
+                                    <select 
+                                        value={validatingApostila.professor_id || ''}
+                                        onChange={(e) => handleSetProfessor(e.target.value || null)}
+                                        disabled={isSavingValidation}
+                                        className="flex-1 h-10 px-3 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer"
+                                    >
+                                        <option value="">Sem professor</option>
+                                        {teachers.map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Progress bar */}
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-end px-1">
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Checklist</span>
+                                    <span className="text-xl font-black text-slate-900">{getValidationProgress(validatingApostila.validation)}%</span>
+                                </div>
+                                <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200 p-0.5">
+                                    <div 
+                                        className={`h-full rounded-full transition-all duration-700 ease-out ${getValidationProgress(validatingApostila.validation) === 100 ? 'bg-emerald-500' : 'bg-amber-400'}`}
+                                        style={{ width: `${getValidationProgress(validatingApostila.validation)}%` }}
+                                    ></div>
+                                </div>
+                            </div>
+
+                            {/* Checklist Grid */}
+                            <div className="grid grid-cols-1 gap-2">
+                                {[
+                                    { id: 'structure', label: 'Estrutura', desc: 'Títulos e hierarquia', icon: 'account_tree' },
+                                    { id: 'images', label: 'Imagens', desc: 'Mídias e diagramação', icon: 'image' },
+                                    { id: 'notebooks', label: 'Cadernos', desc: 'Memorização vinculada', icon: 'book' },
+                                    { id: 'questions', label: 'Questões', desc: 'Formatação e correção', icon: 'quiz' },
+                                ].map((item) => {
+                                    const isChecked = (validatingApostila.validation as any)?.[item.id] === true;
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => handleToggleValidation(item.id as any)}
+                                            disabled={isSavingValidation}
+                                            className={`flex items-center gap-4 p-3 rounded-2xl border-2 transition-all text-left ${isChecked ? 'bg-emerald-50 border-emerald-500' : 'bg-white border-slate-100 hover:border-slate-200'}`}
+                                        >
+                                            <div className={`size-8 rounded-lg flex items-center justify-center ${isChecked ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                                <span className="material-symbols-outlined text-[18px]">{isChecked ? 'check' : item.icon}</span>
+                                            </div>
+                                            <div className="flex-1">
+                                                <h4 className={`text-[11px] font-black uppercase tracking-widest ${isChecked ? 'text-emerald-700' : 'text-slate-700'}`}>{item.label}</h4>
+                                                <p className={`text-[9px] font-bold ${isChecked ? 'text-emerald-600/60' : 'text-slate-400'}`}>{item.desc}</p>
+                                            </div>
+                                            <div className={`size-5 rounded-full border-2 flex items-center justify-center ${isChecked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200'}`}>
+                                                {isChecked && <span className="material-symbols-outlined text-[10px]">check</span>}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 bg-slate-50 border-t border-slate-100">
+                            <button 
+                                onClick={() => setIsValidationModalOpen(false)}
+                                className="w-full py-3 bg-white border border-slate-200 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all active:scale-95"
+                            >
+                                Fechar Painel de Verificação
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
