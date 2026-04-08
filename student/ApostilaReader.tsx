@@ -8,14 +8,16 @@ import 'katex/dist/katex.min.css';
 interface Apostila {
     id: string;
     title: string;
+    description: string;
     content: string;
-    disciplina: { name: string };
-    author: { full_name: string };
-    created_at?: string;
-    description?: string;
+    disciplina_id: string;
+    assunto_id: string;
     estimated_time?: string;
-    disciplina_id?: string;
-    assunto_id?: string;
+    professor_id?: string;
+    disciplina?: { name: string };
+    author?: { full_name: string };
+    teacher?: { name: string; avatar_url: string };
+    created_at?: string;
 }
 
 interface Question {
@@ -60,7 +62,7 @@ const ApostilaReader: React.FC = () => {
             // 1. Fetch Apostila
             const { data: apData, error: apError } = await supabase
                 .from('apostilas')
-                .select('*, disciplina:disciplinas(name), author:profiles!author_id(full_name)')
+                .select('*, disciplina:disciplinas(name), author:profiles!author_id(full_name), teacher:teachers(*)')
                 .eq('id', id)
                 .single();
 
@@ -152,23 +154,35 @@ const ApostilaReader: React.FC = () => {
         // 1.8. Process Mathematical Equations (KaTeX)
         const processMath = (text: string) => {
             return text
-                // Display Mode: $$...$$
+                // 1. Converte <code> com conteúdo LaTeX para texto puro para processamento
+                .replace(/<code>([\s\S]*?\\(?:frac|sqrt|cdot|times|sum|int|align|begin|quad|implies|iff|neg|lor|land)[\s\S]*?)<\/code>/gi, '$1')
+                
+                // 2. Display Mode: $$...$$ ou \[...\]
                 .replace(/\$\$([\s\S]*?)\$\$/g, (_, tex) => {
                     try {
                         return katex.renderToString(tex, { displayMode: true, throwOnError: false });
                     } catch { return _; }
                 })
-                // Display Mode: \[...\]
                 .replace(/\\\[([\s\S]*?)\\\]/g, (_, tex) => {
                     try {
                         return katex.renderToString(tex, { displayMode: true, throwOnError: false });
                     } catch { return _; }
                 })
-                // Inline Mode: \(...\)
+                
+                // 3. Inline Mode: \(...\) ou $...$ (apenas se tiver caracteres matemáticos para evitar falsos positivos com $)
                 .replace(/\\\(([\s\S]*?)\\\)/g, (_, tex) => {
                     try {
                         return katex.renderToString(tex, { displayMode: false, throwOnError: false });
                     } catch { return _; }
+                })
+                .replace(/\$([^\n\$]+?)\$/g, (_, tex) => {
+                    // Detectar se parece math (presença de \, ^, _, {, } ou operadores comuns)
+                    if (/[\\^_\{\}\+\=\-\/\(\)]/.test(tex)) {
+                        try {
+                            return katex.renderToString(tex, { displayMode: false, throwOnError: false });
+                        } catch { return _; }
+                    }
+                    return _;
                 });
         };
 
@@ -1125,10 +1139,14 @@ const ApostilaReader: React.FC = () => {
 
                     <div className="flex flex-wrap items-center gap-4 text-sm font-bold text-slate-500 mb-8 px-4">
                         <div className="flex items-center gap-2">
-                            <div className="size-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                                <span className="material-symbols-outlined text-sm">person</span>
+                            <div className="size-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 overflow-hidden">
+                                {apostila.teacher?.avatar_url ? (
+                                    <img src={apostila.teacher.avatar_url} className="size-full object-cover" alt={apostila.teacher.name} />
+                                ) : (
+                                    <span className="material-symbols-outlined text-sm">person</span>
+                                )}
                             </div>
-                            <span>Prof. {apostila.author?.full_name?.split(' ')[0]}</span>
+                            <span>{apostila.teacher ? `Professor: ${apostila.teacher.name}` : `Prof. ${apostila.author?.full_name?.split(' ')[0]}`}</span>
                         </div>
                         {apostila.estimated_time && (
                             <>

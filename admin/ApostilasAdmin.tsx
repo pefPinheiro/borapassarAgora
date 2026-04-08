@@ -85,7 +85,8 @@ const ApostilasAdmin: React.FC = () => {
             subassuntos_ids: [],
             subsubassuntos_ids: []
         } as any,
-        commission_valid_until: ''
+        commission_valid_until: '',
+        professor_id: null
     });
 
     // Cadernos State
@@ -278,7 +279,8 @@ const ApostilasAdmin: React.FC = () => {
                     subassuntos_ids: apostila.filters?.subassuntos_ids || [],
                     subsubassuntos_ids: apostila.filters?.subsubassuntos_ids || []
                 },
-                commission_valid_until: apostila.commission_valid_until || ''
+                commission_valid_until: apostila.commission_valid_until || '',
+                professor_id: apostila.professor_id || null
             });
 
             fetchLinkedNotebooks(apostila.id);
@@ -302,7 +304,8 @@ const ApostilasAdmin: React.FC = () => {
                     subassuntos_ids: [],
                     subsubassuntos_ids: []
                 },
-                commission_valid_until: ''
+                commission_valid_until: '',
+                professor_id: null
             });
             setNotebooks([]);
         }
@@ -337,6 +340,7 @@ const ApostilasAdmin: React.FC = () => {
             delete (apPayload as any).author;
             delete (apPayload as any).assigned_editor;
             delete (apPayload as any).disciplinas;
+            delete (apPayload as any).teacher;
 
             if (editingApostila) {
                 const { error } = await supabase
@@ -379,7 +383,7 @@ const ApostilasAdmin: React.FC = () => {
     const handleDuplicate = async (apostila: Apostila) => {
         if (window.confirm(`Deseja duplicar a apostila "${apostila.title}"?`)) {
             try {
-                const { id, created_at, updated_at, author, assigned_editor, disciplinas, ...rest } = apostila;
+                const { id, created_at, updated_at, author, assigned_editor, disciplinas, teacher, ...rest } = apostila;
                 const duplicatePayload = {
                     ...rest,
                     title: `${apostila.title} (Cópia)`,
@@ -1087,7 +1091,7 @@ const ApostilasAdmin: React.FC = () => {
                                     </select>
                                 </div>
 
-                                {formData.assunto_id && subassuntos.filter(s => s.assunto_id === formData.assunto_id).length > 0 && (
+                                 {formData.assunto_id && subassuntos.filter(s => s.assunto_id === formData.assunto_id).length > 0 && (
                                     <div className="space-y-3 p-5 bg-white/5 border border-white/10 rounded-3xl max-h-64 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Árvore de Subtópicos</label>
                                         <div className="space-y-3">
@@ -1181,6 +1185,18 @@ const ApostilasAdmin: React.FC = () => {
                                         </div>
                                     </div>
                                 )}
+
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Professor Associado</label>
+                                    <select
+                                        value={formData.professor_id || ''}
+                                        onChange={e => setFormData({ ...formData, professor_id: e.target.value || null })}
+                                        className="w-full h-14 px-6 bg-white/5 border border-white/10 rounded-2xl outline-none font-black text-xs text-white focus:border-blue-500/50 transition-all"
+                                    >
+                                        <option value="" className="text-slate-900">Selecione um professor...</option>
+                                        {teachers.map(t => <option key={t.id} value={t.id} className="text-slate-900">{t.name}</option>)}
+                                    </select>
+                                </div>
 
                                 {currentUser?.role === 'super' && (
                                     <div className="space-y-3 p-6 bg-blue-500/5 border border-blue-500/20 rounded-3xl">
@@ -1523,7 +1539,6 @@ const ApostilasAdmin: React.FC = () => {
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-base font-black text-[#111418] group-hover:text-[#137fec] transition-colors">{a.title}</span>
                                                         </div>
-                                                        <span className="text-xs text-slate-400 font-bold max-w-sm border-l-2 border-slate-100 pl-3 ml-1">{a.description || 'Sem descrição cadastrada.'}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-10 py-8">

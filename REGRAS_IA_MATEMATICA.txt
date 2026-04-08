@@ -1,0 +1,76 @@
+# ESPECIFICAÇÃO DE FORMATAÇÃO MATEMÁTICA E CIENTÍFICA (PLATAFORMA BORA PASSAR AGORA)
+
+Este documento contém as regras obrigatórias que a Inteligência Artificial deve seguir ao gerar conteúdos teóricos, exercícios e apostilas para garantir a renderização correta das fórmulas.
+
+---
+
+## 1. DELIMITADORES DE FÓRMULAS (OBRIGATÓRIO)
+
+Para evitar conflitos com o texto comum e garantir a ativação do renderizador KaTeX:
+
+- **FÓRMULAS EM BLOCO (Centralizadas e em destaque):**
+  Use sempre dois cifrões: `$$ fórmula $$` ou colchetes escapados `\[ fórmula \]`.
+  *Exemplo:* `$$ x = \frac{-b \pm \sqrt{\Delta}}{2a} $$`
+
+- **FÓRMULAS EM LINHA (Dentro de sentenças/parágrafos):**
+  Use parênteses escapados `\( fórmula \)` ou cifrão simples `$ fórmula $`.
+  *Exemplo:* `O valor de \( \pi \) é aproximadamente 3,14.`
+
+---
+
+## 2. OPERADORES BÁSICOS E SÍMBOLOS
+
+A IA nunca deve usar caracteres de teclado comuns para operadores matemáticos complexos.
+
+- **Multiplicação:** Use `\times` (×) ou `\cdot` (·). Nunca use `*`.
+- **Visão:** Use `\div` (÷) ou a estrutura de fração `\frac{a}{b}`. Nunca use `/` para frações.
+- **Diferente:** Use `\neq` (≠).
+- **Menor/Maior ou Igual:** Use `\leq` (≤) ou `\geq` (≥).
+- **Aproximadamente:** Use `\approx` (≈).
+
+---
+
+## 3. POTÊNCIAS, RAÍZES E ÍNDICES
+
+- **Potência:** Use sempre chaves para o expoente: `x^{exp}`.
+- **Subscrito (Índices):** Use chaves para o índice: `a_{n+1}`.
+- **Raiz Quadrada:** Use `\sqrt{conteúdo}`.
+- **Raiz N-ésima:** Use `\sqrt[n]{conteúdo}`.
+
+---
+
+## 4. CONJUNTOS E LÓGICA PROPOSICIONAL (FUNDAMENTAL)
+
+O sistema de Raciocínio Lógico exige estes símbolos específicos:
+
+- **Conjunção (e):** `\land` (∧)
+- **Disjunção (ou):** `\lor` (∨)
+- **Negação (não):** `\neg` ou `\sim` (¬ ou ~)
+- **Condicional (se...então):** `\implies` (→)
+- **Bicondicional (se e somente se):** `\iff` (↔)
+- **Portanto:** `\therefore` (∴)
+- **Para todo / Existe:** `\forall` e `\exists`
+
+---
+
+## 5. REGRAS DE PRESERVAÇÃO DE TAGS CUSTOMIZADAS
+
+Além da matemática, preserve as tags de estilização da plataforma quando necessário:
+
+- `[--AVISO--] conteúdo [/--AVISO--]`
+- `[--IMPORTANTE--] conteúdo [/--IMPORTANTE--]`
+- `[--LEI--] conteúdo [/--LEI--]`
+- `[--EXEMPLO--] conteúdo [/--EXEMPLO--]`
+- `[--BORA-PRATICAR--] conteúdo [/--BORA-PRATICAR--]`
+- `[--TITULO--] Nome do Capítulo [/--TITULO--]`
+
+---
+
+## 6. EXEMPLOS DE APLICAÇÃO CORRETA
+
+**Incorreto (IA Comum):** "A formula é H = a*b/2 e o resultado é P -> Q."
+
+**Correto (IA Bora Passar):** "A fórmula é \( Area = \frac{a \times b}{2} \) e a relação lógica é \( P \implies Q \)."
+
+---
+Documento gerado em 08/04/2026 para suporte ao desenvolvimento.
