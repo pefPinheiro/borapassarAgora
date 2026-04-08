@@ -282,25 +282,21 @@ const CadernoView: React.FC = () => {
                             })}
                         </div>
 
-                        {/* Explanation & Action Footer */}
-                        {showFeedback && (
-                            <div className="bg-white border-t border-slate-100 p-6 animate-in slide-in-from-bottom-4 duration-500">
-                                <div className="mb-6 bg-slate-50 rounded-2xl p-5 border border-slate-100">
-                                    <div className="flex items-center gap-2 mb-2 text-slate-400">
-                                        <span className="material-symbols-outlined text-sm">lightbulb</span>
-                                        <span className="text-[10px] font-black uppercase tracking-widest">Explicação</span>
-                                    </div>
-                                    <div className="text-sm text-slate-600 font-medium leading-relaxed" dangerouslySetInnerHTML={{ __html: processContent(currentQ.explanation || 'Sem explicação disponível para esta questão.') }} />
-                                </div>
-                                <button
-                                    onClick={handleNext}
-                                    className="w-full py-4 bg-[#111418] text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs hover:scale-[1.02] shadow-xl hover:bg-black transition-all active:scale-95 flex items-center justify-center gap-3"
-                                >
-                                    <span>{currentIndex < questions.length - 1 ? 'Próxima Questão' : 'Concluir Caderno'}</span>
-                                    <span className="material-symbols-outlined">arrow_forward</span>
-                                </button>
-                            </div>
-                        )}
+                        {/* Fast Action Footer - Permanent to prevent layout shifts */}
+                        <div className="bg-white border-t border-slate-100 p-6">
+                            <button
+                                onClick={handleNext}
+                                disabled={!showFeedback}
+                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-xs transition-all flex items-center justify-center gap-3 ${
+                                    showFeedback 
+                                        ? 'bg-[#111418] text-white shadow-xl hover:scale-[1.02] hover:bg-black active:scale-95' 
+                                        : 'bg-slate-100 text-slate-300 cursor-not-allowed opacity-50'
+                                }`}
+                            >
+                                <span>{currentIndex < questions.length - 1 ? 'Próxima Questão' : 'Concluir Caderno'}</span>
+                                <span className="material-symbols-outlined">arrow_forward</span>
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
