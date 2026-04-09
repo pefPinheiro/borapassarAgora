@@ -328,7 +328,7 @@ const ApostilasAdmin: React.FC = () => {
                     subsubassuntos_ids: []
                 },
                 commission_valid_until: '',
-                professor_id: null
+                professor_id: (currentUser?.role === 'teacher' && currentTeacher) ? currentTeacher.id : null
             });
             setNotebooks([]);
         }
