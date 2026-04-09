@@ -153,6 +153,17 @@ const ApostilaReader: React.FC = () => {
 
         // 1.8. Process Mathematical Equations (KaTeX)
         const processMath = (text: string) => {
+            const cleanLatex = (tex: string) => {
+                return tex
+                    .replace(/&amp;/gi, '&')      // Unescape & primeiro
+                    .replace(/&lt;/gi, '<')
+                    .replace(/&gt;/gi, '>')
+                    .replace(/<br\s*\/?>/gi, ' ') // Substituir breaks por espaço
+                    .replace(/<(?:.|\n)*?>/gm, ' ') // Remover tags HTML residuais trocando por ESPAÇO (evita \hlinep)
+                    .replace(/\s+/g, ' ')           // Colapsar múltiplos espaços
+                    .trim();
+            };
+
             return text
                 // 1. Converte <code> com conteúdo LaTeX para texto puro para processamento
                 .replace(/<code>([\s\S]*?\\(?:frac|sqrt|cdot|times|sum|int|align|begin|quad|implies|iff|neg|lor|land)[\s\S]*?)<\/code>/gi, '$1')
@@ -160,33 +171,142 @@ const ApostilaReader: React.FC = () => {
                 // 2. Display Mode: $$...$$ ou \[...\]
                 .replace(/\$\$([\s\S]*?)\$\$/g, (_, tex) => {
                     try {
-                        return katex.renderToString(tex, { displayMode: true, throwOnError: false });
+                        return katex.renderToString(cleanLatex(tex), { displayMode: true, throwOnError: false });
                     } catch { return _; }
                 })
                 .replace(/\\\[([\s\S]*?)\\\]/g, (_, tex) => {
                     try {
-                        return katex.renderToString(tex, { displayMode: true, throwOnError: false });
+                        return katex.renderToString(cleanLatex(tex), { displayMode: true, throwOnError: false });
                     } catch { return _; }
                 })
                 
                 // 3. Inline Mode: \(...\) ou $...$ (apenas se tiver caracteres matemáticos para evitar falsos positivos com $)
                 .replace(/\\\(([\s\S]*?)\\\)/g, (_, tex) => {
                     try {
-                        return katex.renderToString(tex, { displayMode: false, throwOnError: false });
+                        return katex.renderToString(cleanLatex(tex), { displayMode: false, throwOnError: false });
                     } catch { return _; }
                 })
                 .replace(/\$([^\n\$]+?)\$/g, (_, tex) => {
                     // Detectar se parece math (presença de \, ^, _, {, } ou operadores comuns)
                     if (/[\\^_\{\}\+\=\-\/\(\)]/.test(tex)) {
                         try {
-                            return katex.renderToString(tex, { displayMode: false, throwOnError: false });
+                            return katex.renderToString(cleanLatex(tex), { displayMode: false, throwOnError: false });
                         } catch { return _; }
                     }
                     return _;
+                })
+                
+                // 4. Ambientes diretos \begin{array} ... \end{array} que podem não estar em \[ \]
+                .replace(/\\begin\{array\}([\s\S]*?)\\end\{array\}/gi, (match) => {
+                    try {
+                        return katex.renderToString(cleanLatex(match), { displayMode: true, throwOnError: false });
+                    } catch { return match; }
                 });
         };
 
+        // 1.8.5. Process Markdown Headers and Bold/Italic
+        const processMarkdown = (text: string) => {
+            let processed = text;
+            
+            // 0. Process Advanced Markdown Tables (GFM Standard)
+            // Identifica blocos com pipes (|) que seguem a estrutura de tabela
+            const potentialTableBlockRegex = /((?:(?:<p>|<div>)?\s*.*?\|.*?(?:\s*|<\/p>|<\/div>|<br\s*\/?>)*){2,})/gi;
+            
+            processed = processed.replace(potentialTableBlockRegex, (block) => {
+                // Segurança: Ignorar ambientes matemáticos KaTeX (array, matrix)
+                if (block.includes('\\begin') || block.includes('\\end')) return block;
+
+                // Normalização: Converter tags de quebra em quebras de linha reais
+                const lines = block
+                    .replace(/<(?:p|div|br\s*\/?)>/gi, '\n')
+                    .replace(/<\/(?:p|div)>/gi, '\n')
+                    .split('\n')
+                    .map(l => l.trim())
+                    .filter(l => l.includes('|'));
+
+                if (lines.length < 2) return block;
+
+                // Helper para parsear uma linha respeitando pipes escapados \| e pipes laterais opcionais
+                const parseMarkdownRow = (line: string) => {
+                    let cleaned = line.trim();
+                    if (cleaned.startsWith('|')) cleaned = cleaned.slice(1);
+                    if (cleaned.endsWith('|')) cleaned = cleaned.slice(0, -1);
+                    // Split por pipe que não seja precedido por uma barra invertida (Lookbehind negativo)
+                    // Como JS antigo não suporta lookbehind em todos os ambientes, usamos uma abordagem mais compatível
+                    const parts = [];
+                    let current = '';
+                    for (let i = 0; i < cleaned.length; i++) {
+                        if (cleaned[i] === '|' && (i === 0 || cleaned[i-1] !== '\\')) {
+                            parts.push(current.trim());
+                            current = '';
+                        } else {
+                            current += cleaned[i];
+                        }
+                    }
+                    parts.push(current.trim());
+                    // Limpar os pipes escapados
+                    return parts.map(p => p.replace(/\\\|/g, '|'));
+                };
+
+                const headerRow = parseMarkdownRow(lines[0]);
+                const dividerRow = parseMarkdownRow(lines[1]);
+                
+                // Validação da linha delimitadora (ex: |:---:|---:|)
+                const isDivider = dividerRow.every(c => /^[|:\s-]+$/.test(c)) && dividerRow.some(c => c.includes('-'));
+                if (!isDivider) return block;
+
+                // Capturar alinhamentos
+                const alignments = dividerRow.map(c => {
+                    const start = c.startsWith(':');
+                    const end = c.endsWith(':');
+                    if (start && end) return 'center';
+                    if (end) return 'right';
+                    return 'left';
+                });
+
+                const bodyRows = lines.slice(2).map(parseMarkdownRow);
+
+                let html = '<div class="table-container my-12 animate-in fade-in zoom-in-95 duration-1000"><table>';
+                html += '<thead><tr>';
+                headerRow.forEach((h, i) => {
+                    const align = alignments[i] || 'left';
+                    html += `<th style="text-align: ${align}">${h}</th>`;
+                });
+                html += '</tr></thead><tbody>';
+
+                bodyRows.forEach(row => {
+                    if (row.length === 0 || (row.length === 1 && row[0] === '')) return;
+                    html += '<tr>';
+                    for (let i = 0; i < headerRow.length; i++) {
+                        const align = alignments[i] || 'left';
+                        html += `<td style="text-align: ${align}">${row[i] || ''}</td>`;
+                    }
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table></div>';
+                return html;
+            });
+
+            // 1. Process Bold/Italic first (so tags like <strong> can be inside headers)
+            processed = processed.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+            processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            // 2. Process Headers (H2, H3, H4)
+            const headerRegex = /(#{2,4})\s+((?:(?!(?:<br|<\/p>|<div>|\n)).)*)/gi;
+            
+            processed = processed.replace(headerRegex, (match, hashes, content) => {
+                const level = hashes.length;
+                return `<h${level}>${content.trim()}</h${level}>`;
+            });
+
+            processed = processed.replace(/<p>\s*<\/p>/g, '');
+            
+            return processed;
+        };
+
         cleanContent = processMath(cleanContent);
+        cleanContent = processMarkdown(cleanContent);
 
         // 2. Regex flexível para capturar IDs de questões e vídeos
         // Permite "QUESTÃO INTERATIVA ID", "QUESTÃO INTERATIVA" e o novo formato "quest_id"
@@ -524,63 +644,73 @@ const ApostilaReader: React.FC = () => {
                     flex-direction: column;
                 }
 
-                /* TIPOGRAFIA GERAL */
+                /* TIPOGRAFIA GERAL - Priority selectors to override Quill (.ql-editor) */
+                .apostila-content .ql-editor h1,
                 .apostila-content h1 { 
-                    font-family: 'Lexend', sans-serif;
-                    font-size: 3rem; 
-                    font-weight: 900; 
-                    color: #0f172a; 
-                    margin: 3rem 0 2rem 0; 
-                    line-height: 0.95; 
-                    text-transform: uppercase;
-                    letter-spacing: -0.03em;
-                    background: linear-gradient(to right, #0f172a 0%, #334155 100%);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    padding: 0;
+                    font-family: 'Lexend', sans-serif !important;
+                    font-size: 3rem !important; 
+                    font-weight: 900 !important; 
+                    color: #0f172a !important; 
+                    margin: 4rem 0 2rem 0 !important; 
+                    line-height: 1 !important; 
+                    text-transform: uppercase !important;
+                    letter-spacing: -0.03em !important;
+                    background: linear-gradient(to right, #0f172a 0%, #334155 100%) !important;
+                    -webkit-background-clip: text !important;
+                    -webkit-text-fill-color: transparent !important;
+                    padding: 0 !important;
+                    border: none !important;
                 }
                 
+                .apostila-content .ql-editor h2,
                 .apostila-content h2 { 
-                    font-family: 'Lexend', sans-serif;
-                    font-size: 1.8rem; 
-                    font-weight: 800; 
-                    color: #1e293b; 
-                    margin: 3rem 0 1.5rem 0; 
-                    padding: 0 0 0 1.5rem;
+                    font-family: 'Lexend', sans-serif !important;
+                    font-size: 2rem !important; 
+                    font-weight: 800 !important; 
+                    color: #1e293b !important; 
+                    margin: 4rem 0 2rem 0 !important; 
+                    padding: 0.5rem 0 0.5rem 2rem !important;
                     text-align: left !important;
-                    border-left: 6px solid #3b82f6;
-                    line-height: 1.2;
+                    border-left: 8px solid #3b82f6 !important;
+                    line-height: 1.2 !important;
+                    display: block !important;
                 }
 
+                .apostila-content .ql-editor h3,
                 .apostila-content h3 { 
-                    font-family: 'Lexend', sans-serif;
-                    font-size: 1.4rem; 
-                    font-weight: 700; 
-                    color: #334155; 
-                    margin: 2rem 0 1rem 0; 
-                    padding: 0;
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
+                    font-family: 'Lexend', sans-serif !important;
+                    font-size: 1.5rem !important; 
+                    font-weight: 800 !important; 
+                    color: #334155 !important; 
+                    margin: 3rem 0 1.5rem 0 !important; 
+                    padding: 0 !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    gap: 12px !important;
+                    border: none !important;
                 }
-                .apostila-content h3::before {
-                    content: '#';
-                    font-family: 'Lexend', sans-serif;
-                    font-size: 1.8rem;
-                    color: #cbd5e1;
-                    font-weight: 900;
-                    line-height: 1;
-                    margin-top: -4px; /* Ajuste visual fino */
+                .apostila-content h3::before,
+                .apostila-content .ql-editor h3::before {
+                    content: '#' !important;
+                    font-family: 'Lexend', sans-serif !important;
+                    font-size: 2rem !important;
+                    color: #cbd5e1 !important;
+                    font-weight: 900 !important;
+                    line-height: 1 !important;
+                    margin: 0 !important;
+                    display: inline-block !important;
                 }
 
+                .apostila-content .ql-editor h4,
                 .apostila-content h4 {
-                    font-family: 'Lexend', sans-serif;
-                    font-size: 1.15rem;
-                    font-weight: 800;
-                    color: #0ea5e9;
-                    margin: 1.5rem 0 0.8rem 0;
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
+                    font-family: 'Lexend', sans-serif !important;
+                    font-size: 1.25rem !important;
+                    font-weight: 800 !important;
+                    color: #0ea5e9 !important;
+                    margin: 2rem 0 1rem 0 !important;
+                    text-transform: uppercase !important;
+                    letter-spacing: 0.05em !important;
+                    border: none !important;
                 }
 
                 .apostila-content p { 
@@ -712,34 +842,54 @@ const ApostilaReader: React.FC = () => {
                     letter-spacing: 0.1em;
                 }
 
-                /* Tables: Vibrant Header Glass */
-                .apostila-content table {
-                    width: 100%;
-                    margin: 5rem 0;
+                /* Tables: Vibrant Professional Style */
+                .table-container {
+                    margin: 4rem 0;
                     border-radius: 0px;
                     overflow: hidden;
-                    border: 2px solid #e0e7ff;
-                    box-shadow: 0 20px 40px rgba(99, 102, 241, 0.08);
+                    border: 1px solid #e2e8f0;
+                    box-shadow: 0 20px 50px -10px rgba(0,0,0,0.05);
                 }
-                .apostila-content th {
-                    background: linear-gradient(to right, #6366f1, #8b5cf6);
-                    padding: 1.8rem;
-                    text-align: left;
-                    font-size: 0.9rem;
-                    font-weight: 900;
-                    text-transform: uppercase;
-                    color: white;
-                    letter-spacing: 0.15em;
-                }
-                .apostila-content td {
-                    padding: 1.8rem;
-                    border-bottom: 1px solid #eef2ff;
-                    font-size: 1.1rem;
-                    color: #1e1b4b;
+
+                .apostila-content table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    table-layout: fixed; /* Garantir distribuição controlada */
+                    font-family: 'Plus Jakarta Sans', sans-serif;
                     background: white;
                 }
-                .apostila-content tr:nth-child(even) td {
-                    background: #fbfbfe;
+
+                .apostila-content th {
+                    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+                    color: white;
+                    padding: 1.5rem;
+                    text-align: left;
+                    font-size: 0.85rem;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                    letter-spacing: 0.1em;
+                    border: none;
+                }
+
+                .apostila-content td {
+                    padding: 1.5rem;
+                    border-bottom: 1px solid #f1f5f9;
+                    font-size: 1.05rem;
+                    color: #475569;
+                    line-height: 1.6;
+                    vertical-align: middle;
+                    transition: background 0.2s ease;
+                }
+
+                .apostila-content tr:last-child td { border-bottom: none; }
+                .apostila-content tr:hover td { background: #f8fafc; }
+
+                /* Especial para tabelas de 2 colunas (Resumos de Lógica) */
+                .apostila-content table tr th:first-child:nth-last-child(2),
+                .apostila-content table tr th:first-child:nth-last-child(2) ~ th,
+                .apostila-content table tr td:first-child:nth-last-child(2),
+                .apostila-content table tr td:first-child:nth-last-child(2) ~ td {
+                    width: 50%;
                 }
 
                 /* Code: Synthwave Visual */
@@ -784,6 +934,24 @@ const ApostilaReader: React.FC = () => {
                     .apostila-content blockquote p { font-size: 1rem !important; }
                     
                     .apostila-content img { margin: 2rem 0 !important; border-radius: 12px !important; }
+                }
+
+                /* KaTeX Mathematical Styling */
+                .katex-display {
+                    margin: 3rem 0 !important;
+                    padding: 2rem !important;
+                    background: #f8fafc !important;
+                    border-radius: 0px !important;
+                    border: 1px solid #e2e8f0 !important;
+                    overflow-x: auto !important;
+                    overflow-y: hidden !important;
+                    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02) !important;
+                }
+                .katex {
+                    font-size: 1.15em !important;
+                }
+                .katex .arraycolsep {
+                    width: 1em !important;
                 }
 
                 .no-scrollbar::-webkit-scrollbar { display: none; }
