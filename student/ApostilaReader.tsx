@@ -159,7 +159,7 @@ const ApostilaReader: React.FC = () => {
                     .replace(/&lt;/gi, '<')
                     .replace(/&gt;/gi, '>')
                     .replace(/<br\s*\/?>/gi, ' ') // Substituir breaks por espaço
-                    .replace(/<(?:.|\n)*?>/gm, ' ') // Remover tags HTML residuais trocando por ESPAÇO (evita \hlinep)
+                    .replace(/<\/?(?:p|div|br|span|strong|b|em|i|u|s|h[1-6]|ol|ul|li|pre|code|font)\b[^>]*?>/gi, ' ') // Remover apenas tags HTML conhecidas
                     .replace(/\s+/g, ' ')           // Colapsar múltiplos espaços
                     .trim();
             };
@@ -210,7 +210,7 @@ const ApostilaReader: React.FC = () => {
             
             // 0. Process Advanced Markdown Tables (GFM Standard)
             // Identifica blocos com pipes (|) que seguem a estrutura de tabela
-            const potentialTableBlockRegex = /((?:(?:<p>|<div>)?\s*.*?\|.*?(?:\s*|<\/p>|<\/div>|<br\s*\/?>)*){2,})/gi;
+            const potentialTableBlockRegex = /((?:(?:<p>|<div>)?\s*(?:(?!<\/?(?:p|div)).)*?\|.*?(?:\s*|<\/p>|<\/div>|<br\s*\/?>)*){2,})/gi;
             
             processed = processed.replace(potentialTableBlockRegex, (block) => {
                 // Segurança: Ignorar ambientes matemáticos KaTeX (array, matrix)
