@@ -61,6 +61,14 @@ const ApostilasAdmin: React.FC = () => {
     const [filterSearch, setFilterSearch] = useState('');
     const [filterDisciplina, setFilterDisciplina] = useState('');
     const [filterAuthor, setFilterAuthor] = useState('');
+    const [filterProfessor, setFilterProfessor] = useState('');
+    const [currentTeacher, setCurrentTeacher] = useState<Teacher | null>(null);
+
+    // Observation State
+    const [isObservationModalOpen, setIsObservationModalOpen] = useState(false);
+    const [observingApostila, setObservingApostila] = useState<Apostila | null>(null);
+    const [observationText, setObservationText] = useState('');
+    const [isSavingObservation, setIsSavingObservation] = useState(false);
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -110,7 +118,14 @@ const ApostilasAdmin: React.FC = () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-                if (profile) setCurrentUser(profile);
+                if (profile) {
+                    setCurrentUser(profile);
+                    // Se for professor, buscar registro do professor
+                    if (profile.role === 'teacher') {
+                        const { data: teacher } = await supabase.from('teachers').select('*').eq('linked_profile_id', profile.id).single();
+                        if (teacher) setCurrentTeacher(teacher);
+                    }
+                }
             }
             fetchAuxData();
         };
@@ -141,12 +156,12 @@ const ApostilasAdmin: React.FC = () => {
 
     useEffect(() => {
         fetchApostilas();
-    }, [currentPage, filterSearch, filterDisciplina, filterAuthor]);
+    }, [currentPage, filterSearch, filterDisciplina, filterAuthor, filterProfessor]);
 
     // Reset to page 1 when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [filterSearch, filterDisciplina, filterAuthor]);
+    }, [filterSearch, filterDisciplina, filterAuthor, filterProfessor]);
 
     const fetchApostilas = async () => {
         setLoading(true);
@@ -169,6 +184,9 @@ const ApostilasAdmin: React.FC = () => {
             }
             if (filterAuthor) {
                 query = query.or(`author_id.eq.${filterAuthor},assigned_editor_id.eq.${filterAuthor}`);
+            }
+            if (filterProfessor) {
+                query = query.eq('professor_id', filterProfessor);
             }
 
             const from = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -260,6 +278,11 @@ const ApostilasAdmin: React.FC = () => {
 
     const handleOpenForm = async (apostila?: Apostila) => {
         if (apostila) {
+            const perms = getPermissions(apostila);
+            if (!perms.canEdit) {
+                alert('Você não tem permissão para editar esta apostila.');
+                return;
+            }
             setEditingApostila(apostila);
             setFormData({
                 title: apostila.title || '',
@@ -621,8 +644,44 @@ const ApostilasAdmin: React.FC = () => {
     };
 
     const handleOpenValidationModal = (apostila: Apostila) => {
+        const perms = getPermissions(apostila);
+        if (!perms.canValidate) {
+            alert('Você não tem permissão para validar esta apostila.');
+            return;
+        }
         setValidatingApostila(apostila);
         setIsValidationModalOpen(true);
+    };
+
+    const getPermissions = (a: Apostila) => {
+        if (!currentUser) return { canDelete: false, canEdit: false, canDuplicate: false, canValidate: false };
+        const isSuper = currentUser.role === 'super' || currentUser.role === 'admin';
+        
+        // Professor permission
+        const isTeacherRole = currentUser.role === 'teacher';
+        const isProfessorLinked = currentTeacher && a.professor_id && a.professor_id === currentTeacher.id;
+
+        // Strict rule for professors: only associated workbooks
+        if (isTeacherRole) {
+            // Se o professor for o professor_id associado, ele pode editar e validar.
+            // Caso contrário, APENAS visualizar.
+            return {
+                canDelete: false,
+                canEdit: !!isProfessorLinked,
+                canDuplicate: false,
+                canValidate: !!isProfessorLinked
+            };
+        }
+
+        const isAuthor = a.author_id === currentUser.id;
+        const isEditor = a.assigned_editor_id === currentUser.id;
+
+        return {
+            canDelete: isSuper,
+            canEdit: isSuper || isAuthor || isEditor,
+            canDuplicate: isSuper || isAuthor || isEditor,
+            canValidate: isSuper || !!isProfessorLinked
+        };
     };
 
     const handleToggleValidation = async (field: keyof NonNullable<Apostila['validation']>) => {
@@ -694,14 +753,44 @@ const ApostilasAdmin: React.FC = () => {
 
     const getValidationProgress = (validation?: any) => {
         if (!validation || typeof validation !== 'object') return 0;
-        const values = [
+        const items = [
             validation.structure === true,
             validation.images === true,
             validation.notebooks === true,
             validation.questions === true
         ];
-        const checked = values.filter(v => v).length;
-        return Math.round((checked / values.length) * 100);
+        // professional_validation é um bônus/selo final, não conta no progresso base de 0-100% 
+        // ou conta como 5º item? Vamos colocar como informativo.
+        const checked = items.filter(v => v).length;
+        return Math.round((checked / items.length) * 100);
+    };
+
+    const handleOpenObservationModal = (apostila: Apostila) => {
+        setObservingApostila(apostila);
+        setObservationText(apostila.observations || '');
+        setIsObservationModalOpen(true);
+    };
+
+    const handleSaveObservation = async () => {
+        if (!observingApostila) return;
+        setIsSavingObservation(true);
+        try {
+            const { error } = await supabase
+                .from('apostilas')
+                .update({ observations: observationText })
+                .eq('id', observingApostila.id);
+            
+            if (error) throw error;
+            
+            // Local update
+            setApostilas(prev => prev.map(a => a.id === observingApostila.id ? { ...a, observations: observationText } : a));
+            setIsObservationModalOpen(false);
+            alert('Observação salva com sucesso!');
+        } catch (e: any) {
+            alert('Erro ao salvar observação: ' + e.message);
+        } finally {
+            setIsSavingObservation(false);
+        }
     };
 
     // Filter Logic - (unchanged code skipped for brevity)
@@ -726,19 +815,6 @@ const ApostilasAdmin: React.FC = () => {
     // Filter Logic - Now handled server-side for performance
     const filteredApostilas = apostilas;
 
-    // Permission Logic
-    // Permission Logic
-    const getPermissions = (a: Apostila) => {
-        if (!currentUser) return { canDelete: false, canEdit: false, canDuplicate: false };
-        const isSuper = currentUser.role === 'super';
-        const isAuthorized = a.assigned_editor_id === currentUser.id;
-
-        return {
-            canDelete: isSuper,
-            canEdit: isSuper || isAuthorized,
-            canDuplicate: isSuper || isAuthorized
-        };
-    };
 
     // Grouping Logic
     const grouped = filteredApostilas.reduce((acc, a) => {
@@ -1191,7 +1267,8 @@ const ApostilasAdmin: React.FC = () => {
                                     <select
                                         value={formData.professor_id || ''}
                                         onChange={e => setFormData({ ...formData, professor_id: e.target.value || null })}
-                                        className="w-full h-14 px-6 bg-white/5 border border-white/10 rounded-2xl outline-none font-black text-xs text-white focus:border-blue-500/50 transition-all"
+                                        disabled={currentUser?.role !== 'super'}
+                                        className="w-full h-14 px-6 bg-white/5 border border-white/10 rounded-2xl outline-none font-black text-xs text-white focus:border-blue-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <option value="" className="text-slate-900">Selecione um professor...</option>
                                         {teachers.map(t => <option key={t.id} value={t.id} className="text-slate-900">{t.name}</option>)}
@@ -1496,12 +1573,27 @@ const ApostilasAdmin: React.FC = () => {
                     </select>
                     <select
                         value={filterAuthor}
-                        onChange={e => setFilterAuthor(e.target.value)}
+                        onChange={e => {
+                            const val = e.target.value;
+                            if (val.startsWith('prof_')) {
+                                setFilterProfessor(val.replace('prof_', ''));
+                                setFilterAuthor('');
+                            } else {
+                                setFilterAuthor(val);
+                                setFilterProfessor('');
+                            }
+                        }}
                         className="h-14 px-6 bg-slate-50 border border-slate-100 rounded-[20px] text-sm font-bold text-slate-500 outline-none appearance-none"
                     >
                         <option value="">Filtrar Responsável</option>
-                        <option value={currentUser?.id || ''}>Minha Produção</option>
-                        {admins.filter(adm => adm.id !== currentUser?.id).map(adm => <option key={adm.id} value={adm.id}>{adm.full_name}</option>)}
+                        <optgroup label="Corpo Administrativo">
+                            <option value={currentUser?.id || ''}>Minha Produção (Adm)</option>
+                            {admins.filter(adm => adm.id !== currentUser?.id).map(adm => <option key={adm.id} value={adm.id}>{adm.full_name}</option>)}
+                        </optgroup>
+                        <optgroup label="Professores">
+                            {currentTeacher && <option value={`prof_${currentTeacher.id}`}>Minhas Apostilas (Professor)</option>}
+                            {teachers.filter(t => t.id !== currentTeacher?.id).map(t => <option key={t.id} value={`prof_${t.id}`}>{t.name}</option>)}
+                        </optgroup>
                     </select>
                 </div>
             </div>
@@ -1552,20 +1644,33 @@ const ApostilasAdmin: React.FC = () => {
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-10 py-8 text-center">
-                                                    <button
-                                                        onClick={() => handleOpenValidationModal(a)}
-                                                        className={`group/qual relative px-4 py-2 rounded-2xl transition-all border-2 flex items-center gap-3 mx-auto ${getValidationProgress(a.validation) === 100 ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : getValidationProgress(a.validation) > 0 ? 'bg-amber-50 border-amber-300 text-amber-600' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-300'}`}
-                                                    >
-                                                        <span className={`material-symbols-outlined text-[20px] ${getValidationProgress(a.validation) > 0 && getValidationProgress(a.validation) < 100 ? 'animate-pulse' : ''}`}>
-                                                            {getValidationProgress(a.validation) === 100 ? 'verified' : 'verified_user'}
-                                                        </span>
-                                                        <span className="text-[10px] font-black uppercase tracking-widest">{getValidationProgress(a.validation)}%</span>
-                                                        
-                                                        {getValidationProgress(a.validation) > 0 && getValidationProgress(a.validation) < 100 && (
-                                                            <div className="absolute -top-1 -right-1 size-3 bg-amber-500 rounded-full border-2 border-white"></div>
-                                                        )}
-                                                    </button>
+                                                <td className="px-10 py-8 text-center text-slate-300">
+                                                    {perms.canValidate ? (
+                                                        <div
+                                                            onClick={() => handleOpenValidationModal(a)}
+                                                            className={`group/qual relative px-4 py-2 rounded-2xl transition-all border-2 flex items-center gap-3 mx-auto cursor-pointer ${a.validation?.professional_validation ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg' : getValidationProgress(a.validation) === 100 ? 'bg-emerald-50 border-emerald-400 text-emerald-600' : getValidationProgress(a.validation) > 0 ? 'bg-amber-50 border-amber-300 text-amber-600' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-300'}`}
+                                                        >
+                                                            <span className={`material-symbols-outlined text-[20px] ${getValidationProgress(a.validation) > 0 && getValidationProgress(a.validation) < 100 ? 'animate-pulse' : ''}`}>
+                                                                {a.validation?.professional_validation ? 'verified' : getValidationProgress(a.validation) === 100 ? 'verified' : 'verified_user'}
+                                                            </span>
+                                                            <span className="text-[10px] font-black uppercase tracking-widest">
+                                                                {a.validation?.professional_validation ? 'Validado' : `${getValidationProgress(a.validation)}%`}
+                                                            </span>
+                                                            
+                                                            {getValidationProgress(a.validation) > 0 && getValidationProgress(a.validation) < 100 && !a.validation?.professional_validation && (
+                                                                <div className="absolute -top-1 -right-1 size-3 bg-amber-500 rounded-full border-2 border-white"></div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <div className={`relative px-4 py-2 rounded-2xl border-2 flex items-center gap-3 mx-auto opacity-40 grayscale-[0.8] cursor-not-allowed ${a.validation?.professional_validation ? 'bg-indigo-100 border-indigo-200 text-indigo-400' : 'bg-slate-50 border-slate-100 text-slate-300'}`}>
+                                                             <span className="material-symbols-outlined text-[20px]">
+                                                                {a.validation?.professional_validation ? 'verified' : 'verified_user'}
+                                                            </span>
+                                                            <span className="text-[10px] font-black uppercase tracking-widest">
+                                                                {a.validation?.professional_validation ? 'Validado' : `${getValidationProgress(a.validation)}%`}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="px-10 py-8 text-center">
                                                     <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${a.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
@@ -1574,6 +1679,16 @@ const ApostilasAdmin: React.FC = () => {
                                                 </td>
                                                 <td className="px-10 py-8">
                                                     <div className="flex items-center justify-end gap-2 translate-x-2 group-hover:translate-x-0 transition-transform">
+                                                        {perms.canValidate && (
+                                                            <button
+                                                                onClick={() => handleOpenObservationModal(a)}
+                                                                className={`size-10 flex items-center justify-center rounded-xl transition-all ${a.observations ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                                                title="Adicionar Observação / Melhoria"
+                                                            >
+                                                                <span className="material-symbols-outlined text-[20px]">assignment_add</span>
+                                                            </button>
+                                                        )}
+                                                        
                                                         <button
                                                             onClick={() => handlePreview(a.id)}
                                                             className="size-10 flex items-center justify-center text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
@@ -1688,8 +1803,8 @@ const ApostilasAdmin: React.FC = () => {
                                     <select 
                                         value={validatingApostila.professor_id || ''}
                                         onChange={(e) => handleSetProfessor(e.target.value || null)}
-                                        disabled={isSavingValidation}
-                                        className="flex-1 h-10 px-3 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer"
+                                        disabled={isSavingValidation || currentUser?.role !== 'super'}
+                                        className="flex-1 h-10 px-3 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <option value="">Sem professor</option>
                                         {teachers.map(t => (
@@ -1743,6 +1858,21 @@ const ApostilasAdmin: React.FC = () => {
                                     );
                                 })}
                             </div>
+
+                            {/* professional_validation Toggle */}
+                            <div className="pt-4 border-t border-slate-100">
+                                <button
+                                    onClick={() => handleToggleValidation('professional_validation' as any)}
+                                    disabled={isSavingValidation}
+                                    className={`w-full flex flex-col items-center gap-3 p-6 rounded-3xl border-2 transition-all ${validatingApostila.validation?.professional_validation ? 'bg-indigo-600 border-indigo-400 text-white shadow-xl shadow-indigo-200' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-white hover:border-indigo-200'}`}
+                                >
+                                    <span className="material-symbols-outlined text-[32px]">{validatingApostila.validation?.professional_validation ? 'verified' : 'fact_check'}</span>
+                                    <div className="text-center">
+                                        <h4 className="text-xs font-black uppercase tracking-[0.2em]">{validatingApostila.validation?.professional_validation ? 'Apostila Validada' : 'Validar Apostila'}</h4>
+                                        <p className="text-[9px] font-bold opacity-60 mt-1">{validatingApostila.validation?.professional_validation ? 'Acurácia técnica confirmada pelo mestre' : 'Confirmar revisão final e precisão técnica'}</p>
+                                    </div>
+                                </button>
+                            </div>
                         </div>
 
                         {/* Footer */}
@@ -1752,6 +1882,52 @@ const ApostilasAdmin: React.FC = () => {
                                 className="w-full py-3 bg-white border border-slate-200 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all active:scale-95"
                             >
                                 Fechar Painel de Verificação
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Observação */}
+            {isObservationModalOpen && observingApostila && (
+                <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-lg rounded-[32px] shadow-2xl overflow-hidden flex flex-col scale-in-center animate-in zoom-in-95">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50/30">
+                            <div className="flex items-center gap-3">
+                                <div className="size-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                                    <span className="material-symbols-outlined text-[20px]">comment</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-black text-slate-900 uppercase leading-none">Observações / Melhorias</h3>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">{observingApostila.title}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsObservationModalOpen(false)} className="size-8 rounded-full hover:bg-indigo-100 flex items-center justify-center transition-all">
+                                <span className="material-symbols-outlined text-[20px]">close</span>
+                            </button>
+                        </div>
+                        <div className="p-8 space-y-4">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Digite as melhorias necessárias:</label>
+                            <textarea
+                                value={observationText}
+                                onChange={e => setObservationText(e.target.value)}
+                                className="w-full h-48 p-5 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-200 transition-all font-medium text-slate-700 resize-none text-sm"
+                                placeholder="Descreva aqui o que precisa ser corrigido ou melhorado nesta apostila..."
+                            />
+                        </div>
+                        <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
+                            <button 
+                                onClick={() => setIsObservationModalOpen(false)}
+                                className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:bg-slate-100 transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={handleSaveObservation}
+                                disabled={isSavingObservation}
+                                className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-600/20 active:scale-95 disabled:opacity-50"
+                            >
+                                {isSavingObservation ? 'Salvando...' : 'Salvar Observação'}
                             </button>
                         </div>
                     </div>

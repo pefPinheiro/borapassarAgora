@@ -170,11 +170,13 @@ export interface Apostila {
   commission_valid_until?: string;
   professor_id?: string;
   teacher?: Teacher;
+  observations?: string;
   validation?: {
     structure: boolean;
     images: boolean;
     notebooks: boolean;
     questions: boolean;
+    professional_validation?: boolean;
   };
 }
 
@@ -186,6 +188,8 @@ export interface Teacher {
   ad_images: string[];
   avatar_url?: string;
   status: 'Ativo' | 'Inativo';
+  corporate_email?: string;
+  linked_profile_id?: string;
   created_at: string;
   updated_at: string;
   // Joins

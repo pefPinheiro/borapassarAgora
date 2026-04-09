@@ -18,8 +18,14 @@ const ProfessorsAdmin: React.FC = () => {
         status: 'Ativo',
         disciplines_ids: [],
         ad_images: [],
-        avatar_url: ''
+        avatar_url: '',
+        corporate_email: '',
+        linked_profile_id: ''
     });
+
+    const [corporatePrefix, setCorporatePrefix] = useState('');
+    const [profiles, setProfiles] = useState<any[]>([]);
+    const [searchingProfile, setSearchingProfile] = useState(false);
 
     const avatarInputRef = useRef<HTMLInputElement>(null);
     const adImagesInputRef = useRef<HTMLInputElement>(null);
@@ -27,7 +33,21 @@ const ProfessorsAdmin: React.FC = () => {
     useEffect(() => {
         fetchProfessors();
         fetchDisciplinas();
+        fetchProfiles();
     }, []);
+
+    const fetchProfiles = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, full_name, email, role, avatar_url')
+                .order('full_name');
+            if (error) throw error;
+            setProfiles(data || []);
+        } catch (e) {
+            console.error('Error fetching profiles:', e);
+        }
+    };
 
     const fetchProfessors = async () => {
         setLoading(true);
@@ -64,10 +84,40 @@ const ProfessorsAdmin: React.FC = () => {
                 status: 'Ativo',
                 disciplines_ids: [],
                 ad_images: [],
-                avatar_url: ''
+                avatar_url: '',
+                corporate_email: '',
+                linked_profile_id: ''
             });
         }
         setView('form');
+    };
+
+    const handleProfileLink = async (profileId: string) => {
+        const selected = profiles.find(p => p.id === profileId);
+        if (!selected) return;
+
+        setFormData(prev => ({
+            ...prev,
+            linked_profile_id: profileId,
+            name: prev.name || selected.full_name,
+            avatar_url: prev.avatar_url || selected.avatar_url,
+            corporate_email: selected.email
+        }));
+
+        // Automatically update the profile role to teacher if needed
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ 
+                    role: 'teacher',
+                    allowed_modules: ['apostilas', 'simulados', 'cadernos', 'questoes'],
+                    status: 'active'
+                })
+                .eq('id', profileId);
+            if (error) throw error;
+        } catch (e) {
+            console.error('Error updating profile role:', e);
+        }
     };
 
     const handleFileUpload = async (file: File, folder: string) => {
@@ -251,6 +301,82 @@ const ProfessorsAdmin: React.FC = () => {
                                 />
                             </div>
                         </div>
+
+                        {/* Acesso & E-mail Corporativo Card */}
+                        <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm p-10 space-y-8">
+                            <div className="flex items-center gap-4 mb-2 border-b border-slate-50 pb-6">
+                                <div className="size-10 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center">
+                                    <span className="material-symbols-outlined">key</span>
+                                </div>
+                                <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Perfil de Acesso & Vinculação</h3>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="space-y-4">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Vincular Colaborador</label>
+                                        <div className="relative group">
+                                            <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
+                                                <span className="material-symbols-outlined">person_add</span>
+                                            </div>
+                                            <select
+                                                value={formData.linked_profile_id || ''}
+                                                onChange={(e) => handleProfileLink(e.target.value)}
+                                                className="w-full h-14 pl-14 pr-6 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-bold text-[#111418] focus:border-blue-500 focus:bg-white transition-all appearance-none"
+                                            >
+                                                <option value="">Selecione um colaborador registrado...</option>
+                                                {profiles.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.full_name} ({p.email})</option>
+                                                ))}
+                                            </select>
+                                            <div className="absolute inset-y-0 right-0 pr-6 flex items-center pointer-events-none text-slate-400">
+                                                <span className="material-symbols-outlined">unfold_more</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-[9px] text-slate-400 font-bold italic pl-1">Selecione o perfil do colaborador que será associado a este professor.</p>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Status do Perfil vinculado</label>
+                                        {formData.linked_profile_id ? (
+                                            <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between animate-in fade-in duration-300">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="size-10 rounded-full overflow-hidden border-2 border-white shadow-sm ring-1 ring-emerald-200">
+                                                        <img src={profiles.find(p => p.id === formData.linked_profile_id)?.avatar_url || 'https://picsum.photos/50/50'} className="size-full object-cover" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs font-black text-emerald-900 leading-none mb-1">
+                                                            {profiles.find(p => p.id === formData.linked_profile_id)?.full_name}
+                                                        </p>
+                                                        <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600/60 leading-none">PERFIL VINCULADO</p>
+                                                    </div>
+                                                </div>
+                                                <span className="material-symbols-outlined text-emerald-500">verified</span>
+                                            </div>
+                                        ) : (
+                                            <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between opacity-50">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="size-10 bg-slate-200 rounded-full flex items-center justify-center text-slate-400">
+                                                        <span className="material-symbols-outlined text-[20px]">link_off</span>
+                                                    </div>
+                                                    <p className="text-xs font-black text-slate-400 leading-none italic">Nenhum perfil vinculado ainda</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="p-8 bg-[#111418] rounded-[32px] text-white border border-slate-800 shadow-2xl space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="size-8 bg-blue-500/20 text-blue-400 rounded-lg flex items-center justify-center">
+                                            <span className="material-symbols-outlined text-[20px]">shield_person</span>
+                                        </div>
+                                        <h4 className="text-xs font-black uppercase tracking-widest">Informações de Acesso</h4>
+                                    </div>
+                                    <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                                        Ao vincular o colaborador, o sistema atualizará automaticamente o perfil dele para o cargo de <span className="text-blue-400 font-bold underline">Professor</span> e concederá acesso total à Gestão de Conteúdo (Apostilas, Simulados, Cadernos e Questões).
+                                    </p>
+                                </div>
+                            </div>
 
                         {/* Propaganda Card */}
                         <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm p-10 space-y-8">

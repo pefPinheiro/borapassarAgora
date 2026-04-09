@@ -26,6 +26,12 @@ const AdminRegister: React.FC = () => {
             return;
         }
 
+        if (!email.toLowerCase().endsWith('@borapassaragora.com')) {
+            setError('E-mail inválido. Utilize seu e-mail corporativo @borapassaragora.com');
+            setLoading(false);
+            return;
+        }
+
         if (password !== confirmPassword) {
             setError('As senhas não conferem.');
             setLoading(false);
@@ -122,7 +128,7 @@ const AdminRegister: React.FC = () => {
                                     onChange={(e) => setEmail(e.target.value)}
                                     disabled={loading}
                                     className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none disabled:opacity-50"
-                                    placeholder="admin@borapassar.com"
+                                    placeholder="seu.nome@borapassaragora.com"
                                 />
                             </div>
 

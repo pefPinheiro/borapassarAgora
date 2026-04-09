@@ -13,8 +13,7 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
-import BubbleMenuExtension from '@tiptap/extension-bubble-menu';
-import FloatingMenuExtension from '@tiptap/extension-floating-menu';
+// BubbleMenu and FloatingMenu are used as components, so we don't need to register them as extensions manually.
 import { supabase } from '../lib/supabase';
 
 const MenuButton = ({ onClick, isActive, icon, label }: any) => (
@@ -55,8 +54,6 @@ const TiptapEditor = React.forwardRef<TiptapRef, TiptapEditorProps>(({ content, 
         TableRow,
         TableHeader,
         TableCell,
-        BubbleMenuExtension,
-        FloatingMenuExtension,
     ], [placeholder]);
 
     const editor = useEditor({

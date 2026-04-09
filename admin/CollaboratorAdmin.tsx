@@ -100,7 +100,7 @@ const CollaboratorAdmin: React.FC = () => {
           valorFixo: p.fixed_payment_value || 0,
           periodoFixo: p.fixed_payment_period || 'Mensal',
           modulosPermitidos: p.allowed_modules || [],
-          view_all_payments: p.view_all_payments || false,
+          verTodosPagamentos: p.view_all_payments || false,
           receiveGeneralCommission: p.receive_general_commission || false,
           dataSolicitacao: new Date(p.created_at || p.updated_at || Date.now()).toLocaleDateString(),
           avatar_url: p.avatar_url,
@@ -115,7 +115,7 @@ const CollaboratorAdmin: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Error fetching collaborators:', error);
-      alert('Erro ao carregar lista: ' + (error.message || error));
+      alert('Erro ao carregar lista: ' + (error.message || 'Erro desconhecido'));
     } finally {
       setLoading(false);
     }
@@ -156,13 +156,14 @@ const CollaboratorAdmin: React.FC = () => {
           job_title: formData.cargo,
           status: dbStatus,
 
-          payment_type: formData.tipoRemuneracao,
-          fixed_payment_value: formData.valorFixo,
-          fixed_payment_period: formData.periodoFixo,
-          allowed_modules: formData.modulosPermitidos,
-          view_all_payments: formData.verTodosPagamentos,
-          receive_general_commission: formData.receiveGeneralCommission,
-          is_investor: formData.is_investor
+          payment_type: formData.tipoRemuneracao || 'Comissão',
+          fixed_payment_value: Number(formData.valorFixo) || 0,
+          fixed_payment_period: formData.periodoFixo || 'Mensal',
+          allowed_modules: formData.modulosPermitidos || [],
+          view_all_payments: Boolean(formData.verTodosPagamentos),
+          receive_general_commission: Boolean(formData.receiveGeneralCommission),
+          is_investor: Boolean(formData.is_investor),
+          role: formData.role || 'editor'
         })
         .eq('id', editingId);
 
@@ -172,8 +173,9 @@ const CollaboratorAdmin: React.FC = () => {
       setIsModalOpen(false);
       fetchCollaborators();
     } catch (error: any) {
-      console.error('Error updating profile:', error);
-      alert('Erro ao atualizar: ' + error.message);
+      console.error('Detailed Supabase Error:', error);
+      const errorMsg = error.message || (error.code ? `Erro DB (${error.code})` : 'Erro desconhecido');
+      alert('Erro ao atualizar: ' + errorMsg);
     }
   };
 
@@ -379,6 +381,23 @@ const CollaboratorAdmin: React.FC = () => {
                     <option value="Ativo">Ativo / Liberado</option>
                     <option value="Inativo">Bloqueado / Inativo</option>
                     <option value="Pendente">Pendente / Em Análise</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 text-blue-500">Nível de Acesso (Perfil)</label>
+                  <select
+                    value={formData.role}
+                    onChange={e => setFormData({ ...formData, role: e.target.value })}
+                    className="w-full h-12 px-4 bg-blue-50 border border-blue-100 rounded-2xl font-bold text-blue-700 outline-none focus:border-blue-500 transition-all font-black uppercase"
+                  >
+                    <option value="admin">Administrador (Admin)</option>
+                    <option value="super">Super Administrador (Super)</option>
+                    <option value="editor">Editor de Conteúdo</option>
+                    <option value="teacher">Professor (Teacher)</option>
+                    <option value="moderator">Moderador</option>
+                    <option value="collaborator">Colaborador Geral</option>
+                    <option value="student">Aluno / Usuário (Student)</option>
                   </select>
                 </div>
               </div>
