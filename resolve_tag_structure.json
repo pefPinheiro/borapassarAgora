@@ -1,0 +1,16 @@
+{
+  "resolve_tag": {
+    "syntax": "[--RESOLVE: 01--] ... [--SOLUCAO--] ... [/--SOLUCAO--] [/--RESOLVE--]",
+    "fields": {
+      "numero": "Definido no parâmetro :01 da tag [--RESOLVE--]",
+      "questao": "Texto livre entre a tag de abertura and a tag [--SOLUCAO--]",
+      "solucao": "Conteúdo dentro da tag [--SOLUCAO--]"
+    },
+    "example_json_data": {
+      "id": "12",
+      "enunciado": "Qual é a capital da França?",
+      "resolucao": "A capital da França é Paris, famosa pela Torre Eiffel."
+    },
+    "how_to_use": "No editor, utilize o botão 'Resolvida' ou digite as tags manualmente. O sistema processará o número após os dois pontos e aplicará o estilo de linha divisória e fundo azul na solução."
+  }
+}

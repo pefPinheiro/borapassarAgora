@@ -326,7 +326,12 @@ const ApostilaReader: React.FC = () => {
             .replace(/\[--EXEMPLO--\]([\s\S]*?)\[\/--EXEMPLO--\]/g, '<div class="custom-tag tag-exemplo"><div class="tag-icon-box"><span class="material-symbols-outlined">lightbulb</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Exemplo</strong></div><div class="tag-text">$1</div></div></div>')
             .replace(/\[--BORA-PRATICAR--\]([\s\S]*?)\[\/--BORA-PRATICAR--\]/g, '<div class="custom-tag tag-praticar"><div class="tag-icon-box"><span class="material-symbols-outlined">fitness_center</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Bora Praticar Agora!</strong></div><div class="tag-text">$1</div></div></div>')
             .replace(/\[--CORRECAO--\]([\s\S]*?)\[\/--CORRECAO--\]/g, '<div class="custom-tag tag-correcao"><div class="tag-icon-box"><span class="material-symbols-outlined">edit_note</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Correção Necessária</strong></div><div class="tag-text">$1</div></div></div>')
-            .replace(/\[--TITULO--\]([\s\S]*?)\[\/--TITULO--\]/g, '<div class="custom-tag tag-titulo"><div class="tag-content-wrapper"><div class="tag-text">$1</div></div></div>');
+            .replace(/\[--TITULO--\]([\s\S]*?)\[\/--TITULO--\]/g, '<div class="custom-tag tag-titulo"><div class="tag-content-wrapper"><div class="tag-text">$1</div></div></div>')
+            .replace(/\[--RESOLVE:?\s*(\d+)?--\]([\s\S]*?)\[\/--RESOLVE--\]/gi, (match, numero, inner) => {
+                const num = numero || "00";
+                const cleanInner = inner.replace(/\[--SOLUCAO--\]([\s\S]*?)\[\/--SOLUCAO--\]/gi, '<div class="resolve-solution">$1</div>');
+                return `<div class="tag-resolve"><div class="resolve-header"><span>BORA PASSAR ${num}</span></div><div class="resolve-body">${cleanInner}</div></div>`;
+            });
 
 
         // 3. Encontra todas as ocorrências e cria um array de partes
@@ -635,6 +640,55 @@ const ApostilaReader: React.FC = () => {
                     letter-spacing: 0.1em;
                     margin: 0;
                     line-height: 1.2;
+                }
+
+                /* Variante RESOLVE (Questão Resolvida) */
+                .tag-resolve {
+                    margin: 4rem 0;
+                    border: none;
+                    background: transparent;
+                }
+                .resolve-header {
+                    display: flex;
+                    align-items: center;
+                    text-align: center;
+                    margin: 3rem 0;
+                }
+                .resolve-header::before,
+                .resolve-header::after {
+                    content: '';
+                    flex: 1;
+                    border-bottom: 2px solid #e2e8f0;
+                }
+                .resolve-header span {
+                    padding: 0 2rem;
+                    font-family: 'Lexend', sans-serif;
+                    font-weight: 900;
+                    color: #64748b;
+                    font-size: 1rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.2em;
+                }
+                .resolve-body {
+                    padding: 0;
+                }
+                .resolve-solution {
+                    margin-top: 2rem;
+                    padding: 2.5rem;
+                    background-color: #f0f9ff; /* Light blue background */
+                    border-radius: 24px;
+                    border: 1px solid #bae6fd;
+                    position: relative;
+                }
+                .resolve-solution::before {
+                    content: 'RESPOSTA E COMENTÁRIOS';
+                    display: block;
+                    font-family: 'Lexend', sans-serif;
+                    font-size: 0.75rem;
+                    font-weight: 800;
+                    color: #0369a1;
+                    margin-bottom: 1rem;
+                    letter-spacing: 0.1em;
                 }
 
                 /* Variante VIDEO */

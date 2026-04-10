@@ -63,6 +63,7 @@ Além da matemática, preserve as tags de estilização da plataforma quando nec
 - `[--EXEMPLO--] conteúdo [/--EXEMPLO--]`
 - `[--BORA-PRATICAR--] conteúdo [/--BORA-PRATICAR--]`
 - `[--TITULO--] Nome do Capítulo [/--TITULO--]`
+- `[--RESOLVE: XX--] Enunciado... [--SOLUCAO--] Explicação... [/--SOLUCAO--] [/--RESOLVE--]` (Onde XX é o número da questão).
 
 ---
 

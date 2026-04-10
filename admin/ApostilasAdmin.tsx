@@ -593,7 +593,21 @@ const ApostilasAdmin: React.FC = () => {
         }
     };
 
-    const insertTag = (tagType: 'question' | 'video' | 'image' | 'math' | 'exemplo' | 'lei' | 'correcao') => {
+    const insertTag = (tagType: 'question' | 'video' | 'image' | 'math' | 'exemplo' | 'lei' | 'correcao' | 'resolve') => {
+        if (tagType === 'resolve') {
+            const num = window.prompt("Número da Questão:", "01");
+            if (num === null) return;
+            editorRef.current?.insertContent(`
+                <p>[--RESOLVE: ${num}--]</p>
+                <p>Enunciado da questão aqui...</p>
+                <p>[--SOLUCAO--]</p>
+                <p>Resolução detalhada aqui...</p>
+                <p>[/--SOLUCAO--]</p>
+                <p>[/--RESOLVE--]</p>
+            `);
+            return;
+        }
+
         if (tagType === 'question') {
             setIsQuestionModalOpen(true);
             return;
@@ -1094,6 +1108,10 @@ const ApostilasAdmin: React.FC = () => {
                                                 <button onClick={() => insertTag('correcao')} className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-500/20 active:scale-95">
                                                     <span className="material-symbols-outlined text-[18px]">edit_note</span>
                                                     <span className="hidden md:inline">Correção</span>
+                                                </button>
+                                                <button onClick={() => insertTag('resolve')} className="flex items-center gap-2 px-4 py-2.5 bg-cyan-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-cyan-700 transition-all shadow-lg shadow-cyan-500/20 active:scale-95">
+                                                    <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                                                    <span className="hidden md:inline">Resolvida</span>
                                                 </button>
                                             </div>
 
