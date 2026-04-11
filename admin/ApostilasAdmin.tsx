@@ -735,33 +735,37 @@ const ApostilasAdmin: React.FC = () => {
 
     const handleSetProfessor = async (professorId: string | null) => {
         if (!validatingApostila) return;
+        await updateApostilaProfessor(validatingApostila.id, professorId);
+    };
 
-        setIsSavingValidation(true);
+    const updateApostilaProfessor = async (apostilaId: string, professorId: string | null) => {
         try {
             const { error } = await supabase
                 .from('apostilas')
                 .update({ professor_id: professorId })
-                .eq('id', validatingApostila.id);
+                .eq('id', apostilaId);
 
             if (error) throw error;
 
             // Update local state
             const updatedTeacher = teachers.find(t => t.id === professorId) || undefined;
-            setValidatingApostila({ 
-                ...validatingApostila, 
-                professor_id: professorId || undefined, 
-                teacher: updatedTeacher 
-            });
+            
             setApostilas(prev => prev.map(a => 
-                a.id === validatingApostila.id 
+                a.id === apostilaId 
                 ? { ...a, professor_id: professorId || undefined, teacher: updatedTeacher } 
                 : a
             ));
+
+            if (validatingApostila?.id === apostilaId) {
+                setValidatingApostila({ 
+                    ...validatingApostila, 
+                    professor_id: professorId || undefined, 
+                    teacher: updatedTeacher 
+                });
+            }
         } catch (error: any) {
             console.error('Error saving professor:', error);
             alert('Erro ao salvar professor: ' + error.message);
-        } finally {
-            setIsSavingValidation(false);
         }
     };
 
@@ -1661,7 +1665,20 @@ const ApostilasAdmin: React.FC = () => {
                                                             )}
                                                         </div>
                                                         <div className="flex flex-col">
-                                                            <span className="text-[11px] font-black text-slate-900">{a.teacher?.name || 'Equipe BPA'}</span>
+                                                            {currentUser?.role === 'super' ? (
+                                                                <select
+                                                                    value={a.professor_id || ''}
+                                                                    onChange={(e) => updateApostilaProfessor(a.id, e.target.value || null)}
+                                                                    className="text-[11px] font-black text-slate-900 bg-transparent border-none outline-none cursor-pointer hover:text-blue-600 transition-colors focus:ring-0 appearance-none"
+                                                                >
+                                                                    <option value="">Equipe BPA</option>
+                                                                    {teachers.map(t => (
+                                                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                                                    ))}
+                                                                </select>
+                                                            ) : (
+                                                                <span className="text-[11px] font-black text-slate-900">{a.teacher?.name || 'Equipe BPA'}</span>
+                                                            )}
                                                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Publicado em: {new Date(a.created_at).toLocaleDateString()}</span>
                                                         </div>
                                                     </div>
