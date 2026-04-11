@@ -13,20 +13,10 @@ const Simulados: React.FC = () => {
     const [simulados, setSimulados] = useState<Simulado[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Filter and Selection States
     const [bancas, setBancas] = useState<Banca[]>([]);
     const [disciplinas, setDisciplinas] = useState<Disciplina[]>([]);
     const [assuntos, setAssuntos] = useState<Assunto[]>([]);
     const [allQuestions, setAllQuestions] = useState<Questao[]>([]);
-    const [filteredQuestions, setFilteredQuestions] = useState<Questao[]>([]);
-
-    // Question Selection Filters
-    const [searchQ, setSearchQ] = useState('');
-    const [filterDisc, setFilterDisc] = useState('');
-    const [filterSub, setFilterSub] = useState('');
-    const [filterBan, setFilterBan] = useState('');
-    const [filterAno, setFilterAno] = useState('');
-    const [filterDiff, setFilterDiff] = useState('');
     const [manualQuestionId, setManualQuestionId] = useState('');
 
     const [editingSimulado, setEditingSimulado] = useState<Simulado | null>(null);
@@ -49,10 +39,6 @@ const Simulados: React.FC = () => {
         fetchSimulados();
         fetchAuxiliaryData();
     }, []);
-
-    useEffect(() => {
-        applyFilters();
-    }, [searchQ, filterDisc, filterSub, filterBan, filterAno, filterDiff, allQuestions]);
 
     const fetchSimulados = async () => {
         setLoading(true);
@@ -82,29 +68,17 @@ const Simulados: React.FC = () => {
     };
 
     const fetchAuxiliaryData = async () => {
-        const [bRes, dRes, aRes, qRes] = await Promise.all([
+        const [bRes, dRes, aRes] = await Promise.all([
             supabase.from('bancas').select('id, name').order('name'),
             supabase.from('disciplinas').select('*').order('name'),
-            supabase.from('assuntos').select('*').order('name'),
-            supabase.from('questions').select('*, bancas(name), disciplinas(name), assuntos(name)')
+            supabase.from('assuntos').select('*').order('name')
         ]);
 
         if (bRes.data) setBancas(bRes.data);
         if (dRes.data) setDisciplinas(dRes.data);
         if (aRes.data) setAssuntos(aRes.data);
-        if (qRes.data) setAllQuestions(qRes.data);
     };
 
-    const applyFilters = () => {
-        let qs = [...allQuestions];
-        if (searchQ) qs = qs.filter(q => q.enunciado.toLowerCase().includes(searchQ.toLowerCase()));
-        if (filterDisc) qs = qs.filter(q => q.disciplina_id === filterDisc);
-        if (filterSub) qs = qs.filter(q => q.assunto_id === filterSub);
-        if (filterBan) qs = qs.filter(q => q.banca_id === filterBan);
-        if (filterAno) qs = qs.filter(q => q.ano === filterAno);
-        if (filterDiff) qs = qs.filter(q => q.dificuldade === filterDiff);
-        setFilteredQuestions(qs);
-    };
 
     const handleOpenForm = async (simulado?: Simulado) => {
         if (simulado) {
@@ -130,6 +104,23 @@ const Simulados: React.FC = () => {
                 ...simulado,
                 questions: sqData?.map(q => q.question_id) || []
             });
+
+            // Buscar detalhes das questões para exibição no formulário
+            if (sqData && sqData.length > 0) {
+                const ids = sqData.map(q => q.question_id);
+                const { data: qDetails } = await supabase
+                    .from('questions')
+                    .select('*, bancas(name), disciplinas(name), assuntos(name)')
+                    .in('id', ids);
+                
+                if (qDetails) {
+                    setAllQuestions(prev => {
+                        const existingIds = new Set(prev.map(p => p.id));
+                        const uniqueNew = qDetails.filter(d => !existingIds.has(d.id));
+                        return [...prev, ...uniqueNew];
+                    });
+                }
+            }
         } else {
             setEditingSimulado(null);
             setDisciplineWeights({});
@@ -331,12 +322,12 @@ const Simulados: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-20">
-                    {/* Painel de Configurações */}
+                    {/* Painel de Configurações Lateral */}
                     <div className="lg:col-span-4 space-y-6">
                         <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
                             <div className="flex items-center gap-2 text-[#137fec]">
                                 <span className="material-symbols-outlined">settings</span>
-                                <h3 className="text-xs font-black uppercase tracking-widest text-slate-900">Configurações Gerais</h3>
+                                <h3 className="text-xs font-black uppercase tracking-widest text-slate-900">Parâmetros do Exame</h3>
                             </div>
 
                             <div className="space-y-4">
@@ -347,14 +338,14 @@ const Simulados: React.FC = () => {
                                         type="text"
                                         value={formData.title}
                                         onChange={e => setFormData({ ...formData, title: e.target.value })}
-                                        className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-700"
+                                        className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 focus:border-blue-500"
                                         placeholder="Ex: PM-SP 2026 - Pós Edital"
                                     />
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Tempo (minutos)</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Tempo (min)</label>
                                         <input
                                             required
                                             type="number"
@@ -364,19 +355,19 @@ const Simulados: React.FC = () => {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-red-500 uppercase tracking-widest pl-1">Penalidade / Erro</label>
+                                        <label className="text-[10px] font-black text-red-500 uppercase tracking-widest pl-1">Peso Erro</label>
                                         <input
                                             type="number"
                                             step="0.01"
                                             value={formData.penalty}
                                             onChange={e => setFormData({ ...formData, penalty: Number(e.target.value) })}
-                                            className="w-full h-12 px-4 bg-red-50/50 border border-red-100 rounded-2xl outline-none font-bold text-red-600"
+                                            className="w-full h-12 px-4 bg-red-50 border border-red-100 rounded-2xl outline-none font-bold text-red-600"
                                         />
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Banca Principal</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Banca Examinadora</label>
                                     <select
                                         value={formData.banca_id}
                                         onChange={e => setFormData({ ...formData, banca_id: e.target.value })}
@@ -388,7 +379,7 @@ const Simulados: React.FC = () => {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Status de Publicação</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Status</label>
                                     <div className="flex p-1.5 bg-slate-100 rounded-2xl">
                                         {['Ativo', 'Inativo'].map(s => (
                                             <button
@@ -416,199 +407,163 @@ const Simulados: React.FC = () => {
                                     const discIds = Array.from(new Set(selectedQs.map(q => q.disciplina_id))).filter(Boolean);
 
                                     if (discIds.length === 0) {
-                                        return <p className="text-sm text-slate-400 italic">Adicione questões para configurar os pesos.</p>;
+                                        return <p className="text-[11px] font-bold text-slate-400 italic text-center py-4 bg-slate-50 rounded-xl border border-dashed">Adicione questões para configurar os pesos.</p>;
                                     }
 
-                                    return discIds.map(dId => {
-                                        const discName = disciplinas.find(d => d.id === dId)?.name || 'Desconhecida';
-                                        return (
-                                            <div key={dId} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                                <span className="text-xs font-bold text-slate-700">{discName}</span>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-black uppercase text-slate-400">Pts</span>
-                                                    <input
-                                                        type="number"
-                                                        step="0.1"
-                                                        min="0"
-                                                        value={disciplineWeights[dId] !== undefined ? disciplineWeights[dId] : 1}
-                                                        onChange={e => {
-                                                            const val = parseFloat(e.target.value);
-                                                            setDisciplineWeights(prev => ({ ...prev, [dId]: isNaN(val) ? 0 : val }))
-                                                        }}
-                                                        className="w-16 h-8 px-2 text-center bg-white border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-blue-500"
-                                                    />
-                                                </div>
-                                            </div>
-                                        );
-                                    });
-                                })()}
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex-1 flex flex-col min-h-[400px]">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-2 text-[#137fec]">
-                                    <span className="material-symbols-outlined">format_list_numbered</span>
-                                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-900">Questões Selecionadas</h3>
-                                </div>
-                                <span className="bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded-lg">
-                                    {formData.questions?.length || 0}
-                                </span>
-                            </div>
-
-                            <div className="space-y-3 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
-                                {formData.questions?.length === 0 ? (
-                                    <div className="text-center py-10 opacity-30 italic text-sm">Nenhuma questão adicionada.</div>
-                                ) : formData.questions?.map((qid, idx) => {
-                                    const q = allQuestions.find(x => x.id === qid);
-                                    if (!q) return null;
                                     return (
-                                        <div key={qid} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 group relative">
-                                            <div className="flex items-start gap-3">
-                                                <div className="size-6 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-[10px] font-black text-slate-900">
-                                                    {String(idx + 1).padStart(2, '0')}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="text-[10px] font-bold line-clamp-2 text-slate-600 mb-2 q-preview-no-img" dangerouslySetInnerHTML={{ __html: q.enunciado }} />
-                                                    <div className="flex gap-2">
-                                                        <span className="text-[8px] font-black uppercase bg-white px-1.5 py-0.5 rounded border border-slate-100 text-slate-400">{q.bancas?.name}</span>
+                                        <div className="space-y-2">
+                                            {discIds.map(dId => {
+                                                const discName = disciplinas.find(d => d.id === dId)?.name || 'Desconhecida';
+                                                return (
+                                                    <div key={dId} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                                        <span className="text-[10px] font-black text-slate-600 truncate mr-2">{discName}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[9px] font-black uppercase text-slate-400">Peso</span>
+                                                            <input
+                                                                type="number"
+                                                                step="0.1"
+                                                                min="0"
+                                                                value={disciplineWeights[dId] !== undefined ? disciplineWeights[dId] : 1}
+                                                                onChange={e => {
+                                                                    const val = parseFloat(e.target.value);
+                                                                    setDisciplineWeights(prev => ({ ...prev, [dId]: isNaN(val) ? 0 : val }))
+                                                                }}
+                                                                className="w-14 h-8 px-2 text-center bg-white border border-slate-200 rounded-lg text-xs font-black outline-none focus:border-blue-500"
+                                                            />
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                                    <button onClick={() => moveQuestion(idx, 'up')} className="size-6 bg-white rounded border border-slate-200 text-slate-400 hover:text-blue-500 flex items-center justify-center">
-                                                        <span className="material-symbols-outlined text-[16px]">expand_less</span>
-                                                    </button>
-                                                    <button onClick={() => moveQuestion(idx, 'down')} className="size-6 bg-white rounded border border-slate-200 text-slate-400 hover:text-blue-500 flex items-center justify-center">
-                                                        <span className="material-symbols-outlined text-[16px]">expand_more</span>
-                                                    </button>
-                                                    <button onClick={() => toggleQuestion(qid)} className="size-6 bg-red-50 rounded border border-red-100 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center">
-                                                        <span className="material-symbols-outlined text-[16px]">close</span>
-                                                    </button>
-                                                </div>
-                                            </div>
+                                                );
+                                            })}
                                         </div>
                                     );
-                                })}
+                                })()}
                             </div>
                         </div>
                     </div>
 
-                    {/* Banco de Questões com Filtros */}
+                    {/* Central de Gerenciamento de Questões */}
                     <div className="lg:col-span-8 space-y-6">
+                        {/* Seção de Inserção */}
                         <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-slate-400">
-                                    <span className="material-symbols-outlined">search</span>
-                                    <h3 className="text-xs font-black uppercase tracking-widest">Banco de Filtros Completo</h3>
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        setSearchQ('');
-                                        setFilterDisc('');
-                                        setFilterSub('');
-                                        setFilterBan('');
-                                        setFilterAno('');
-                                        setFilterDiff('');
-                                    }}
-                                    className="text-[10px] font-black text-blue-500 uppercase hover:underline"
-                                >
-                                    Limpar Filtros
-                                </button>
+                            <div className="flex items-center gap-2 text-[#137fec]">
+                                <span className="material-symbols-outlined">add_circle</span>
+                                <h3 className="text-xs font-black uppercase tracking-widest text-slate-900">Inserir por Identificador (ID)</h3>
                             </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div className="lg:col-span-3 pb-4 border-b border-slate-100 flex items-center gap-4">
-                                    <div className="flex-1">
-                                        <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest pl-1 block mb-2">Adicionar pela ID (Direct Add)</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                placeholder="Cole aqui o UUID da questão..."
-                                                value={manualQuestionId}
-                                                onChange={e => setManualQuestionId(e.target.value)}
-                                                className="flex-1 h-11 px-4 bg-blue-50 border border-blue-100 rounded-xl outline-none text-sm font-bold placeholder:text-blue-300"
-                                            />
-                                            <button 
-                                                onClick={handleAddManualId}
-                                                className="px-6 h-11 bg-blue-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all active:scale-95 shadow-lg shadow-blue-500/20"
-                                            >
-                                                Adicionar
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="lg:col-span-3">
+                            <div className="flex gap-3">
+                                <div className="flex-1">
                                     <input
                                         type="text"
-                                        placeholder="Pesquisar no enunciado das questões..."
-                                        value={searchQ}
-                                        onChange={e => setSearchQ(e.target.value)}
-                                        className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-bold placeholder:text-slate-400"
+                                        placeholder="Cole aqui o UUID da questão (ex: 550e8400-e29b-41d4-a716-446655440000)"
+                                        value={manualQuestionId}
+                                        onChange={e => setManualQuestionId(e.target.value)}
+                                        className="w-full h-14 px-6 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm placeholder:text-slate-400 focus:border-blue-500 transition-all font-mono"
                                     />
+                                    <p className="text-[10px] font-bold text-slate-400 mt-2 px-2 uppercase tracking-tight">O simulado é montado exclusivamente através da colagem dos IDs das questões.</p>
                                 </div>
-                                <select value={filterDisc} onChange={e => { setFilterDisc(e.target.value); setFilterSub(''); }} className="h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none">
-                                    <option value="">Disciplina: Todas</option>
-                                    {disciplinas.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                                </select>
-                                <select value={filterSub} onChange={e => setFilterSub(e.target.value)} disabled={!filterDisc} className="h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none disabled:opacity-50">
-                                    <option value="">Assunto: Todos</option>
-                                    {assuntos.filter(a => a.disciplina_id === filterDisc).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                                </select>
-                                <select value={filterBan} onChange={e => setFilterBan(e.target.value)} className="h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none">
-                                    <option value="">Banca: Todas</option>
-                                    {bancas.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                                </select>
-                                <select value={filterAno} onChange={e => setFilterAno(e.target.value)} className="h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none">
-                                    <option value="">Ano: Qualquer</option>
-                                    {Array.from({ length: 10 }, (_, i) => String(2026 - i)).map(y => <option key={y} value={y}>{y}</option>)}
-                                </select>
-                                <select value={filterDiff} onChange={e => setFilterDiff(e.target.value)} className="h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none">
-                                    <option value="">Dificuldade: Todas</option>
-                                    <option value="Fácil">Fácil</option>
-                                    <option value="Médio">Médio</option>
-                                    <option value="Difícil">Difícil</option>
-                                </select>
-                                <div className="h-11 flex items-center justify-center px-4 bg-blue-50 rounded-xl border border-blue-100 text-[10px] font-black text-blue-600 whitespace-nowrap overflow-hidden text-ellipsis">
-                                    {filteredQuestions.length} ITEMS
-                                </div>
+                                <button 
+                                    onClick={handleAddManualId}
+                                    className="px-8 h-14 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600 transition-all active:scale-95 shadow-xl shadow-slate-200"
+                                >
+                                    Adicionar
+                                </button>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {filteredQuestions.slice(0, 50).map(q => {
-                                const isSelected = formData.questions?.includes(q.id);
-                                return (
-                                    <div
-                                        key={q.id}
-                                        onClick={() => toggleQuestion(q.id)}
-                                        className={`p-6 bg-white rounded-3xl border transition-all cursor-pointer relative group ${isSelected ? 'border-blue-500 ring-2 ring-blue-50' : 'border-slate-100 hover:border-blue-200 shadow-sm'}`}
-                                    >
-                                        <div className="flex gap-4">
-                                            <div className={`size-10 rounded-2xl flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-blue-500 text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500'}`}>
-                                                <span className="material-symbols-outlined">{isSelected ? 'check' : 'add'}</span>
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex gap-2 mb-2">
-                                                    <span className="text-[9px] font-black uppercase text-slate-400 leading-none truncate">{q.bancas?.name} • {q.ano}</span>
-                                                    <span className="text-[9px] font-black uppercase text-blue-500 leading-none truncate">{q.disciplinas?.name}</span>
-                                                </div>
-                                                <div className="text-sm font-bold text-slate-900 leading-relaxed line-clamp-3 q-preview-no-img" dangerouslySetInnerHTML={{ __html: q.enunciado }} />
-                                                <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-50">
-                                                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${q.dificuldade === 'Fácil' ? 'bg-green-50 text-green-600' : q.dificuldade === 'Médio' ? 'bg-yellow-50 text-yellow-600' : 'bg-red-50 text-red-600'}`}>
-                                                        {q.dificuldade}
-                                                    </span>
-                                                    <span className="text-[9px] font-black text-slate-300 uppercase">#{q.id.slice(0, 8)}</span>
-                                                </div>
-                                            </div>
+                        {/* Lista Principal Interativa */}
+                        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col min-h-[700px]">
+                            <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
+                                <div className="flex items-center gap-3">
+                                    <div className="size-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center">
+                                        <span className="material-symbols-outlined">format_list_numbered</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Itens do Simulado</h3>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Estrutura de {formData.questions?.length || 0} questões em ordem</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                     <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${formData.questions?.length || 0 > 0 ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-50 text-slate-400 border border-slate-200'}`}>
+                                        {formData.questions?.length || 0 > 0 ? 'Simulado Estruturado' : 'Aguardando Conteúdo'}
+                                     </span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 overflow-y-auto max-h-[900px] pr-2 custom-scrollbar">
+                                {formData.questions?.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-40 text-slate-300 gap-4">
+                                        <span className="material-symbols-outlined text-7xl">quiz</span>
+                                        <div className="text-center">
+                                            <p className="font-bold text-sm uppercase tracking-widest">Nenhuma questão no simulado</p>
+                                            <p className="text-xs mt-1">Utilize o campo de ID acima para popular o exame.</p>
                                         </div>
                                     </div>
-                                );
-                            })}
-                            {filteredQuestions.length > 50 && (
-                                <div className="col-span-full py-6 text-center text-slate-400 text-xs font-medium italic">
-                                    Exibindo as primeiras 50 questões. Use os filtros para refinar sua busca.
-                                </div>
-                            )}
+                                ) : (
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {formData.questions?.map((qid, idx) => {
+                                            const q = allQuestions.find(x => x.id === qid);
+                                            if (!q) return (
+                                                <div key={qid} className="p-6 bg-slate-50 border border-slate-200 rounded-3xl flex items-center justify-between animate-pulse">
+                                                    <span className="text-xs font-bold text-slate-400">Buscando informações da questão {qid.slice(0, 8)}...</span>
+                                                    <button onClick={() => toggleQuestion(qid)} className="text-red-500 material-symbols-outlined">close</button>
+                                                </div>
+                                            );
+                                            return (
+                                                <div key={qid} className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm hover:border-blue-200 transition-all group relative">
+                                                    <div className="flex gap-6">
+                                                        <div className="flex flex-col items-center gap-2">
+                                                            <div className="size-10 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-sm shadow-lg">
+                                                                {idx + 1}
+                                                            </div>
+                                                            <div className="flex flex-col gap-1 p-1 bg-slate-50 rounded-lg border border-slate-100">
+                                                                <button 
+                                                                    onClick={() => moveQuestion(idx, 'up')} 
+                                                                    disabled={idx === 0}
+                                                                    className="size-7 flex items-center justify-center rounded-md hover:bg-white hover:text-blue-500 disabled:opacity-20 transition-all"
+                                                                >
+                                                                    <span className="material-symbols-outlined text-lg">expand_less</span>
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => moveQuestion(idx, 'down')} 
+                                                                    disabled={idx === (formData.questions?.length || 0) - 1}
+                                                                    className="size-7 flex items-center justify-center rounded-md hover:bg-white hover:text-blue-500 disabled:opacity-20 transition-all"
+                                                                >
+                                                                    <span className="material-symbols-outlined text-lg">expand_more</span>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex flex-wrap gap-2 mb-3">
+                                                                <span className="px-2 py-0.5 bg-blue-50 text-blue-500 rounded text-[9px] font-black uppercase tracking-widest leading-none flex items-center h-5">{q.disciplinas?.name}</span>
+                                                                <span className="px-2 py-0.5 bg-slate-50 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest leading-none flex items-center h-5">{q.bancas?.name || 'Geral'}</span>
+                                                                <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded text-[9px] font-black uppercase tracking-widest leading-none flex items-center h-5">ID: {q.id.slice(0, 8)}</span>
+                                                            </div>
+                                                            <div 
+                                                                className="text-sm font-bold text-slate-800 leading-relaxed q-preview-no-img line-clamp-2" 
+                                                                dangerouslySetInnerHTML={{ __html: q.enunciado }} 
+                                                            />
+                                                            
+                                                            <div className="mt-4 flex items-center justify-between border-t border-slate-50 pt-4">
+                                                                <div className="flex items-center gap-4">
+                                                                    <span className="text-[9px] font-black text-slate-300 uppercase">Dificuldade: <span className="text-slate-500">{q.dificuldade}</span></span>
+                                                                    <span className="text-[9px] font-black text-slate-300 uppercase truncate max-w-[200px]">Assunto: <span className="text-slate-500">{q.assuntos?.name || 'Não classificado'}</span></span>
+                                                                </div>
+                                                                <button 
+                                                                    onClick={() => toggleQuestion(qid)} 
+                                                                    className="flex items-center gap-2 px-3 py-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all text-[10px] font-black uppercase tracking-widest"
+                                                                >
+                                                                    <span className="material-symbols-outlined text-base">delete</span>
+                                                                    Remover
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
