@@ -1653,11 +1653,15 @@ const ApostilasAdmin: React.FC = () => {
                                                 </td>
                                                 <td className="px-10 py-8">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="size-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
-                                                            <span className="material-symbols-outlined text-sm">person</span>
+                                                        <div className="size-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 overflow-hidden">
+                                                            {a.teacher?.avatar_url ? (
+                                                                <img src={a.teacher.avatar_url} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <span className="material-symbols-outlined text-sm">person</span>
+                                                            )}
                                                         </div>
                                                         <div className="flex flex-col">
-                                                            <span className="text-[11px] font-black text-slate-900">{a.author?.full_name || 'Equipe BPA'}</span>
+                                                            <span className="text-[11px] font-black text-slate-900">{a.teacher?.name || 'Equipe BPA'}</span>
                                                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Publicado em: {new Date(a.created_at).toLocaleDateString()}</span>
                                                         </div>
                                                     </div>
