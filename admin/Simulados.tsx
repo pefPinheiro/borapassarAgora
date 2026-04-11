@@ -151,8 +151,14 @@ const Simulados: React.FC = () => {
     };
 
     const handleAddManualId = async () => {
-        const id = manualQuestionId.trim();
-        if (!id) return;
+        let rawInput = manualQuestionId.trim();
+        if (!rawInput) return;
+
+        // Tenta extrair o UUID caso venha formatado como [QUESTÃO INTERATIVA ID: "UUID"]
+        const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+        const match = rawInput.match(uuidRegex);
+        
+        const id = match ? match[0] : rawInput;
         
         if (formData.questions?.includes(id)) {
             alert('Esta questão já está no simulado.');
