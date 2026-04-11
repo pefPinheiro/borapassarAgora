@@ -27,6 +27,7 @@ const Simulados: React.FC = () => {
     const [filterBan, setFilterBan] = useState('');
     const [filterAno, setFilterAno] = useState('');
     const [filterDiff, setFilterDiff] = useState('');
+    const [manualQuestionId, setManualQuestionId] = useState('');
 
     const [editingSimulado, setEditingSimulado] = useState<Simulado | null>(null);
     const [formData, setFormData] = useState<Partial<Simulado & { questions: string[] }>>({
@@ -151,6 +152,42 @@ const Simulados: React.FC = () => {
         } else {
             setFormData({ ...formData, questions: [...current, id] });
         }
+    };
+
+    const handleAddManualId = async () => {
+        const id = manualQuestionId.trim();
+        if (!id) return;
+        
+        if (formData.questions?.includes(id)) {
+            alert('Esta questão já está no simulado.');
+            setManualQuestionId('');
+            return;
+        }
+
+        let q = allQuestions.find(it => it.id === id);
+        
+        if (!q) {
+            // Tentativa de busca direta no banco caso não esteja no cache local (slice de 50)
+            const { data, error } = await supabase
+                .from('questions')
+                .select('*, bancas(name), disciplinas(name), assuntos(name)')
+                .eq('id', id)
+                .single();
+            
+            if (error || !data) {
+                alert('ID da questão não encontrado na base de dados.');
+                return;
+            }
+            q = data;
+            // Opcional: Adicionar ao cache local para evitar refetch
+            setAllQuestions(prev => [...prev, data]);
+        }
+
+        setFormData({
+            ...formData,
+            questions: [...(formData.questions || []), q.id]
+        });
+        setManualQuestionId('');
     };
 
     const moveQuestion = (index: number, direction: 'up' | 'down') => {
@@ -435,6 +472,26 @@ const Simulados: React.FC = () => {
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="lg:col-span-3 pb-4 border-b border-slate-100 flex items-center gap-4">
+                                    <div className="flex-1">
+                                        <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest pl-1 block mb-2">Adicionar pela ID (Direct Add)</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Cole aqui o UUID da questão..."
+                                                value={manualQuestionId}
+                                                onChange={e => setManualQuestionId(e.target.value)}
+                                                className="flex-1 h-11 px-4 bg-blue-50 border border-blue-100 rounded-xl outline-none text-sm font-bold placeholder:text-blue-300"
+                                            />
+                                            <button 
+                                                onClick={handleAddManualId}
+                                                className="px-6 h-11 bg-blue-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all active:scale-95 shadow-lg shadow-blue-500/20"
+                                            >
+                                                Adicionar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div className="lg:col-span-3">
                                     <input
                                         type="text"
