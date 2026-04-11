@@ -30,6 +30,11 @@ const Simulados: React.FC = () => {
     const [manualQuestionId, setManualQuestionId] = useState('');
 
     const [editingSimulado, setEditingSimulado] = useState<Simulado | null>(null);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [previewSimulado, setPreviewSimulado] = useState<Simulado | null>(null);
+    const [previewQuestions, setPreviewQuestions] = useState<Questao[]>([]);
+    const [previewLoading, setPreviewLoading] = useState(false);
+    
     const [formData, setFormData] = useState<Partial<Simulado & { questions: string[] }>>({
         title: '',
         banca_id: '',
@@ -254,6 +259,37 @@ const Simulados: React.FC = () => {
         }
     };
 
+    const handleOpenPreview = async (s: Simulado) => {
+        setPreviewSimulado(s);
+        setIsPreviewOpen(true);
+        setPreviewLoading(true);
+        setPreviewQuestions([]);
+        try {
+            const { data, error } = await supabase
+                .from('simulado_questions')
+                .select(`
+                    question_id,
+                    position,
+                    questao:questions (
+                        *,
+                        alternativas,
+                        bancas (name),
+                        disciplinas (name)
+                    )
+                `)
+                .eq('simulado_id', s.id)
+                .order('position', { ascending: true });
+
+            if (error) throw error;
+            setPreviewQuestions(data?.map((d: any) => d.questao) || []);
+        } catch (error) {
+            console.error('Error fetching preview questions:', error);
+            alert('Erro ao carregar preview do simulado');
+        } finally {
+            setPreviewLoading(false);
+        }
+    };
+
     const handleDelete = async (id: string) => {
         if (window.confirm('Excluir este simulado?')) {
             const { error } = await supabase.from('simulados').delete().eq('id', id);
@@ -276,6 +312,15 @@ const Simulados: React.FC = () => {
                         </h2>
                     </div>
                     <div className="flex gap-3">
+                        {editingSimulado && (
+                            <button 
+                                onClick={() => handleOpenPreview(editingSimulado)}
+                                className="px-6 py-3 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-xl font-bold hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-2"
+                            >
+                                <span className="material-symbols-outlined text-[20px]">visibility</span>
+                                Visualizar
+                            </button>
+                        )}
                         <button onClick={handleCloseForm} className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50">
                             Cancelar
                         </button>
@@ -642,6 +687,9 @@ const Simulados: React.FC = () => {
                                     </td>
                                     <td className="px-8 py-6">
                                         <div className="flex items-center justify-end gap-1">
+                                            <button onClick={() => handleOpenPreview(s)} className="p-2.5 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all" title="Visualizar Questões">
+                                                <span className="material-symbols-outlined text-[22px]">visibility</span>
+                                            </button>
                                             <button onClick={() => handleOpenForm(s)} className="p-2.5 text-slate-400 hover:text-[#137fec] hover:bg-blue-50 rounded-xl transition-all">
                                                 <span className="material-symbols-outlined text-[22px]">edit</span>
                                             </button>
@@ -656,6 +704,101 @@ const Simulados: React.FC = () => {
                     </table>
                 </div>
             </div>
+            {/* Preview Modal */}
+            {isPreviewOpen && previewSimulado && (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-5xl h-[90vh] rounded-[32px] shadow-2xl overflow-hidden flex flex-col scale-in-center animate-in zoom-in-95">
+                        {/* Header */}
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <div className="flex items-center gap-4">
+                                <div className="size-12 bg-blue-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                                    <span className="material-symbols-outlined">visibility</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 leading-none">{previewSimulado.title}</h3>
+                                    <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">
+                                        {previewLoading ? 'Carregando questões...' : `${previewQuestions.length} Questões`} • {previewSimulado.duration} min
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex gap-3">
+                            <button 
+                                onClick={() => window.open(`/aluno/simulado/${previewSimulado.id}`, '_blank')} 
+                                className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2"
+                            >
+                                <span className="material-symbols-outlined text-sm">open_in_new</span>
+                                Ver como Aluno
+                            </button>
+                            <button 
+                                onClick={() => setIsPreviewOpen(false)} 
+                                className="size-10 rounded-full hover:bg-slate-200 flex items-center justify-center transition-all text-slate-400 hover:text-slate-600"
+                            >
+                                <span className="material-symbols-outlined text-[20px]">close</span>
+                            </button>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar bg-slate-50/30">
+                            {previewLoading ? (
+                                <div className="h-full flex flex-col items-center justify-center text-slate-300 animate-pulse">
+                                    <span className="material-symbols-outlined text-6xl mb-4">hourglass_empty</span>
+                                    <p className="font-bold uppercase tracking-widest text-xs">Carregando conteúdo...</p>
+                                </div>
+                            ) : previewQuestions.length === 0 ? (
+                                <div className="h-full flex flex-col items-center justify-center text-slate-300">
+                                    <span className="material-symbols-outlined text-6xl mb-4">info</span>
+                                    <p className="font-bold uppercase tracking-widest text-xs">Nenhuma questão vinculada a este simulado.</p>
+                                </div>
+                            ) : (
+                                previewQuestions.map((q, idx) => (
+                                    <div key={q.id} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm relative group">
+                                        <div className="absolute -left-4 top-8 size-8 bg-slate-900 text-white rounded-lg flex items-center justify-center font-black text-xs shadow-xl">{idx + 1}</div>
+                                        
+                                        <div className="flex flex-wrap gap-2 mb-6">
+                                            <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded font-black text-[9px] uppercase tracking-widest">{q.bancas?.name}</span>
+                                            <span className="px-2 py-0.5 bg-blue-50 text-blue-500 rounded font-black text-[9px] uppercase tracking-widest">{q.disciplinas?.name}</span>
+                                            <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded font-black text-[9px] uppercase tracking-widest">#{q.id.slice(0, 8)}</span>
+                                        </div>
+
+                                        <div className="text-lg font-bold text-slate-900 leading-relaxed mb-8 break-words whitespace-pre-wrap [&_*]:max-w-full" dangerouslySetInnerHTML={{ __html: q.enunciado }}></div>
+
+                                        <div className="space-y-3">
+                                            {q.alternativas.map((alt, i) => (
+                                                <div key={i} className={`p-4 rounded-xl border flex items-start gap-4 ${alt.isCorreta ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+                                                    <div className={`size-6 rounded-lg border flex items-center justify-center font-black text-xs shrink-0 ${alt.isCorreta ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white border-slate-200'}`}>
+                                                        {String.fromCharCode(65 + i)}
+                                                    </div>
+                                                    <div className="text-sm font-bold break-words [&_*]:max-w-full" dangerouslySetInnerHTML={{ __html: alt.texto }}></div>
+                                                    {alt.isCorreta && <span className="ml-auto material-symbols-outlined text-emerald-500">check_circle</span>}
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {q.resposta_professor && (
+                                            <div className="mt-8 pt-8 border-t border-slate-100">
+                                                <div className="flex items-center gap-2 mb-4 text-[#137fec]">
+                                                    <span className="material-symbols-outlined text-lg">psychology</span>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest">Gabarito Comentado</p>
+                                                </div>
+                                                <div className="text-sm font-medium text-slate-600 italic leading-relaxed break-words [&_*]:max-w-full" dangerouslySetInnerHTML={{ __html: q.resposta_professor }}></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+                .q-preview-no-img img { display: none !important; }
+                .q-preview-no-img * { max-width: 100%; word-break: break-word; }
+            `}</style>
         </div>
     );
 };
