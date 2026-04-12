@@ -26,6 +26,39 @@ const SimuladosStudent: React.FC = () => {
 
     const fetchSimuladoData = async () => {
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                navigate('/login');
+                return;
+            }
+
+            // 0. Check Access
+            const { data: courseLinks } = await supabase
+                .from('course_simulados')
+                .select('course_id')
+                .eq('simulado_id', id);
+            
+            const courseIds = courseLinks?.map(cl => cl.course_id) || [];
+            
+            const { data: enrollmentData } = await supabase
+                .from('enrollments')
+                .select('status')
+                .eq('profile_id', user.id)
+                .in('course_id', courseIds)
+                .eq('status', 'Ativo')
+                .limit(1)
+                .maybeSingle();
+
+            if (!enrollmentData) {
+                const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+                if (profile?.role !== 'admin' && profile?.role !== 'super') {
+                    console.error('Sem acesso ao simulado: Matrícula não ativa.');
+                    alert('Você não tem uma matrícula ativa em um curso que ofereça este simulado.');
+                    navigate('/aluno/cursos');
+                    return;
+                }
+            }
+
             const { data: sData, error: sError } = await supabase
                 .from('simulados')
                 .select('*')
@@ -42,7 +75,7 @@ const SimuladosStudent: React.FC = () => {
                 .select('courses(title, banner_url)')
                 .eq('simulado_id', id)
                 .limit(1)
-                .single();
+                .maybeSingle();
 
             if (cData?.courses) {
                 // @ts-ignore

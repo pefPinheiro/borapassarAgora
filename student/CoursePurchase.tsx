@@ -73,12 +73,12 @@ const CoursePurchase: React.FC = () => {
 
         const { data, error } = await supabase
             .from('enrollments')
-            .select('id')
+            .select('id, status')
             .eq('course_id', id)
             .eq('profile_id', session.user.id)
-            .single();
+            .maybeSingle();
 
-        if (data) setIsEnrolled(true);
+        if (data && data.status === 'Ativo') setIsEnrolled(true);
     };
 
     const handleEnrollFree = async () => {

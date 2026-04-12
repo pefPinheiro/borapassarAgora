@@ -30,6 +30,9 @@ const CourseCheckout: React.FC = () => {
     const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
     const [discountAmount, setDiscountAmount] = useState(0);
 
+    // Payment Selection
+    const [method, setMethod] = useState<'all' | 'pix'>('all');
+
     useEffect(() => {
         if (id) {
             fetchCourse();
@@ -71,6 +74,10 @@ const CourseCheckout: React.FC = () => {
     };
 
     const finalPrice = course ? (course.price_offer - discountAmount) : 0;
+    const pixDiscountPercent = course?.pix_discount || 0;
+    const pixPrice = finalPrice * (1 - (pixDiscountPercent / 100));
+    const isPix = method === 'pix';
+    const currentPrice = isPix ? pixPrice : finalPrice;
 
     const fetchUser = async () => {
         const { data: { session } } = await supabase.auth.getSession();
@@ -116,9 +123,9 @@ const CourseCheckout: React.FC = () => {
                     profile_id: session.user.id,
                     status: 'Pendente',
                     progress: 0,
-                    amount_paid: finalPrice, 
-                    amount_discount: discountAmount,
-                    payment_method: 'mercadopago_checkout',
+                    amount_paid: currentPrice, 
+                    amount_discount: discountAmount + (isPix ? (finalPrice - pixPrice) : 0),
+                    payment_method: isPix ? 'pix' : 'mercadopago_checkout',
                     coupon_applied: appliedCoupon?.name || null
                 }])
                 .select()
@@ -133,12 +140,13 @@ const CourseCheckout: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     title: course.title,
-                    price: finalPrice,
+                    price: currentPrice,
                     quantity: 1,
                     enrollment_id: enrollment.id,
                     course_id: id,
                     payer_email: session.user.email,
-                    payer_name: cpf 
+                    payer_name: cpf,
+                    is_pix: isPix
                 })
             });
 
@@ -175,8 +183,8 @@ const CourseCheckout: React.FC = () => {
                         <h1 className="text-3xl font-black italic">{course.title}</h1>
                     </div>
                     <div className="text-right">
-                        <p className="text-sm text-slate-400 font-bold uppercase">Valor Total</p>
-                        <p className="text-3xl font-black text-[#137fec]">R$ {finalPrice.toFixed(2).replace('.', ',')}</p>
+                        <p className="text-sm text-slate-400 font-bold uppercase">Preço Final</p>
+                        <p className="text-3xl font-black text-[#137fec]">R$ {currentPrice.toFixed(2).replace('.', ',')}</p>
                     </div>
                 </div>
 
@@ -200,22 +208,63 @@ const CourseCheckout: React.FC = () => {
                     </div>
 
                     <div className="space-y-6 flex flex-col justify-between">
-                        <div>
-                            <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase tracking-wide text-sm mb-4"><span className="material-symbols-outlined">verified_user</span> Resumo</h3>
-                            <div className="space-y-4 p-5 bg-slate-50 border border-slate-100 rounded-2xl">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-slate-500">Subtotal</span>
-                                    <span className="font-bold text-slate-700">R$ {course.price_offer?.toFixed(2).replace('.', ',')}</span>
+                            <div className="mt-6 space-y-4">
+                                <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase tracking-wide text-sm"><span className="material-symbols-outlined">payments</span> Método de Pagamento</h3>
+                                
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button 
+                                        onClick={() => setMethod('all')}
+                                        className={`p-4 rounded-2xl border-2 transition-all text-left flex flex-col gap-1 ${method === 'all' ? 'border-[#137fec] bg-blue-50' : 'border-slate-100 hover:border-slate-200'}`}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <span className="material-symbols-outlined text-[#137fec]">credit_card</span>
+                                            {method === 'all' && <span className="material-symbols-outlined text-[#137fec] text-sm">check_circle</span>}
+                                        </div>
+                                        <span className="text-[10px] font-black uppercase text-slate-900 leading-tight">Cartão / Geral</span>
+                                        <span className="text-[8px] font-bold text-slate-500 uppercase">Até 12x</span>
+                                    </button>
+
+                                    <button 
+                                        onClick={() => setMethod('pix')}
+                                        className={`p-4 rounded-2xl border-2 transition-all text-left flex flex-col gap-1 relative overflow-hidden ${method === 'pix' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 hover:border-slate-200'}`}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <span className="material-symbols-outlined text-emerald-500">pix</span>
+                                            {method === 'pix' && <span className="material-symbols-outlined text-emerald-500 text-sm">check_circle</span>}
+                                        </div>
+                                        <span className="text-[10px] font-black uppercase text-slate-900 leading-tight">PIX</span>
+                                        <span className="text-[8px] font-bold text-emerald-600 uppercase">-{pixDiscountPercent}% OFF</span>
+                                        {pixDiscountPercent > 0 && <div className="absolute top-1 -right-4 bg-emerald-500 text-white text-[7px] font-black px-4 py-0.5 rotate-45 uppercase">PROMO</div>}
+                                    </button>
                                 </div>
-                                {discountAmount > 0 && (
-                                    <div className="flex justify-between text-sm text-emerald-600">
-                                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm">sell</span> Desconto ({appliedCoupon?.name})</span>
-                                        <span className="font-bold">- R$ {discountAmount.toFixed(2).replace('.', ',')}</span>
+                            </div>
+
+                            <div className="mt-8 space-y-4 p-5 bg-slate-900 rounded-2xl text-white shadow-xl">
+                                <div className="flex justify-between text-xs items-center">
+                                    <span className="text-slate-400 font-bold uppercase tracking-widest">Resumo do Pagamento</span>
+                                    <span className="text-[9px] bg-[#137fec] px-2 py-0.5 rounded-full font-black uppercase">{isPix ? 'PIX ATIVO' : 'CRÉDITO/OUTROS'}</span>
+                                </div>
+                                <div className="space-y-2 pt-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-400">Preço Base</span>
+                                        <span className="font-bold text-white">R$ {course.price_offer?.toFixed(2).replace('.', ',')}</span>
                                     </div>
-                                )}
-                                <div className="pt-3 border-t border-slate-200 flex justify-between items-center">
-                                    <span className="text-xs font-black uppercase text-slate-400">Total a Pagar</span>
-                                    <span className="text-xl font-black text-[#137fec]">R$ {finalPrice.toFixed(2).replace('.', ',')}</span>
+                                    {discountAmount > 0 && (
+                                        <div className="flex justify-between text-sm text-[#137fec]">
+                                            <span className="flex items-center gap-1 font-bold">Cupom: {appliedCoupon?.name}</span>
+                                            <span className="font-bold">- R$ {discountAmount.toFixed(2).replace('.', ',')}</span>
+                                        </div>
+                                    )}
+                                    {isPix && pixDiscountPercent > 0 && (
+                                        <div className="flex justify-between text-sm text-emerald-400">
+                                            <span className="flex items-center gap-1 font-bold">Desconto PIX ({pixDiscountPercent}%)</span>
+                                            <span className="font-bold">- R$ {(finalPrice - pixPrice).toFixed(2).replace('.', ',')}</span>
+                                        </div>
+                                    )}
+                                    <div className="pt-3 border-t border-white/10 flex justify-between items-center">
+                                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Total Líquido</span>
+                                        <span className={`${isPix ? 'text-emerald-400' : 'text-[#137fec]'} text-2xl font-black`}>R$ {currentPrice.toFixed(2).replace('.', ',')}</span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -239,9 +288,12 @@ const CourseCheckout: React.FC = () => {
                             </div>
                         </div>
 
-                        <button onClick={handlePreSubmit} className="w-full mt-4 py-4 bg-[#009ee3] hover:bg-[#0081b9] text-white rounded-xl font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2">
-                            Pagar com Mercado Pago
-                            <span className="material-symbols-outlined">open_in_new</span>
+                        <button 
+                            onClick={handlePreSubmit} 
+                            className={`w-full mt-4 py-5 rounded-2xl font-black uppercase tracking-widest shadow-lg transition-all flex items-center justify-center gap-2 ${isPix ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20' : 'bg-[#009ee3] hover:bg-[#0081b9] shadow-blue-500/20'} text-white`}
+                        >
+                            {isPix ? 'Pagar com PIX' : 'Pagar com Mercado Pago'}
+                            <span className="material-symbols-outlined">{isPix ? 'qr_code' : 'open_in_new'}</span>
                         </button>
                     </div>
                 </div>

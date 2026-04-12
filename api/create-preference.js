@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { title, price, quantity, enrollment_id, payer_email, payer_name } = req.body;
+        const { title, price, quantity, enrollment_id, payer_email, payer_name, is_pix } = req.body;
 
         if (!title || !price || !enrollment_id) {
             return res.status(400).json({ error: 'Dados incompletos: title, price ou enrollment_id faltando.' });
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
                 items: [
                     {
                         id: enrollment_id,
-                        title: title,
+                        title: title + (is_pix ? ' (Desconto PIX)' : ''),
                         quantity: quantity || 1,
                         unit_price: Number(price)
                     }
@@ -34,6 +34,14 @@ export default async function handler(req, res) {
                 payer: {
                     email: payer_email || 'email@test.com',
                     name: payer_name || 'Aluno'
+                },
+                payment_methods: {
+                    excluded_payment_types: is_pix ? [
+                        { id: 'ticket' }, 
+                        { id: 'credit_card' }, 
+                        { id: 'debit_card' }
+                    ] : [],
+                    installments: 12
                 },
                 external_reference: enrollment_id, // Chave para vincular no webhook
                 back_urls: {

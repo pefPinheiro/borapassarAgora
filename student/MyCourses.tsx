@@ -48,6 +48,7 @@ const MyCourses: React.FC = () => {
           id,
           progress,
           last_access,
+          status,
           courses (
             id,
             title,
@@ -56,8 +57,7 @@ const MyCourses: React.FC = () => {
             is_notice_open
           )
         `)
-        .eq('profile_id', user.id)
-        .eq('status', 'Ativo');
+        .eq('profile_id', user.id);
 
       if (error) throw error;
       setEnrollments(enrolls as any || []);
@@ -148,47 +148,73 @@ const MyCourses: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-10">
-            {enrollments.map(enroll => (
-              <Link key={enroll.id} to={`/aluno/curso/${enroll.courses.id}`} className="group bg-white rounded-[60px] border border-slate-100 overflow-hidden shadow-sm hover:shadow-[0_40px_100px_-20px_rgba(19,127,236,0.15)] transition-all duration-700 flex flex-col h-full relative">
-                <div className="h-56 overflow-hidden relative p-4">
-                  <div className="size-full rounded-[48px] overflow-hidden shadow-2xl transition-all duration-700 group-hover:rounded-[32px]">
-                    <img src={enroll.courses.banner_url || 'https://images.unsplash.com/photo-1454165833767-027ffea9e77b?q=80&w=1470&auto=format&fit=crop'} className="size-full object-cover transition-transform duration-1000 group-hover:scale-110" />
+            {enrollments.map(enroll => {
+              const isPending = (enroll as any).status === 'Pendente';
+              const targetPath = isPending 
+                ? `/aluno/curso/${enroll.courses.id}/checkout` 
+                : `/aluno/curso/${enroll.courses.id}`;
 
-                    {enroll.courses.is_notice_open && (
-                      <div className="absolute top-6 left-6 z-20">
-                        <div className="bg-emerald-500 text-white px-5 py-2.5 rounded-[18px] font-black text-[9px] uppercase tracking-widest shadow-xl flex items-center gap-2 animate-bounce">
-                          <span className="size-1.5 bg-white rounded-full animate-pulse"></span>
-                          Edital Aberto
+              return (
+                <Link key={enroll.id} to={targetPath} className={`group bg-white rounded-[60px] border border-slate-100 overflow-hidden shadow-sm hover:shadow-[0_40px_100px_-20px_rgba(19,127,236,0.15)] transition-all duration-700 flex flex-col h-full relative ${isPending ? 'opacity-80 grayscale-[30%]' : ''}`}>
+                  <div className="h-56 overflow-hidden relative p-4">
+                    <div className="size-full rounded-[48px] overflow-hidden shadow-2xl transition-all duration-700 group-hover:rounded-[32px]">
+                      <img src={enroll.courses.banner_url || 'https://images.unsplash.com/photo-1454165833767-027ffea9e77b?q=80&w=1470&auto=format&fit=crop'} className="size-full object-cover transition-transform duration-1000 group-hover:scale-110" />
+
+                      {isPending ? (
+                        <div className="absolute top-6 left-6 z-20">
+                          <div className="bg-amber-500 text-white px-5 py-2.5 rounded-[18px] font-black text-[9px] uppercase tracking-widest shadow-xl flex items-center gap-2">
+                             <span className="material-symbols-outlined text-sm">payments</span>
+                             Aguardando Pagamento
+                          </div>
                         </div>
+                      ) : enroll.courses.is_notice_open && (
+                        <div className="absolute top-6 left-6 z-20">
+                          <div className="bg-emerald-500 text-white px-5 py-2.5 rounded-[18px] font-black text-[9px] uppercase tracking-widest shadow-xl flex items-center gap-2 animate-bounce">
+                            <span className="size-1.5 bg-white rounded-full animate-pulse"></span>
+                            Edital Aberto
+                          </div>
+                        </div>
+                      )}
+
+                      <div className={`absolute inset-0 ${isPending ? 'bg-amber-900/40' : 'bg-slate-900/40'} opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]`}>
+                        <span className="bg-white text-slate-900 px-10 py-4 rounded-[20px] font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl scale-90 group-hover:scale-100 transition-all">
+                          {isPending ? 'Finalizar Pagamento' : 'Retomar Estudo'}
+                        </span>
                       </div>
-                    )}
-
-                    <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-                      <span className="bg-white text-slate-900 px-10 py-4 rounded-[20px] font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl scale-90 group-hover:scale-100 transition-all">Retomar Estudo</span>
                     </div>
                   </div>
-                </div>
 
-                <div className="p-10 flex flex-col flex-1 gap-6">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black text-[#137fec] bg-[#137fec]/10 px-4 py-1.5 rounded-full uppercase tracking-widest">{enroll.courses.area}</span>
-                    <span className="text-[9px] text-slate-300 font-black uppercase tracking-widest italic">{formatDate(enroll.last_access)}</span>
-                  </div>
-
-                  <h4 className="font-black text-2xl text-slate-900 leading-[1.1] uppercase tracking-tighter italic group-hover:text-[#ff3b9a] transition-colors">{enroll.courses.title}</h4>
-
-                  <div className="mt-auto pt-8 space-y-4">
-                    <div className="flex justify-between text-[10px] font-black uppercase tracking-[0.2em] italic">
-                      <span className="text-slate-400">Seu Progresso Atual</span>
-                      <span className="text-[#137fec]">{Math.min(100, enroll.progress)}%</span>
+                  <div className="p-10 flex flex-col flex-1 gap-6">
+                    <div className="flex justify-between items-center">
+                      <span className={`text-[10px] font-black ${isPending ? 'text-amber-600 bg-amber-100' : 'text-[#137fec] bg-[#137fec]/10'} px-4 py-1.5 rounded-full uppercase tracking-widest`}>
+                        {isPending ? 'Pendente' : enroll.courses.area}
+                      </span>
+                      <span className="text-[9px] text-slate-300 font-black uppercase tracking-widest italic">{formatDate(enroll.last_access)}</span>
                     </div>
-                    <div className="w-full bg-slate-50 h-3 rounded-full overflow-hidden border border-slate-100">
-                      <div className="bg-gradient-to-r from-[#137fec] to-[#3b82f6] h-full rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(19,127,236,0.3)]" style={{ width: `${Math.min(100, enroll.progress)}%` }}></div>
+
+                    <h4 className={`font-black text-2xl text-slate-900 leading-[1.1] uppercase tracking-tighter italic ${isPending ? 'group-hover:text-amber-600' : 'group-hover:text-[#ff3b9a]'} transition-colors`}>{enroll.courses.title}</h4>
+
+                    <div className="mt-auto pt-8 space-y-4">
+                      {isPending ? (
+                        <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest italic bg-amber-50 p-4 rounded-2xl border border-amber-100">
+                          Sua vaga está pré-garantida. <br /> Clique para ativar seu acesso.
+                        </p>
+                      ) : (
+                        <>
+                          <div className="flex justify-between text-[10px] font-black uppercase tracking-[0.2em] italic">
+                            <span className="text-slate-400">Seu Progresso Atual</span>
+                            <span className="text-[#137fec]">{Math.min(100, enroll.progress)}%</span>
+                          </div>
+                          <div className="w-full bg-slate-50 h-3 rounded-full overflow-hidden border border-slate-100">
+                            <div className="bg-gradient-to-r from-[#137fec] to-[#3b82f6] h-full rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(19,127,236,0.3)]" style={{ width: `${Math.min(100, enroll.progress)}%` }}></div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         )}
       </section>

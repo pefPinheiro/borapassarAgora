@@ -59,6 +59,12 @@ const ApostilaReader: React.FC = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                navigate('/login');
+                return;
+            }
+
             // 1. Fetch Apostila
             const { data: apData, error: apError } = await supabase
                 .from('apostilas')
@@ -68,6 +74,34 @@ const ApostilaReader: React.FC = () => {
 
             if (apError) throw apError;
             setApostila(apData);
+
+            // 1.5. Check Access Security
+            // Checks if student has an ACTIVE enrollment in ANY course that contains this apostila
+            const { data: accessData } = await supabase
+                .from('course_items')
+                .select('course_id, courses!inner(id)')
+                .eq('apostila_id', id);
+
+            const courseIds = accessData?.map(item => item.course_id) || [];
+            
+            const { data: enrollmentData } = await supabase
+                .from('enrollments')
+                .select('status')
+                .eq('profile_id', user.id)
+                .in('course_id', courseIds)
+                .eq('status', 'Ativo')
+                .limit(1)
+                .maybeSingle();
+
+            if (!enrollmentData) {
+                const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+                if (profile?.role !== 'admin' && profile?.role !== 'super') {
+                    console.error('Sem acesso à apostila: Matrícula não ativa.');
+                    alert('Você não tem uma matrícula ativa para acessar este material.');
+                    navigate('/aluno/cursos');
+                    return;
+                }
+            }
 
             // 2. Fetch Course Banner using relation
             const { data: itemData } = await supabase
@@ -84,15 +118,12 @@ const ApostilaReader: React.FC = () => {
             }
 
             // 3. Fetch User Profile for Footer
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const { data: profData } = await supabase
-                    .from('profiles')
-                    .select('full_name, cpf')
-                    .eq('id', user.id)
-                    .single();
-                if (profData) setProfile(profData);
-            }
+            const { data: profData } = await supabase
+                .from('profiles')
+                .select('full_name, cpf')
+                .eq('id', user.id)
+                .single();
+            if (profData) setProfile(profData);
 
             // 4. Fetch Linked Notebooks
             const { data: nbData } = await supabase

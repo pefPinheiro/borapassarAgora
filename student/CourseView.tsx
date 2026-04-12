@@ -101,13 +101,14 @@ const CourseView: React.FC = () => {
           .eq('profile_id', user.id)
           .maybeSingle();
 
-        if (enrollData) {
-          console.log('Matrícula encontrada:', enrollData.id);
+        if (enrollData && enrollData.status === 'Ativo') {
+          console.log('Matrícula ativa encontrada:', enrollData.id);
           setEnrollment(enrollData);
           const completed = Array.isArray(enrollData.completed_items) ? enrollData.completed_items : [];
           setReadItems(completed);
         } else {
-          console.error('Nenhuma matrícula encontrada para este aluno neste curso.');
+          console.warn('Matrícula não ativa ou inexistente. Redirecionando para compra.');
+          navigate(`/aluno/curso/${id}/comprar`);
         }
 
         // Fetch Simulado Attempts
