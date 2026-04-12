@@ -248,7 +248,7 @@ const CourseCheckout: React.FC = () => {
                         enrollment_id: enrollment.id,
                         course_id: id,
                         payer_email: session.user.email,
-                        payer_name: cpf,
+                        payer_name: userProfile?.full_name || 'Aluno',
                         is_pix: false
                     })
                 });

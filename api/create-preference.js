@@ -32,8 +32,8 @@ export default async function handler(req, res) {
                     }
                 ],
                 payer: {
-                    email: payer_email || 'email@test.com',
-                    name: payer_name || 'Aluno'
+                    email: payer_email,
+                    name: payer_name
                 },
                 payment_methods: {
                     default_payment_method_id: is_pix ? 'pix' : undefined,
