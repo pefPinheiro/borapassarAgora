@@ -249,19 +249,92 @@ const CourseCheckout: React.FC = () => {
 
             {/* Terms Modal */}
             {showTerms && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-3xl p-8 max-w-lg w-full space-y-6 animate-in zoom-in-95">
-                        <h3 className="text-xl font-black text-slate-900">Termos e Condições</h3>
-                        <p className="text-sm text-slate-500">Ao confirmar, você concorda com os termos de uso, política de cancelamento e processamento de dados.</p>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+                    <div className="bg-white rounded-[40px] shadow-2xl border border-white max-w-xl w-full p-10 space-y-8 animate-in zoom-in-95 duration-300">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-6">
+                            <div>
+                                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">Termos de <span className="text-[#137fec]">Adesão.</span></h3>
+                                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mt-1">Leia com atenção antes de confirmar sua inscrição</p>
+                            </div>
+                            <div className="size-12 bg-blue-50 rounded-2xl flex items-center justify-center text-[#137fec]">
+                                <span className="material-symbols-outlined font-bold">gavel</span>
+                            </div>
+                        </div>
 
-                        <label className="flex items-center gap-3 p-4 border rounded-xl cursor-pointer hover:bg-slate-50">
-                            <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="size-5 rounded border-slate-300 text-blue-600 focus:ring-0" />
-                            <span className="text-sm font-bold text-slate-700">Li e concordo com os termos</span>
-                        </label>
+                        <div className="max-h-[350px] overflow-y-auto pr-4 space-y-6 text-sm text-slate-600 custom-scrollbar text-justify">
+                            <section>
+                                <h4 className="font-black text-slate-900 uppercase text-xs mb-2 flex items-center gap-2">
+                                    <span className="size-5 bg-slate-900 text-white rounded-full flex items-center justify-center text-[10px] font-sans">1</span>
+                                    Objeto do Serviço
+                                </h4>
+                                <p className="leading-relaxed">
+                                    Ao adquirir este curso, você terá acesso imediato à nossa plataforma de estudos, que inclui <strong>apostilas interativas</strong>, simulados inéditos e um banco de questões comentadas por especialistas. O material é 100% digital e focado no edital vigente.
+                                </p>
+                            </section>
 
-                        <div className="flex gap-3">
-                            <button onClick={() => setShowTerms(false)} className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-500 hover:bg-slate-50">Cancelar</button>
-                            <button onClick={handlePlaceOrder} disabled={submitting || !agreed} className="flex-1 py-3 bg-[#009ee3] text-white rounded-xl font-bold disabled:opacity-50">Confirmar</button>
+                            <section>
+                                <h4 className="font-black text-slate-900 uppercase text-xs mb-2 flex items-center gap-2">
+                                    <span className="size-5 bg-slate-900 text-white rounded-full flex items-center justify-center text-[10px] font-sans">2</span>
+                                    Garantia e Reembolso
+                                </h4>
+                                <p className="leading-relaxed">
+                                    Prezamos pela sua total satisfação. Conforme o Código de Defesa do Consumidor, você tem o direito de arrependimento com <strong>devolução integral do valor pago em até 7 (sete) dias</strong> corridos após a compra. Sem burocracia, direto pelo nosso suporte.
+                                </p>
+                            </section>
+
+                            <section>
+                                <h4 className="font-black text-slate-900 uppercase text-xs mb-2 flex items-center gap-2">
+                                    <span className="size-5 bg-slate-900 text-white rounded-full flex items-center justify-center text-[10px] font-sans">3</span>
+                                    Propriedade Intelectual
+                                </h4>
+                                <p className="leading-relaxed">
+                                    Todo o conteúdo disponibilizado é protegido por leis de direitos autorais. O acesso é pessoal e intransferível. O compartilhamento de login ou a reprodução não autorizada do material resultará no bloqueio imediato da conta e medidas legais cabíveis.
+                                </p>
+                            </section>
+
+                            <section>
+                                <h4 className="font-black text-slate-900 uppercase text-xs mb-2 flex items-center gap-2">
+                                    <span className="size-5 bg-slate-900 text-white rounded-full flex items-center justify-center text-[10px] font-sans">4</span>
+                                    Privacidade de Dados
+                                </h4>
+                                <p className="leading-relaxed">
+                                    Seus dados pessoais (CPF, e-mail, telefone) são tratados com total segurança e confidencialidade, seguindo rigorosamente as diretrizes da Lei Geral de Proteção de Dados (LGPD).
+                                </p>
+                            </section>
+
+                            <section className="p-5 bg-slate-50 rounded-3xl border border-slate-100 italic font-medium text-[#137fec] text-center text-xs">
+                                "Nossa missão é facilitar sua jornada rumo à farda. Estude com a melhor tecnologia educacional do mercado."
+                            </section>
+                        </div>
+
+                        <div className="space-y-4 pt-4 border-t border-slate-50">
+                            <label className="flex items-center gap-4 p-5 border-2 border-slate-100 rounded-[24px] cursor-pointer hover:border-[#137fec] hover:bg-blue-50/20 transition-all group">
+                                <div className="relative flex items-center">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={agreed} 
+                                        onChange={e => setAgreed(e.target.checked)} 
+                                        className="size-6 rounded-lg border-2 border-slate-300 text-[#137fec] focus:ring-0 cursor-pointer appearance-none checked:bg-[#137fec] checked:border-[#137fec] transition-all" 
+                                    />
+                                    <span className="material-symbols-outlined absolute inset-0 text-white text-base flex items-center justify-center pointer-events-none opacity-0 group-[&:has(input:checked)]:opacity-100 scale-50 group-[&:has(input:checked)]:scale-100 transition-all font-black">check</span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-black text-slate-800 uppercase tracking-tighter">Li e concordo com os termos</span>
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Declaro estar ciente das regras de uso e política de garantia</span>
+                                </div>
+                            </label>
+
+                            <div className="flex gap-4">
+                                <button onClick={() => setShowTerms(false)} className="flex-1 py-4 border border-slate-200 rounded-2xl font-black uppercase text-[10px] tracking-widest text-slate-400 hover:bg-slate-50 transition-all">Cancelar</button>
+                                <button 
+                                    onClick={handlePlaceOrder} 
+                                    disabled={submitting || !agreed} 
+                                    className="flex-[2] py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-emerald-500/20 disabled:opacity-30 disabled:grayscale transition-all flex items-center justify-center gap-2 group"
+                                >
+                                    {submitting ? 'Aguarde...' : 'Confirmar e Pagar'}
+                                    <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -271,6 +344,10 @@ const CourseCheckout: React.FC = () => {
                 .label-text { display: block; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 4px; padding-left: 4px; }
                 .input-field { width: 100%; padding: 12px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; font-weight: 600; color: #334155; outline: none; transition: all; }
                 .input-field:focus { border-color: #009ee3; background: #fff; box-shadow: 0 0 0 4px rgba(0,158,227,0.1); }
+                .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
             `}</style>
         </div>
     );
