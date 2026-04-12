@@ -441,16 +441,20 @@ const CourseCheckout: React.FC = () => {
                         <div className="pt-4 space-y-3">
                             <button 
                                 onClick={() => {
-                                    // Verify enrollment status
-                                    const { data: { session } } = supabase.auth.getSession() as any;
-                                    supabase.from('enrollments')
-                                        .select('id')
-                                        .eq('course_id', id)
-                                        .eq('profile_id', session?.user?.id)
-                                        .single()
-                                        .then(({ data }: any) => {
-                                            if (data) checkPaymentStatus(data.id);
-                                        });
+                                    // Verifica status da matrícula
+                                    const check = async () => {
+                                        const { data: { session } } = await supabase.auth.getSession();
+                                        if (!session?.user?.id) return;
+                                        
+                                        const { data } = await supabase.from('enrollments')
+                                            .select('id')
+                                            .eq('course_id', id)
+                                            .eq('profile_id', session.user.id)
+                                            .single();
+                                            
+                                        if (data) checkPaymentStatus(data.id);
+                                    };
+                                    check();
                                 }}
                                 disabled={checkingPayment}
                                 className="w-full py-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-[24px] font-black uppercase tracking-widest text-[11px] shadow-xl shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 group"

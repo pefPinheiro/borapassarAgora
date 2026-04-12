@@ -30,17 +30,15 @@ export default async function handler(req, res) {
         if (type === 'payment' || paymentId) {
             const payment = new Payment(client);
             const paymentInfo = await payment.get({ id: paymentId });
+            const { status, external_reference, payment_method_id } = paymentInfo;
 
-            const { status, external_reference, payment_method_id, transaction_amount } = paymentInfo;
+            console.log(`[Webhook MP] Recebido: Pagamento ${paymentId}, Status: ${status}, Ref: ${external_reference}`);
 
             if (external_reference) {
-                // Atualizar Supabase (Enrollments)
                 let enrollStatus = 'Pendente';
                 if (status === 'approved') enrollStatus = 'Ativo';
                 else if (status === 'rejected' || status === 'cancelled') enrollStatus = 'Cancelado';
-                else if (status === 'in_process' || status === 'pending') enrollStatus = 'Pendente';
 
-                // Só atualiza se mudou algo relevante e se tiver a chave de serviço (segurança)
                 if (SUPABASE_KEY) {
                     const { error } = await supabase
                         .from('enrollments')
@@ -48,21 +46,16 @@ export default async function handler(req, res) {
                             status: enrollStatus,
                             payment_method: payment_method_id || 'mercadopago',
                             updated_at: new Date().toISOString()
-                            // amount_paid já deve ter sido setado na criação, mas poderíamos confirmar:
-                            // amount_paid: transaction_amount 
                         })
                         .eq('id', external_reference);
 
                     if (error) {
-                        console.error('Erro ao atualizar Supabase:', error);
-                        // Não retorna 500 para o MP não ficar retentando infinitamente se for erro de lógica nossa
+                        console.error(`[Webhook Erro] Falha ao atualizar matrícula ${external_reference}:`, error);
                         return res.status(200).json({ error: 'Database update failed' });
                     }
-                    console.log(`Pagamento ${paymentId} processado. Enrollment ${external_reference} -> ${enrollStatus}`);
-
-                    // Se aprovado, talvez disparar e-mail de boas vindas? (Futuro)
+                    console.log(`[Webhook Sucesso] Matrícula ${external_reference} atualizada para ${enrollStatus}`);
                 } else {
-                    console.warn('SUPABASE_SERVICE_ROLE_KEY não configurada. Update ignorado.');
+                    console.warn('[Webhook Aviso] SUPABASE_SERVICE_ROLE_KEY não encontrada!');
                 }
             }
         }
