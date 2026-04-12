@@ -11,7 +11,31 @@ const CourseCheckout: React.FC = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [course, setCourse] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState<any>(null);
+    const [submitting, setSubmitting] = useState(false);
     const [userProfile, setUserProfile] = useState<any>(null);
+
+    // Form
+    const [cpf, setCpf] = useState('');
+    const [phone, setPhone] = useState('');
+    const [isWhatsApp, setIsWhatsApp] = useState(false);
+    const [birthDate, setBirthDate] = useState('');
+
+    // Modal
+    const [showTerms, setShowTerms] = useState(false);
+    const [agreed, setAgreed] = useState(false);
+
+    // Popup State
+    const [popup, setPopup] = useState<{ type: 'success' | 'error' | 'info'; title: string; message: string } | null>(null);
+
+    // Coupon State
+    const [couponCode, setCouponCode] = useState('');
+    const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+    const [discountAmount, setDiscountAmount] = useState(0);
+
+    // Payment Selection
+    const [method, setMethod] = useState<'all' | 'pix'>('all');
 
     // PIX Data
     const [pixData, setPixData] = useState<{ qr_code: string; qr_code_base64: string } | null>(null);
