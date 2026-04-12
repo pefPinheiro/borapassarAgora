@@ -11,27 +11,11 @@ const CourseCheckout: React.FC = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [course, setCourse] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-    const [user, setUser] = useState<any>(null);
-    const [submitting, setSubmitting] = useState(false);
+    const [userProfile, setUserProfile] = useState<any>(null);
 
-    // Form
-    const [cpf, setCpf] = useState('');
-    const [phone, setPhone] = useState('');
-    const [isWhatsApp, setIsWhatsApp] = useState(false);
-    const [birthDate, setBirthDate] = useState('');
-
-    // Modal
-    const [showTerms, setShowTerms] = useState(false);
-    const [agreed, setAgreed] = useState(false);
-
-    // Coupon State
-    const [couponCode, setCouponCode] = useState('');
-    const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
-    const [discountAmount, setDiscountAmount] = useState(0);
-
-    // Payment Selection
-    const [method, setMethod] = useState<'all' | 'pix'>('all');
+    // PIX Data
+    const [pixData, setPixData] = useState<{ qr_code: string; qr_code_base64: string } | null>(null);
+    const [checkingPayment, setCheckingPayment] = useState(false);
 
     useEffect(() => {
         if (id) {
@@ -49,27 +33,37 @@ const CourseCheckout: React.FC = () => {
     const applyCoupon = () => {
         if (!course || !couponCode.trim()) return;
         
-        const coupons = course.coupons_json || [];
-        const found = coupons.find((c: any) => c.name.toUpperCase() === couponCode.trim().toUpperCase());
-        
-        if (found) {
-            let discount = 0;
-            if (found.discount_type === 'porcentagem') {
-                discount = (course.price_offer * found.discount_value) / 100;
+        try {
+            let coupons = [];
+            if (typeof course.coupons_json === 'string') {
+                coupons = JSON.parse(course.coupons_json);
             } else {
-                discount = found.discount_value;
+                coupons = course.coupons_json || [];
             }
+
+            const found = coupons.find((c: any) => c.name.toUpperCase() === couponCode.trim().toUpperCase());
             
-            // Limit discount to price_offer
-            discount = Math.min(discount, course.price_offer);
-            
-            setAppliedCoupon(found);
-            setDiscountAmount(discount);
-            alert(`Cupom "${found.name}" aplicado com sucesso!`);
-        } else {
-            setAppliedCoupon(null);
-            setDiscountAmount(0);
-            alert('Cupom inválido ou expirado.');
+            if (found) {
+                let discount = 0;
+                if (found.discount_type === 'porcentagem') {
+                    discount = (course.price_offer * found.discount_value) / 100;
+                } else {
+                    discount = found.discount_value;
+                }
+                
+                discount = Math.min(discount, course.price_offer);
+                
+                setAppliedCoupon(found);
+                setDiscountAmount(discount);
+                setPopup({ type: 'success', title: 'Cupom Ativado!', message: `Desconto de R$ ${discount.toFixed(2)} aplicado com sucesso.` });
+            } else {
+                setAppliedCoupon(null);
+                setDiscountAmount(0);
+                setPopup({ type: 'error', title: 'Cupom Inválido', message: 'Este código não existe ou já expirou.' });
+            }
+        } catch (e) {
+            console.error('Coupon parse error:', e);
+            setPopup({ type: 'error', title: 'Erro no Cupom', message: 'Não foi possível validar o cupom agora.' });
         }
     };
 
@@ -85,6 +79,7 @@ const CourseCheckout: React.FC = () => {
             setUser(session.user);
             const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
             if (profile) {
+                setUserProfile(profile);
                 setCpf(formatCPF(profile.cpf || ''));
                 setPhone(formatPhone(profile.phone || ''));
                 setIsWhatsApp(profile.is_whatsapp || false);
@@ -96,14 +91,38 @@ const CourseCheckout: React.FC = () => {
     };
 
     const handlePreSubmit = () => {
-        if (cpf.replace(/\D/g, '').length !== 11) return alert('CPF inválido.');
-        if (phone.length < 14) return alert('Telefone inválido.');
-        if (!birthDate) return alert('Informe a data de nascimento.');
+        if (cpf.replace(/\D/g, '').length !== 11) {
+            setPopup({ type: 'error', title: 'CPF Inválido', message: 'Por favor, informe um CPF válido para prosseguir.' });
+            return;
+        }
+        if (phone.length < 14) {
+            setPopup({ type: 'error', title: 'Telefone Inválido', message: 'O número de telefone deve conter o DDD.' });
+            return;
+        }
+        if (!birthDate) {
+            setPopup({ type: 'error', title: 'Data de Nascimento', message: 'Sua data de nascimento é necessária para o cadastro.' });
+            return;
+        }
         setShowTerms(true);
     };
 
+    const checkPaymentStatus = async (enrollId: string) => {
+        setCheckingPayment(true);
+        const { data } = await supabase.from('enrollments').select('status').eq('id', enrollId).single();
+        if (data?.status === 'Ativo') {
+            setPopup({ type: 'success', title: 'Pagamento Confirmado!', message: 'Seu acesso já está liberado. Bons estudos!' });
+            setTimeout(() => navigate(`/aluno/curso/${id}`), 2000);
+        } else {
+            setPopup({ type: 'info', title: 'Aguardando...', message: 'Ainda não recebemos a confirmação do pagamento PIX. Isso pode levar alguns segundos.' });
+        }
+        setCheckingPayment(false);
+    };
+
     const handlePlaceOrder = async () => {
-        if (!agreed) return alert('Aceite os termos.');
+        if (!agreed) {
+            setPopup({ type: 'info', title: 'Atenção', message: 'Você precisa aceitar os termos de adesão.' });
+            return;
+        }
         setSubmitting(true);
 
         try {
@@ -115,57 +134,115 @@ const CourseCheckout: React.FC = () => {
                 cpf, phone, is_whatsapp: isWhatsApp, birth_date: birthDate, updated_at: new Date().toISOString()
             }).eq('id', session.user.id);
 
-            // 2. Criar Matrícula PENDENTE (Reserva)
-            const { data: enrollment, error: enrollError } = await supabase
+            // 2. Tentar encontrar matrícula existente
+            const { data: existingEnroll } = await supabase
                 .from('enrollments')
-                .insert([{
-                    course_id: id,
-                    profile_id: session.user.id,
-                    status: 'Pendente',
-                    progress: 0,
-                    amount_paid: currentPrice, 
-                    amount_discount: discountAmount + (isPix ? (finalPrice - pixPrice) : 0),
-                    payment_method: isPix ? 'pix' : 'mercadopago_checkout',
-                    coupon_applied: appliedCoupon?.name || null
-                }])
-                .select()
-                .single();
+                .select('id, status')
+                .eq('course_id', id)
+                .eq('profile_id', session.user.id)
+                .maybeSingle();
 
-            if (enrollError) throw enrollError;
+            let enrollment;
+            const enrollPayload = {
+                course_id: id,
+                profile_id: session.user.id,
+                status: 'Pendente',
+                progress: 0,
+                amount_paid: currentPrice, 
+                amount_discount: discountAmount + (isPix ? (finalPrice - pixPrice) : 0),
+                payment_method: isPix ? 'pix' : 'mercadopago_checkout',
+                coupon_applied: appliedCoupon?.name || null,
+                updated_at: new Date().toISOString()
+            };
 
-            // 3. Chamar Backend para Criar Preferência MP
-            console.log('Chamando API de Pagamento...');
-            const response = await fetch('/api/create-preference', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title: course.title,
-                    price: currentPrice,
-                    quantity: 1,
-                    enrollment_id: enrollment.id,
-                    course_id: id,
-                    payer_email: session.user.email,
-                    payer_name: cpf,
-                    is_pix: isPix
-                })
-            });
-
-            if (!response.ok) {
-                if (response.status === 404) {
-                    throw new Error('Servidor de pagamento não encontrado (404). Se estiver rodando localmente, certifique-se de usar "vercel dev" ou implantar o projeto.');
+            if (existingEnroll) {
+                if (existingEnroll.status === 'Ativo') {
+                    setPopup({ type: 'success', title: 'Matrícula Ativa', message: 'Você já possui este curso liberado!' });
+                    setTimeout(() => navigate(`/aluno/curso/${id}`), 2000);
+                    return;
                 }
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Erro ao criar preferência');
+                const { data: updatedEnroll, error: updateError } = await supabase
+                    .from('enrollments')
+                    .update(enrollPayload)
+                    .eq('id', existingEnroll.id)
+                    .select()
+                    .single();
+                if (updateError) throw updateError;
+                enrollment = updatedEnroll;
+            } else {
+                const { data: newEnroll, error: enrollError } = await supabase
+                    .from('enrollments')
+                    .insert([enrollPayload])
+                    .select()
+                    .single();
+                if (enrollError) throw enrollError;
+                enrollment = newEnroll;
             }
 
-            const { init_point } = await response.json();
+            // 3. Processar Pagamento Transparente ou Redirect
+            if (isPix) {
+                setPopup({ type: 'info', title: 'Gerando PIX...', message: 'Preparando seu código para pagamento instantâneo.' });
+                
+                const firstName = userProfile?.full_name?.split(' ')[0] || 'Aluno';
+                const lastName = userProfile?.full_name?.split(' ').slice(1).join(' ') || 'BPA';
 
-            // 4. Redirecionar
-            window.location.href = init_point;
+                const response = await fetch('/api/process-pix', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        amount: currentPrice,
+                        description: `Curso: ${course.title}`,
+                        enrollment_id: enrollment.id,
+                        course_id: id,
+                        payer: {
+                            email: session.user.email,
+                            first_name: firstName,
+                            last_name: lastName,
+                            cpf: cpf
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Erro ao gerar PIX');
+                }
+
+                const data = await response.json();
+                setPixData(data);
+                setShowTerms(false);
+                setPopup(null);
+            } else {
+                setPopup({ type: 'info', title: 'Redirecionando...', message: 'Conectando ao ambiente seguro do Mercado Pago.' });
+                
+                const response = await fetch('/api/create-preference', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: course.title,
+                        price: currentPrice,
+                        quantity: 1,
+                        enrollment_id: enrollment.id,
+                        course_id: id,
+                        payer_email: session.user.email,
+                        payer_name: cpf,
+                        is_pix: false
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Erro ao criar preferência');
+                }
+
+                const { init_point } = await response.json();
+                window.location.href = init_point;
+            }
 
         } catch (e: any) {
             console.error('Erro:', e);
-            alert('Falha ao iniciar pagamento: ' + e.message);
+            setPopup({ type: 'error', title: 'Erro de Pagamento', message: e.message || 'Não foi possível completar o pedido.' });
+        } finally {
             setSubmitting(false);
         }
     };
@@ -300,6 +377,81 @@ const CourseCheckout: React.FC = () => {
                 </div>
             </div>
 
+            {/* PIX Transparent Modal */}
+            {pixData && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+                    <div className="bg-white rounded-[40px] shadow-2xl border border-white max-w-md w-full p-10 space-y-8 animate-in zoom-in-95 duration-300 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-2 bg-emerald-500"></div>
+                        
+                        <div className="text-center space-y-2">
+                            <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter italic">Pagamento <span className="text-emerald-500">Instantâneo.</span></h3>
+                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mt-1">Escaneie o QR Code ou use o código abaixo</p>
+                        </div>
+
+                        <div className="flex flex-col items-center gap-6">
+                            <div className="size-64 bg-slate-50 rounded-[32px] p-4 border-2 border-dashed border-emerald-100 flex items-center justify-center">
+                                <img src={`data:image/png;base64,${pixData.qr_code_base64}`} alt="QR Code PIX" className="w-full h-full object-contain" />
+                            </div>
+
+                            <div className="w-full space-y-3">
+                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest pl-1 text-center block">Código Copia e Cola</label>
+                                <div className="relative group">
+                                    <input 
+                                        type="text" 
+                                        readOnly 
+                                        value={pixData.qr_code} 
+                                        className="w-full h-14 pl-6 pr-14 bg-slate-50 border-2 border-slate-100 rounded-2xl text-[10px] font-bold text-slate-500 truncate focus:bg-white focus:border-emerald-500 transition-all outline-none" 
+                                    />
+                                    <button 
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(pixData.qr_code);
+                                            setPopup({ type: 'success', title: 'Copiado!', message: 'Código PIX copiado para a área de transferência.' });
+                                        }}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 size-10 bg-white shadow-sm border border-slate-100 rounded-xl flex items-center justify-center text-emerald-500 hover:bg-emerald-50 transition-all"
+                                    >
+                                        <span className="material-symbols-outlined text-xl">content_copy</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="pt-4 space-y-3">
+                            <button 
+                                onClick={() => {
+                                    // Verify enrollment status
+                                    const { data: { session } } = supabase.auth.getSession() as any;
+                                    supabase.from('enrollments')
+                                        .select('id')
+                                        .eq('course_id', id)
+                                        .eq('profile_id', session?.user?.id)
+                                        .single()
+                                        .then(({ data }: any) => {
+                                            if (data) checkPaymentStatus(data.id);
+                                        });
+                                }}
+                                disabled={checkingPayment}
+                                className="w-full py-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-[24px] font-black uppercase tracking-widest text-[11px] shadow-xl shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 group"
+                            >
+                                {checkingPayment ? (
+                                    <div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                ) : (
+                                    <>
+                                        <span className="material-symbols-outlined text-base">verified</span>
+                                        Já realizei o pagamento
+                                    </>
+                                )}
+                            </button>
+                            <button 
+                                onClick={() => setPixData(null)}
+                                className="w-full py-4 text-slate-400 font-bold uppercase tracking-widest text-[10px] hover:text-slate-600 transition-colors"
+                            >
+                                Voltar ao checkout
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Terms Modal */}
             {showTerms && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
@@ -389,6 +541,33 @@ const CourseCheckout: React.FC = () => {
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Professional Status Popup */}
+            {popup && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[40px] shadow-3xl max-w-sm w-full p-10 text-center space-y-6 animate-in zoom-in-95 duration-300 relative overflow-hidden">
+                        <div className={`absolute top-0 left-0 w-full h-2 ${popup.type === 'success' ? 'bg-emerald-500' : popup.type === 'error' ? 'bg-rose-500' : 'bg-blue-500'}`}></div>
+                        
+                        <div className={`size-20 rounded-3xl flex items-center justify-center mx-auto mb-4 ${popup.type === 'success' ? 'bg-emerald-50 text-emerald-500' : popup.type === 'error' ? 'bg-rose-50 text-rose-500' : 'bg-blue-50 text-blue-500'}`}>
+                            <span className="material-symbols-outlined text-4xl font-black">
+                                {popup.type === 'success' ? 'check_circle' : popup.type === 'error' ? 'error' : 'info'}
+                            </span>
+                        </div>
+
+                        <div className="space-y-2">
+                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">{popup.title}</h3>
+                            <p className="text-slate-500 text-sm font-medium leading-relaxed">{popup.message}</p>
+                        </div>
+
+                        <button 
+                            onClick={() => setPopup(null)}
+                            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-[#137fec] transition-all shadow-xl active:scale-95"
+                        >
+                            Entendido
+                        </button>
                     </div>
                 </div>
             )}

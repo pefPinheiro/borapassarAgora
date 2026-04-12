@@ -36,12 +36,13 @@ export default async function handler(req, res) {
                     name: payer_name || 'Aluno'
                 },
                 payment_methods: {
+                    default_payment_method_id: is_pix ? 'pix' : undefined,
                     excluded_payment_types: is_pix ? [
                         { id: 'ticket' }, 
                         { id: 'credit_card' }, 
                         { id: 'debit_card' }
                     ] : [],
-                    installments: 12
+                    installments: is_pix ? 1 : 12
                 },
                 external_reference: enrollment_id, // Chave para vincular no webhook
                 back_urls: {
