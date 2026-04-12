@@ -92,7 +92,7 @@ const CourseCheckout: React.FC = () => {
     };
 
     const finalPrice = course ? (course.price_offer - discountAmount) : 0;
-    const pixDiscountPercent = course?.pix_discount || 0;
+    const pixDiscountPercent = 15; // Desconto automático de 15% solicitado pelo usuário
     const pixPrice = finalPrice * (1 - (pixDiscountPercent / 100));
     const isPix = method === 'pix';
     const currentPrice = isPix ? pixPrice : finalPrice;
@@ -202,65 +202,31 @@ const CourseCheckout: React.FC = () => {
                 enrollment = newEnroll;
             }
 
-            // 3. Processar Pagamento Transparente ou Redirect
-            if (isPix) {
-                setPopup({ type: 'info', title: 'Gerando PIX...', message: 'Preparando seu código para pagamento instantâneo.' });
-                
-                const firstName = userProfile?.full_name?.split(' ')[0] || 'Aluno';
-                const lastName = userProfile?.full_name?.split(' ').slice(1).join(' ') || 'BPA';
+            // 3. SEMPRE Processar via Redirect Mercado Pago (Unificado)
+            setPopup({ type: 'info', title: 'Redirecionando...', message: 'Conectando ao ambiente seguro do Mercado Pago.' });
+            
+            const response = await fetch('/api/create-preference', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: course.title,
+                    price: currentPrice,
+                    quantity: 1,
+                    enrollment_id: enrollment.id,
+                    course_id: id,
+                    payer_email: session.user.email,
+                    payer_name: userProfile?.full_name || 'Aluno',
+                    is_pix: method === 'pix' // Força PIX no MP se o aluno escolheu a aba de desconto
+                })
+            });
 
-                const response = await fetch('/api/process-pix', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        amount: currentPrice,
-                        description: `Curso: ${course.title}`,
-                        enrollment_id: enrollment.id,
-                        course_id: id,
-                        payer: {
-                            email: session.user.email,
-                            first_name: firstName,
-                            last_name: lastName,
-                            cpf: cpf
-                        }
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Erro ao gerar PIX');
-                }
-
-                const data = await response.json();
-                setPixData(data);
-                setShowTerms(false);
-                setPopup(null);
-            } else {
-                setPopup({ type: 'info', title: 'Redirecionando...', message: 'Conectando ao ambiente seguro do Mercado Pago.' });
-                
-                const response = await fetch('/api/create-preference', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        title: course.title,
-                        price: currentPrice,
-                        quantity: 1,
-                        enrollment_id: enrollment.id,
-                        course_id: id,
-                        payer_email: session.user.email,
-                        payer_name: userProfile?.full_name || 'Aluno',
-                        is_pix: false
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Erro ao criar preferência');
-                }
-
-                const { init_point } = await response.json();
-                window.location.href = init_point;
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Erro ao criar preferência');
             }
+
+            const { init_point } = await response.json();
+            window.location.href = init_point;
 
         } catch (e: any) {
             console.error('Erro:', e);
@@ -321,8 +287,8 @@ const CourseCheckout: React.FC = () => {
                                             <span className="material-symbols-outlined text-[#137fec]">credit_card</span>
                                             {method === 'all' && <span className="material-symbols-outlined text-[#137fec] text-sm">check_circle</span>}
                                         </div>
-                                        <span className="text-[10px] font-black uppercase text-slate-900 leading-tight">Cartão / Geral</span>
-                                        <span className="text-[8px] font-bold text-slate-500 uppercase">Até 12x</span>
+                                        <span className="text-[10px] font-black uppercase text-slate-900 leading-tight">Cartão / Boleto</span>
+                                        <span className="text-[8px] font-bold text-slate-500 uppercase">Cartão em 12x ou Boleto</span>
                                     </button>
 
                                     <button 
@@ -400,84 +366,7 @@ const CourseCheckout: React.FC = () => {
                 </div>
             </div>
 
-            {/* PIX Transparent Modal */}
-            {pixData && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
-                    <div className="bg-white rounded-[40px] shadow-2xl border border-white max-w-md w-full p-10 space-y-8 animate-in zoom-in-95 duration-300 relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-2 bg-emerald-500"></div>
-                        
-                        <div className="text-center space-y-2">
-                            <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter italic">Pagamento <span className="text-emerald-500">Instantâneo.</span></h3>
-                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mt-1">Escaneie o QR Code ou use o código abaixo</p>
-                        </div>
-
-                        <div className="flex flex-col items-center gap-6">
-                            <div className="size-64 bg-slate-50 rounded-[32px] p-4 border-2 border-dashed border-emerald-100 flex items-center justify-center">
-                                <img src={`data:image/png;base64,${pixData.qr_code_base64}`} alt="QR Code PIX" className="w-full h-full object-contain" />
-                            </div>
-
-                            <div className="w-full space-y-3">
-                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest pl-1 text-center block">Código Copia e Cola</label>
-                                <div className="relative group">
-                                    <input 
-                                        type="text" 
-                                        readOnly 
-                                        value={pixData.qr_code} 
-                                        className="w-full h-14 pl-6 pr-14 bg-slate-50 border-2 border-slate-100 rounded-2xl text-[10px] font-bold text-slate-500 truncate focus:bg-white focus:border-emerald-500 transition-all outline-none" 
-                                    />
-                                    <button 
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(pixData.qr_code);
-                                            setPopup({ type: 'success', title: 'Copiado!', message: 'Código PIX copiado para a área de transferência.' });
-                                        }}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 size-10 bg-white shadow-sm border border-slate-100 rounded-xl flex items-center justify-center text-emerald-500 hover:bg-emerald-50 transition-all"
-                                    >
-                                        <span className="material-symbols-outlined text-xl">content_copy</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="pt-4 space-y-3">
-                            <button 
-                                onClick={() => {
-                                    // Verifica status da matrícula
-                                    const check = async () => {
-                                        const { data: { session } } = await supabase.auth.getSession();
-                                        if (!session?.user?.id) return;
-                                        
-                                        const { data } = await supabase.from('enrollments')
-                                            .select('id')
-                                            .eq('course_id', id)
-                                            .eq('profile_id', session.user.id)
-                                            .single();
-                                            
-                                        if (data) checkPaymentStatus(data.id);
-                                    };
-                                    check();
-                                }}
-                                disabled={checkingPayment}
-                                className="w-full py-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-[24px] font-black uppercase tracking-widest text-[11px] shadow-xl shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 group"
-                            >
-                                {checkingPayment ? (
-                                    <div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                ) : (
-                                    <>
-                                        <span className="material-symbols-outlined text-base">verified</span>
-                                        Já realizei o pagamento
-                                    </>
-                                )}
-                            </button>
-                            <button 
-                                onClick={() => setPixData(null)}
-                                className="w-full py-4 text-slate-400 font-bold uppercase tracking-widest text-[10px] hover:text-slate-600 transition-colors"
-                            >
-                                Voltar ao checkout
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Modal de PIX interno removido para usar o checkout do Mercado Pago */}
 
             {/* Terms Modal */}
             {showTerms && (

@@ -36,7 +36,7 @@ export default async function handler(req, res) {
                     name: payer_name
                 },
                 payment_methods: {
-                    default_payment_method_id: is_pix ? 'pix' : undefined,
+                    excluded_payment_methods: [],
                     excluded_payment_types: is_pix ? [
                         { id: 'ticket' }, 
                         { id: 'credit_card' }, 
