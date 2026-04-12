@@ -175,8 +175,7 @@ const CourseCheckout: React.FC = () => {
                 amount_paid: currentPrice, 
                 amount_discount: discountAmount + (isPix ? (finalPrice - pixPrice) : 0),
                 payment_method: isPix ? 'pix' : 'mercadopago_checkout',
-                coupon_applied: appliedCoupon?.name || null,
-                updated_at: new Date().toISOString()
+                coupon_applied: appliedCoupon?.name || null
             };
 
             if (existingEnroll) {
