@@ -173,7 +173,8 @@ const CourseCheckout: React.FC = () => {
     if (loading || !course) return <div className="p-20 text-center text-slate-400">Carregando...</div>;
 
     return (
-        <div className="max-w-4xl mx-auto pb-20 pt-10 px-4 animate-in fade-in">
+        <>
+            <div className="max-w-4xl mx-auto pb-20 pt-10 px-4 animate-in fade-in">
             <button onClick={() => navigate(-1)} className="mb-6 text-slate-500 hover:text-[#137fec] font-bold flex items-center gap-2"><span className="material-symbols-outlined">arrow_back</span> Voltar</button>
 
             <div className="bg-white rounded-[40px] shadow-xl border border-slate-100 overflow-hidden">
@@ -401,7 +402,7 @@ const CourseCheckout: React.FC = () => {
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
             `}</style>
-        </div>
+        </>
     );
 };
 
