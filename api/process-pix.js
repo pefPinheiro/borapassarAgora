@@ -17,6 +17,12 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'DADOS_INCOMPLETOS', message: 'Dados necessários não fornecidos.' });
         }
 
+        const accessToken = process.env.MP_ACCESS_TOKEN;
+        if (!accessToken) {
+            console.error('[PIX] Erro: MP_ACCESS_TOKEN não configurado.');
+            return res.status(500).json({ error: 'CONFIG_ERROR', message: 'Token do Mercado Pago não encontrado no servidor.' });
+        }
+
         const payment = new Payment(client);
 
         const body = {
@@ -33,7 +39,7 @@ export default async function handler(req, res) {
                 }
             },
             external_reference: enrollment_id,
-            notification_url: `${(process.env.VITE_APP_URL || '').replace(/\/$/, '')}/api/webhook`, // Opcional, o webhook geral já trata
+            notification_url: `${(process.env.VITE_APP_URL || '').replace(/\/$/, '')}/api/webhook`, 
             metadata: {
                 enrollment_id,
                 course_id
@@ -42,20 +48,27 @@ export default async function handler(req, res) {
 
         const result = await payment.create({ body });
 
+        if (!result || !result.point_of_interaction) {
+            console.error('[PIX] Erro na resposta do MP:', result);
+            return res.status(400).json({ 
+                error: 'MP_INVALID_RESPONSE', 
+                message: 'O Mercado Pago não retornou os dados do PIX. Verifique suas credenciais de produção.',
+                raw: result 
+            });
+        }
+
         return res.status(200).json({
             id: result.id,
             status: result.status,
-            status_detail: result.status_detail,
             qr_code: result.point_of_interaction.transaction_data.qr_code,
             qr_code_base64: result.point_of_interaction.transaction_data.qr_code_base64,
-            ticket_url: result.point_of_interaction.transaction_data.ticket_url
         });
 
     } catch (error) {
         console.error('Erro ao processar PIX:', error);
         return res.status(500).json({ 
-            error: 'ERRO_MP', 
-            message: 'Erro ao gerar QR Code PIX', 
+            error: 'ERRO_TECNICO', 
+            message: 'Falha ao gerar QR Code PIX no servidor.', 
             details: error.message 
         });
     }

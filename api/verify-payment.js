@@ -6,11 +6,18 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const client = new MercadoPagoConfig({ accessToken: MP_ACCESS_TOKEN || '' });
-const supabase = createClient(SUPABASE_URL || '', SUPABASE_KEY || '');
+const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 export default async function handler(req, res) {
+    console.log(`[Verify] Recebida requisição ${req.method} para /api/verify-payment`);
+    
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    if (!MP_ACCESS_TOKEN) {
+        console.error('[Verify] Erro: MP_ACCESS_TOKEN não configurado.');
+        return res.status(500).json({ error: 'Configuration error', details: 'MP_ACCESS_TOKEN is missing' });
     }
 
     try {
@@ -52,8 +59,8 @@ export default async function handler(req, res) {
         else if (status === 'rejected' || status === 'cancelled') enrollStatus = 'Cancelado';
 
         // 2. Atualizar no Banco de Dados
-        if (SUPABASE_KEY) {
-            const { data, error } = await supabase
+        if (supabase) {
+            const { data, error: dbError } = await supabase
                 .from('enrollments')
                 .update({
                     status: enrollStatus,
@@ -63,19 +70,28 @@ export default async function handler(req, res) {
                 .eq('id', enrollment_id)
                 .select();
 
-            if (error) {
-                console.error('[Verify Erro DB]', error);
-                throw error;
+            if (dbError) {
+                console.error('[Verify Erro DB]', dbError);
+                return res.status(200).json({
+                    status: enrollStatus,
+                    paymentStatus: status,
+                    dbUpdated: false,
+                    dbError: dbError.message
+                });
             }
 
             return res.status(200).json({
                 status: enrollStatus,
                 paymentStatus: status,
-                updated: data.length > 0
+                updated: data && data.length > 0
             });
         }
 
-        return res.status(500).json({ error: 'Configuration error' });
+        return res.status(200).json({ 
+            status: enrollStatus, 
+            paymentStatus: status, 
+            message: 'Matrícula identificada, mas Supabase não configurado para atualização automática.' 
+        });
 
     } catch (error) {
         console.error('[Verify] Erro:', error);
