@@ -34,10 +34,7 @@ const CourseCheckout: React.FC = () => {
     const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
     const [discountAmount, setDiscountAmount] = useState(0);
 
-    // Payment Selection
-    const [method, setMethod] = useState<'all' | 'pix'>('all');
-
-    // PIX Data
+    const [method] = useState<'pix'>('pix');
     const [pixData, setPixData] = useState<{ qr_code: string; qr_code_base64: string } | null>(null);
     const [checkingPayment, setCheckingPayment] = useState(false);
 
@@ -92,10 +89,8 @@ const CourseCheckout: React.FC = () => {
     };
 
     const finalPrice = course ? (course.price_offer - discountAmount) : 0;
-    const pixDiscountPercent = 15; // Desconto automático de 15% solicitado pelo usuário
-    const pixPrice = finalPrice * (1 - (pixDiscountPercent / 100));
-    const isPix = method === 'pix';
-    const currentPrice = isPix ? pixPrice : finalPrice;
+    const isPix = true;
+    const currentPrice = finalPrice;
 
     const fetchUser = async () => {
         const { data: { session } } = await supabase.auth.getSession();
@@ -197,8 +192,8 @@ const CourseCheckout: React.FC = () => {
                 status: 'Pendente',
                 progress: 0,
                 amount_paid: currentPrice, 
-                amount_discount: discountAmount + (isPix ? (finalPrice - pixPrice) : 0),
-                payment_method: isPix ? 'pix' : 'mercadopago_checkout',
+                amount_discount: discountAmount,
+                payment_method: 'pix',
                 coupon_applied: appliedCoupon?.name || null
             };
 
@@ -227,39 +222,39 @@ const CourseCheckout: React.FC = () => {
             }
 
             // 3. Processar Pagamento
-            setPopup({ type: 'info', title: 'Processando...', message: 'Gerando seu pedido...' });
+            setPopup({ type: 'info', title: 'Processando...', message: 'Gerando seu QR Code PIX...' });
             
-            if (isPix) {
-                // FLUXO PIX DIRETO (DENTRO DO SITE)
-                const response = await fetch('/api/process-pix', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        amount: currentPrice,
-                        description: `Curso: ${course.title}`,
-                        enrollment_id: enrollment.id,
-                        course_id: id,
-                        payer: {
-                            email: session.user.email,
-                            first_name: userProfile?.full_name?.split(' ')[0] || 'Aluno',
-                            last_name: userProfile?.full_name?.split(' ').slice(1).join(' ') || 'BPA',
-                            cpf: cpf
-                        }
-                    })
-                });
+            // FLUXO PIX DIRETO (DENTRO DO SITE)
+            const response = await fetch('/api/process-pix', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount: currentPrice,
+                    description: `Curso: ${course.title}`,
+                    enrollment_id: enrollment.id,
+                    course_id: id,
+                    payer: {
+                        email: session.user.email,
+                        first_name: userProfile?.full_name?.split(' ')[0] || 'Aluno',
+                        last_name: userProfile?.full_name?.split(' ').slice(1).join(' ') || 'BPA',
+                        cpf: cpf
+                    }
+                })
+            });
 
-                if (!response.ok) throw new Error('Erro ao gerar PIX');
+            if (!response.ok) throw new Error('Erro ao gerar PIX');
 
-                const data = await response.json();
-                setPixData({
-                    qr_code: data.qr_code,
-                    qr_code_base64: data.qr_code_base64
-                });
-                
-                setPopup(null); // Fecha o informativo
-                
-                // INICIAR VERIFICAÇÃO ATIVA (POLLING)
-                const pollInterval = setInterval(async () => {
+            const data = await response.json();
+            setPixData({
+                qr_code: data.qr_code,
+                qr_code_base64: data.qr_code_base64
+            });
+            
+            setPopup(null); // Fecha o informativo
+            setShowTerms(false); // FECHA O MODAL PARA MOSTRAR O PIX
+            
+            // INICIAR VERIFICAÇÃO ATIVA (POLLING)
+            const pollInterval = setInterval(async () => {
                     const checkRes = await fetch('/api/verify-payment', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -276,29 +271,6 @@ const CourseCheckout: React.FC = () => {
 
                 // Limpa o intervalo se o componente desmontar
                 return () => clearInterval(pollInterval);
-
-            } else {
-                // FLUXO CARTÃO/OUTROS (REDIRECIONAMENTO)
-                const response = await fetch('/api/create-preference', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        title: course.title,
-                        price: currentPrice,
-                        quantity: 1,
-                        enrollment_id: enrollment.id,
-                        course_id: id,
-                        payer_email: session.user.email,
-                        payer_name: userProfile?.full_name || 'Aluno',
-                        is_pix: false
-                    })
-                });
-
-                if (!response.ok) throw new Error('Erro ao criar preferência');
-
-                const { init_point } = await response.json();
-                window.location.href = init_point;
-            }
 
         } catch (e: any) {
             console.error('Erro:', e);
@@ -394,47 +366,14 @@ const CourseCheckout: React.FC = () => {
                         )}
                     </div>
 
-                    {!pixData && (
-                        <div className="space-y-6 flex flex-col justify-between">
-                            <div className="mt-6 space-y-4">
-                                <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase tracking-wide text-sm"><span className="material-symbols-outlined">payments</span> Método de Pagamento</h3>
-                                
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button 
-                                        onClick={() => setMethod('all')}
-                                        className={`p-4 rounded-2xl border-2 transition-all text-left flex flex-col gap-1 ${method === 'all' ? 'border-[#137fec] bg-blue-50' : 'border-slate-100 hover:border-slate-200'}`}
-                                    >
-                                        <div className="flex justify-between items-center">
-                                            <span className="material-symbols-outlined text-[#137fec]">credit_card</span>
-                                            {method === 'all' && <span className="material-symbols-outlined text-[#137fec] text-sm">check_circle</span>}
-                                        </div>
-                                        <span className="text-[10px] font-black uppercase text-slate-900 leading-tight">Cartão / Boleto</span>
-                                        <span className="text-[8px] font-bold text-slate-500 uppercase">Cartão em 12x ou Boleto</span>
-                                    </button>
-
-                                    <button 
-                                        onClick={() => setMethod('pix')}
-                                        className={`p-4 rounded-2xl border-2 transition-all text-left flex flex-col gap-1 relative overflow-hidden ${method === 'pix' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 hover:border-slate-200'}`}
-                                    >
-                                        <div className="flex justify-between items-center">
-                                            <span className="material-symbols-outlined text-emerald-500">pix</span>
-                                            {method === 'pix' && <span className="material-symbols-outlined text-emerald-500 text-sm">check_circle</span>}
-                                        </div>
-                                        <span className="text-[10px] font-black uppercase text-slate-900 leading-tight">PIX</span>
-                                        <span className="text-[8px] font-bold text-emerald-600 uppercase">-{pixDiscountPercent}% OFF</span>
-                                        {pixDiscountPercent > 0 && <div className="absolute top-1 -right-4 bg-emerald-500 text-white text-[7px] font-black px-4 py-0.5 rotate-45 uppercase">PROMO</div>}
-                                    </button>
-                                </div>
-                            </div>
-
                             <div className="mt-8 space-y-4 p-5 bg-slate-900 rounded-2xl text-white shadow-xl">
                                 <div className="flex justify-between text-xs items-center">
-                                    <span className="text-slate-400 font-bold uppercase tracking-widest">Resumo do Pagamento</span>
-                                    <span className="text-[9px] bg-[#137fec] px-2 py-0.5 rounded-full font-black uppercase">{isPix ? 'PIX ATIVO' : 'CRÉDITO/OUTROS'}</span>
+                                    <span className="text-slate-400 font-bold uppercase tracking-widest">Resumo do Pedido</span>
+                                    <span className="text-[9px] bg-emerald-500 px-2 py-0.5 rounded-full font-black uppercase">PIX</span>
                                 </div>
                                 <div className="space-y-2 pt-2">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-slate-400">Preço Base</span>
+                                        <span className="text-slate-400">Valor do Curso</span>
                                         <span className="font-bold text-white">R$ {course.price_offer?.toFixed(2).replace('.', ',')}</span>
                                     </div>
                                     {discountAmount > 0 && (
@@ -443,15 +382,9 @@ const CourseCheckout: React.FC = () => {
                                             <span className="font-bold">- R$ {discountAmount.toFixed(2).replace('.', ',')}</span>
                                         </div>
                                     )}
-                                    {isPix && pixDiscountPercent > 0 && (
-                                        <div className="flex justify-between text-sm text-emerald-400">
-                                            <span className="flex items-center gap-1 font-bold">Desconto PIX ({pixDiscountPercent}%)</span>
-                                            <span className="font-bold">- R$ {(finalPrice - pixPrice).toFixed(2).replace('.', ',')}</span>
-                                        </div>
-                                    )}
                                     <div className="pt-3 border-t border-white/10 flex justify-between items-center">
-                                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Total Líquido</span>
-                                        <span className={`${isPix ? 'text-emerald-400' : 'text-[#137fec]'} text-2xl font-black`}>R$ {currentPrice.toFixed(2).replace('.', ',')}</span>
+                                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Total a Pagar</span>
+                                        <span className="text-emerald-400 text-2xl font-black">R$ {currentPrice.toFixed(2).replace('.', ',')}</span>
                                     </div>
                                 </div>
                             </div>
@@ -477,10 +410,10 @@ const CourseCheckout: React.FC = () => {
 
                             <button 
                                 onClick={handlePreSubmit} 
-                                className={`w-full mt-4 py-5 rounded-2xl font-black uppercase tracking-widest shadow-lg transition-all flex items-center justify-center gap-2 ${isPix ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20' : 'bg-[#009ee3] hover:bg-[#0081b9] shadow-blue-500/20'} text-white`}
+                                className="w-full mt-4 py-5 rounded-2xl font-black uppercase tracking-widest shadow-lg transition-all flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20 text-white"
                             >
-                                {isPix ? 'Pagar com PIX' : 'Pagar com Mercado Pago'}
-                                <span className="material-symbols-outlined">{isPix ? 'qr_code' : 'open_in_new'}</span>
+                                Gerar PIX e Pagar
+                                <span className="material-symbols-outlined">qr_code</span>
                             </button>
                         </div>
                     )}
