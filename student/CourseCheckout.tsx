@@ -114,7 +114,13 @@ const CourseCheckout: React.FC = () => {
                 body: JSON.stringify({ enrollment_id: idToVerify })
             });
             const result = await response.json();
-            
+
+            if (!response.ok) {
+                if (isManual) setPopup({ type: 'error', title: 'Erro Crítico no Banco', message: result.details || result.error || 'Falha ao processar.' });
+                console.error('Erro detalhado:', result);
+                return;
+            }
+
             if (result.status === 'Ativo') {
                 // Fallback de segurança: Tenta atualizar status no frontend caso backend falhe por falta de chave
                 try {

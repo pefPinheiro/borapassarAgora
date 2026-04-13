@@ -86,25 +86,30 @@ export default async function handler(req, res) {
 
             if (dbError) {
                 console.error('[Verify Erro DB]', dbError);
-                return res.status(200).json({
-                    status: enrollStatus,
-                    paymentStatus: status,
-                    dbUpdated: false,
-                    dbError: dbError.message
+                return res.status(500).json({
+                    error: 'Falha grave ao atualizar Banco de Dados (Supabase)',
+                    details: dbError.message,
+                    hint: 'Constraint, ForeignKey ou RLS falhou.'
+                });
+            }
+
+            if (!data || data.length === 0) {
+                return res.status(500).json({
+                    error: 'Nenhuma linha atualizada no Supabase.',
+                    details: 'O ID da matrícula pode não existir ou o Service Role Key da Vercel é inválido e o RLS bloqueou a ação.'
                 });
             }
 
             return res.status(200).json({
                 status: enrollStatus,
                 paymentStatus: status,
-                updated: data && data.length > 0
+                updated: true
             });
         }
 
-        return res.status(200).json({ 
-            status: enrollStatus, 
-            paymentStatus: status, 
-            message: 'Matrícula identificada, mas Supabase não configurado para atualização automática.' 
+        return res.status(500).json({ 
+            error: 'Serviço de Banco de Dados Desconectado',
+            details: 'A Vercel não encontrou as chaves SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY.'
         });
 
     } catch (error) {
