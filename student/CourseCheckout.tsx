@@ -486,6 +486,7 @@ const CourseCheckout: React.FC = () => {
                     )}
                 </div>
             </div>
+        </div>
 
             {/* Modal de PIX interno removido para usar o checkout do Mercado Pago */}
 
