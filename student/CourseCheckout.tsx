@@ -221,7 +221,7 @@ const CourseCheckout: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className={`p-8 ${pixData ? 'max-w-md mx-auto' : 'grid grid-cols-1 md:grid-cols-2 gap-10'}`}>
                     <div className="space-y-6">
                         {pixData ? (
                             <div className="bg-emerald-50/30 p-8 rounded-[40px] border-2 border-emerald-500/20 text-center space-y-6">
