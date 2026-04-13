@@ -101,13 +101,41 @@ const CourseView: React.FC = () => {
           .eq('profile_id', user.id)
           .maybeSingle();
 
-        if (enrollData && enrollData.status === 'Ativo') {
-          console.log('Matrícula ativa encontrada:', enrollData.id);
-          setEnrollment(enrollData);
-          const completed = Array.isArray(enrollData.completed_items) ? enrollData.completed_items : [];
-          setReadItems(completed);
+        if (enrollData) {
+          if (enrollData.status === 'Ativo') {
+            console.log('Matrícula ativa encontrada:', enrollData.id);
+            setEnrollment(enrollData);
+            const completed = Array.isArray(enrollData.completed_items) ? enrollData.completed_items : [];
+            setReadItems(completed);
+          } else if (enrollData.status === 'Pendente') {
+            console.log('Matrícula pendente encontrada. Tentando verificar status real...');
+            // Tenta verificar se o pagamento já foi aprovado mas o webhook ainda não chegou
+            try {
+              const verifyRes = await fetch('/api/verify-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enrollment_id: enrollData.id })
+              });
+              const verifyData = await verifyRes.json();
+              
+              if (verifyData.status === 'Ativo') {
+                console.log('Pagamento verificado manualmente com sucesso!');
+                setEnrollment({ ...enrollData, status: 'Ativo' });
+                const completed = Array.isArray(enrollData.completed_items) ? enrollData.completed_items : [];
+                setReadItems(completed);
+              } else {
+                console.warn('Pagamento ainda pendente no Mercado Pago. Redirecionando para checkout.');
+                navigate(`/aluno/curso/${id}/checkout`);
+              }
+            } catch (vErr) {
+              console.error('Erro ao verificar pagamento:', vErr);
+              navigate(`/aluno/curso/${id}/checkout`);
+            }
+          } else {
+             navigate(`/aluno/curso/${id}/comprar`);
+          }
         } else {
-          console.warn('Matrícula não ativa ou inexistente. Redirecionando para compra.');
+          console.warn('Matrícula inexistente. Redirecionando para compra.');
           navigate(`/aluno/curso/${id}/comprar`);
         }
 

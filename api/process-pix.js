@@ -33,7 +33,7 @@ export default async function handler(req, res) {
                 }
             },
             external_reference: enrollment_id,
-            notification_url: `${process.env.VITE_APP_URL}/api/webhook`, // Opcional, o webhook geral já trata
+            notification_url: `${(process.env.VITE_APP_URL || '').replace(/\/$/, '')}/api/webhook`, // Opcional, o webhook geral já trata
             metadata: {
                 enrollment_id,
                 course_id

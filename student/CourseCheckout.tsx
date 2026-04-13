@@ -132,14 +132,38 @@ const CourseCheckout: React.FC = () => {
 
     const checkPaymentStatus = async (enrollId: string) => {
         setCheckingPayment(true);
-        const { data } = await supabase.from('enrollments').select('status').eq('id', enrollId).single();
-        if (data?.status === 'Ativo') {
-            setPopup({ type: 'success', title: 'Pagamento Confirmado!', message: 'Seu acesso já está liberado. Bons estudos!' });
-            setTimeout(() => navigate(`/aluno/curso/${id}`), 2000);
-        } else {
-            setPopup({ type: 'info', title: 'Aguardando...', message: 'Ainda não recebemos a confirmação do pagamento PIX. Isso pode levar alguns segundos.' });
+        try {
+            const response = await fetch('/api/verify-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enrollment_id: enrollId })
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'Ativo') {
+                setPopup({ type: 'success', title: 'Pagamento Confirmado!', message: 'Seu acesso já está liberado. Bons estudos!' });
+                setTimeout(() => navigate(`/aluno/curso/${id}`), 2000);
+            } else if (result.status === 'Cancelado' || result.status === 'rejected') {
+                setPopup({ type: 'error', title: 'Pagamento Recusado', message: 'O Mercado Pago informou que seu pagamento foi recusado ou cancelado.' });
+            } else if (result.status === 'notFound') {
+                setPopup({ type: 'info', title: 'Aguardando...', message: 'Ainda não encontramos nenhum pagamento. Se você já pagou, aguarde 1 minuto e tente novamente.' });
+            } else {
+                setPopup({ type: 'info', title: 'Status do Pagamento', message: `O pagamento ainda está sendo processado (Status: ${result.paymentStatus || 'Pendente'}).` });
+            }
+        } catch (e) {
+            console.error('Erro ao verificar:', e);
+            // Fallback para verificar só no DB se a API falhar
+            const { data } = await supabase.from('enrollments').select('status').eq('id', enrollId).single();
+            if (data?.status === 'Ativo') {
+                setPopup({ type: 'success', title: 'Pagamento Confirmado!', message: 'Seu acesso já está liberado. Bons estudos!' });
+                setTimeout(() => navigate(`/aluno/curso/${id}`), 2000);
+            } else {
+                setPopup({ type: 'error', title: 'Erro de Conexão', message: 'Não conseguimos verificar o status agora. Tente novamente em instantes.' });
+            }
+        } finally {
+            setCheckingPayment(false);
         }
-        setCheckingPayment(false);
     };
 
     const handlePlaceOrder = async () => {

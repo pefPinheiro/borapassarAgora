@@ -45,6 +45,7 @@ export default async function handler(req, res) {
                     installments: is_pix ? 1 : 12
                 },
                 external_reference: enrollment_id, // Chave para vincular no webhook
+                notification_url: `${(process.env.VITE_APP_URL || '').replace(/\/$/, '')}/api/webhook`, // GARANTE O RECEBIMENTO DO WEBHOOK
                 back_urls: {
                     success: `${process.env.VITE_APP_URL || 'http://localhost:5173'}/aluno/curso/${req.body.course_id}?status=success`,
                     failure: `${process.env.VITE_APP_URL || 'http://localhost:5173'}/aluno/curso/${req.body.course_id}/checkout?status=failure`,
