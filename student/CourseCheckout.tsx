@@ -100,7 +100,7 @@ const CourseCheckout: React.FC = () => {
         setShowTerms(true);
     };
 
-    const checkPaymentStatus = async (idToVerify: string) => {
+    const checkPaymentStatus = async (idToVerify: string, isManual: boolean = true) => {
         try {
             const response = await fetch('/api/verify-payment', {
                 method: 'POST',
@@ -108,14 +108,25 @@ const CourseCheckout: React.FC = () => {
                 body: JSON.stringify({ enrollment_id: idToVerify })
             });
             const result = await response.json();
+            
             if (result.status === 'Ativo') {
-                setPopup({ type: 'success', title: 'Confirmado!', message: 'Seu acesso foi liberado!' });
-                setTimeout(() => navigate(`/aluno/curso/${id}`), 2000);
+                // Fallback de segurança: Tenta atualizar status no frontend caso backend falhe por falta de chave
+                try {
+                    await supabase.from('enrollments').update({ status: 'Ativo', updated_at: new Date().toISOString() }).eq('id', idToVerify);
+                } catch (e) {
+                    console.log('Update frontend falhou, dependendo do backend:', e);
+                }
+
+                if (isManual) setPopup({ type: 'success', title: 'Confirmado!', message: 'Seu acesso foi liberado!' });
+                setTimeout(() => window.location.href = `/aluno/curso/${id}`, 1000);
             } else {
-                setPopup({ type: 'info', title: 'Aguardando', message: 'Pagamento ainda não detectado.' });
+                if (isManual) {
+                    setPopup({ type: 'info', title: 'Aguardando', message: 'O pagamento ainda não foi identificado. Aguarde alguns instantes.' });
+                }
             }
         } catch (e) {
-            setPopup({ type: 'error', title: 'Erro', message: 'Falha ao verificar pagamento.' });
+            if (isManual) setPopup({ type: 'error', title: 'Erro', message: 'Falha ao verificar pagamento.' });
+            console.error('Erro no polling:', e);
         }
     };
 
@@ -173,7 +184,7 @@ const CourseCheckout: React.FC = () => {
             setPopup(null);
 
             const poll = setInterval(() => {
-                checkPaymentStatus(enroll.id);
+                checkPaymentStatus(enroll.id, false);
             }, 7000);
             return () => clearInterval(poll);
 
@@ -274,21 +285,67 @@ const CourseCheckout: React.FC = () => {
             </div>
 
             {showTerms && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
-                    <div className="bg-white rounded-[40px] max-w-xl w-full p-10 space-y-6">
-                        <h3 className="text-2xl font-black uppercase italic">Termos de <span className="text-blue-500">Adesão</span></h3>
-                        <div className="max-h-60 overflow-y-auto text-sm text-slate-500 leading-relaxed pr-2">
-                            Ao clicar em aceitar, você concorda com a política de acesso à plataforma Bora Passar Agora. O conteúdo é digital e o acesso é liberado após a confirmação do pagamento. Você tem direito a 7 dias de garantia incondicional conforme o CDC.
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+                    <div className="bg-white rounded-[40px] shadow-2xl border border-white max-w-xl w-full p-10 space-y-8 animate-in zoom-in-95 duration-300">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-6">
+                            <div>
+                                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">Termos de <span className="text-[#137fec]">Adesão.</span></h3>
+                                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mt-1">Leia com atenção antes de confirmar sua inscrição</p>
+                            </div>
+                            <div className="size-12 bg-blue-50 rounded-2xl flex items-center justify-center text-[#137fec]">
+                                <span className="material-symbols-outlined font-bold">gavel</span>
+                            </div>
                         </div>
-                        <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl cursor-pointer">
-                            <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="size-5 rounded border-slate-300 text-blue-500" />
-                            <span className="text-xs font-black uppercase">Li e concordo com os termos</span>
-                        </label>
-                        <div className="flex gap-4">
-                            <button onClick={() => setShowTerms(false)} className="flex-1 py-4 border border-slate-200 rounded-2xl font-black uppercase text-[10px]">Cancelar</button>
-                            <button onClick={handlePlaceOrder} disabled={submitting || !agreed} className="flex-[2] py-4 bg-emerald-500 text-white rounded-2xl font-black uppercase text-[10px] disabled:opacity-50">
-                                {submitting ? 'Gerando...' : 'Confirmar e Pagar'}
-                            </button>
+
+                        <div className="max-h-[350px] overflow-y-auto pr-4 space-y-6 text-sm text-slate-600 custom-scrollbar text-justify font-medium leading-relaxed">
+                            <p>
+                                Ao clicar em aceitar, você concorda expressamente com os Termos de Uso e Política de Privacidade estipulados pela plataforma <strong>Bora Passar Agora</strong>.
+                            </p>
+                            <p>
+                                O curso ora adquirido representa um <strong>Conteúdo Digital em formato de Vídeos e PDF</strong>, cujo acesso será concedido à sua conta pessoal e intransferível de Aluno imediatamente após a confirmação sistêmica do pagamento.
+                            </p>
+                            <div className="p-5 bg-orange-50 text-orange-800 rounded-2xl border border-orange-100">
+                                <h4 className="font-black uppercase tracking-widest text-[10px] mb-2 flex items-center gap-2"><span className="material-symbols-outlined text-sm">warning</span> Importante Saber</h4>
+                                <ul className="list-disc pl-4 space-y-2 text-xs">
+                                    <li>Evite compartilhar sua senha com terceiros, sob risco de bloqueio definitivo sem aviso prévio.</li>
+                                    <li>Nosso ambiente dispõe de tecnologia antibirataria que rastreia IPs e acessos simultâneos irregulares.</li>
+                                </ul>
+                            </div>
+                            <p>
+                                De acordo com o Código de Defesa do Consumidor (Art. 49), garantimos o <strong>Direito de Arrependimento Incondicional em até 7 dias</strong>. Se dentro deste período você perceber que o material não atende sua expectativa, devolveremos 100% do seu investimento.
+                            </p>
+                        </div>
+
+                        <div className="pt-6 border-t border-slate-100">
+                            <label className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all cursor-pointer ${agreed ? 'bg-blue-50 border-[#137fec] text-[#137fec]' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 group'}`}>
+                                <input 
+                                    type="checkbox" 
+                                    checked={agreed} 
+                                    onChange={e => setAgreed(e.target.checked)} 
+                                    className="size-6 text-[#137fec] border-2 border-slate-300 rounded-lg focus:ring-[#137fec]" 
+                                />
+                                <span className="font-black uppercase tracking-widest text-[11px] group-hover:text-slate-900 transition-colors">Li e concordo expressamente com os termos</span>
+                            </label>
+
+                            <div className="flex gap-4 mt-8">
+                                <button 
+                                    onClick={() => setShowTerms(false)} 
+                                    className="px-8 py-5 rounded-2xl font-black uppercase tracking-widest text-[#137fec] bg-blue-50 hover:bg-blue-100 transition-colors text-xs"
+                                >
+                                    Voltar
+                                </button>
+                                <button 
+                                    onClick={handlePlaceOrder} 
+                                    disabled={!agreed || submitting} 
+                                    className={`flex-1 py-5 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all text-white text-xs ${agreed && !submitting ? 'bg-emerald-500 hover:bg-emerald-600 shadow-xl shadow-emerald-500/20' : 'bg-slate-200 cursor-not-allowed'}`}
+                                >
+                                    {submitting ? (
+                                        <><span className="material-symbols-outlined animate-spin">refresh</span> Processando...</>
+                                    ) : (
+                                        <><span className="material-symbols-outlined">check_circle</span> Confirmar Inscrição</>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
