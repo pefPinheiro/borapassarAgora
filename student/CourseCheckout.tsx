@@ -226,31 +226,79 @@ const CourseCheckout: React.FC = () => {
                 enrollment = newEnroll;
             }
 
-            // 3. SEMPRE Processar via Redirect Mercado Pago (Unificado)
-            setPopup({ type: 'info', title: 'Redirecionando...', message: 'Conectando ao ambiente seguro do Mercado Pago.' });
+            // 3. Processar Pagamento
+            setPopup({ type: 'info', title: 'Processando...', message: 'Gerando seu pedido...' });
             
-            const response = await fetch('/api/create-preference', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title: course.title,
-                    price: currentPrice,
-                    quantity: 1,
-                    enrollment_id: enrollment.id,
-                    course_id: id,
-                    payer_email: session.user.email,
-                    payer_name: userProfile?.full_name || 'Aluno',
-                    is_pix: method === 'pix' // Força PIX no MP se o aluno escolheu a aba de desconto
-                })
-            });
+            if (isPix) {
+                // FLUXO PIX DIRETO (DENTRO DO SITE)
+                const response = await fetch('/api/process-pix', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        amount: currentPrice,
+                        description: `Curso: ${course.title}`,
+                        enrollment_id: enrollment.id,
+                        course_id: id,
+                        payer: {
+                            email: session.user.email,
+                            first_name: userProfile?.full_name?.split(' ')[0] || 'Aluno',
+                            last_name: userProfile?.full_name?.split(' ').slice(1).join(' ') || 'BPA',
+                            cpf: cpf
+                        }
+                    })
+                });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Erro ao criar preferência');
+                if (!response.ok) throw new Error('Erro ao gerar PIX');
+
+                const data = await response.json();
+                setPixData({
+                    qr_code: data.qr_code,
+                    qr_code_base64: data.qr_code_base64
+                });
+                
+                setPopup(null); // Fecha o informativo
+                
+                // INICIAR VERIFICAÇÃO ATIVA (POLLING)
+                const pollInterval = setInterval(async () => {
+                    const checkRes = await fetch('/api/verify-payment', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ enrollment_id: enrollment.id })
+                    });
+                    const checkData = await checkRes.json();
+                    
+                    if (checkData.status === 'Ativo') {
+                        clearInterval(pollInterval);
+                        setPopup({ type: 'success', title: 'Pagamento Confirmado!', message: 'Seu acesso foi liberado automaticamente. Bons estudos!' });
+                        setTimeout(() => navigate(`/aluno/curso/${id}`), 2500);
+                    }
+                }, 5000); // Verifica a cada 5 segundos
+
+                // Limpa o intervalo se o componente desmontar
+                return () => clearInterval(pollInterval);
+
+            } else {
+                // FLUXO CARTÃO/OUTROS (REDIRECIONAMENTO)
+                const response = await fetch('/api/create-preference', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: course.title,
+                        price: currentPrice,
+                        quantity: 1,
+                        enrollment_id: enrollment.id,
+                        course_id: id,
+                        payer_email: session.user.email,
+                        payer_name: userProfile?.full_name || 'Aluno',
+                        is_pix: false
+                    })
+                });
+
+                if (!response.ok) throw new Error('Erro ao criar preferência');
+
+                const { init_point } = await response.json();
+                window.location.href = init_point;
             }
-
-            const { init_point } = await response.json();
-            window.location.href = init_point;
 
         } catch (e: any) {
             console.error('Erro:', e);
@@ -281,24 +329,73 @@ const CourseCheckout: React.FC = () => {
 
                 <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-10">
                     <div className="space-y-6">
-                        <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase tracking-wide text-sm"><span className="material-symbols-outlined">person</span> Seus Dados</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="label-text">CPF</label>
-                                <input value={cpf} onChange={e => setCpf(formatCPF(e.target.value))} className="input-field" placeholder="000.000.000-00" />
+                        {pixData ? (
+                            <div className="bg-slate-50 p-8 rounded-[40px] border-2 border-emerald-500/20 text-center space-y-6 animate-in zoom-in-95">
+                                <div className="space-y-2">
+                                    <h3 className="text-xl font-black text-slate-900 uppercase italic">Seu PIX foi gerado!</h3>
+                                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Aguardando seu pagamento para liberar o curso</p>
+                                </div>
+
+                                <div className="bg-white p-4 rounded-3xl shadow-inner inline-block border border-slate-100">
+                                    <img src={`data:image/png;base64,${pixData.qr_code_base64}`} className="size-48" alt="QR Code PIX" />
+                                </div>
+
+                                <div className="space-y-3">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Ou use o código Copia e Cola:</p>
+                                    <button 
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(pixData.qr_code);
+                                            setPopup({ type: 'success', title: 'Copiado!', message: 'Código PIX copiado para a área de transferência.' });
+                                        }}
+                                        className="w-full py-4 bg-white border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-600 hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">content_copy</span>
+                                        Copiar Código PIX
+                                    </button>
+                                </div>
+
+                                <div className="pt-4 border-t border-slate-200 space-y-3">
+                                    <button 
+                                        onClick={() => checkPaymentStatus(enrollment.id)}
+                                        className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">sync</span>
+                                        Já Paguei, Verificar Agora
+                                    </button>
+                                    <a 
+                                        href={`https://wa.me/55?text=Olá! Acabei de fazer o PIX do curso ${course.title} e gostaria de agilizar a liberação.`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="w-full py-3 bg-emerald-50 text-emerald-600 rounded-2xl font-black uppercase text-[9px] tracking-widest hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">support_agent</span>
+                                        Liberação via WhatsApp (Suporte)
+                                    </a>
+                                </div>
                             </div>
-                            <div>
-                                <label className="label-text">Telefone</label>
-                                <input value={phone} onChange={e => setPhone(formatPhone(e.target.value))} className="input-field" placeholder="(00) 00000-0000" />
-                            </div>
-                            <div>
-                                <label className="label-text">Nascimento</label>
-                                <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className="input-field" />
-                            </div>
-                        </div>
+                        ) : (
+                            <>
+                                <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase tracking-wide text-sm"><span className="material-symbols-outlined">person</span> Seus Dados</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="label-text">CPF</label>
+                                        <input value={cpf} onChange={e => setCpf(formatCPF(e.target.value))} className="input-field" placeholder="000.000.000-00" />
+                                    </div>
+                                    <div>
+                                        <label className="label-text">Telefone</label>
+                                        <input value={phone} onChange={e => setPhone(formatPhone(e.target.value))} className="input-field" placeholder="(00) 00000-0000" />
+                                    </div>
+                                    <div>
+                                        <label className="label-text">Nascimento</label>
+                                        <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className="input-field" />
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
 
-                    <div className="space-y-6 flex flex-col justify-between">
+                    {!pixData && (
+                        <div className="space-y-6 flex flex-col justify-between">
                             <div className="mt-6 space-y-4">
                                 <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase tracking-wide text-sm"><span className="material-symbols-outlined">payments</span> Método de Pagamento</h3>
                                 
@@ -377,16 +474,16 @@ const CourseCheckout: React.FC = () => {
                                     </button>
                                 </div>
                             </div>
-                        </div>
 
-                        <button 
-                            onClick={handlePreSubmit} 
-                            className={`w-full mt-4 py-5 rounded-2xl font-black uppercase tracking-widest shadow-lg transition-all flex items-center justify-center gap-2 ${isPix ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20' : 'bg-[#009ee3] hover:bg-[#0081b9] shadow-blue-500/20'} text-white`}
-                        >
-                            {isPix ? 'Pagar com PIX' : 'Pagar com Mercado Pago'}
-                            <span className="material-symbols-outlined">{isPix ? 'qr_code' : 'open_in_new'}</span>
-                        </button>
-                    </div>
+                            <button 
+                                onClick={handlePreSubmit} 
+                                className={`w-full mt-4 py-5 rounded-2xl font-black uppercase tracking-widest shadow-lg transition-all flex items-center justify-center gap-2 ${isPix ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20' : 'bg-[#009ee3] hover:bg-[#0081b9] shadow-blue-500/20'} text-white`}
+                            >
+                                {isPix ? 'Pagar com PIX' : 'Pagar com Mercado Pago'}
+                                <span className="material-symbols-outlined">{isPix ? 'qr_code' : 'open_in_new'}</span>
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
