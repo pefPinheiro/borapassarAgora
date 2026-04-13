@@ -64,8 +64,7 @@ export default async function handler(req, res) {
                     .from('enrollments')
                     .update({
                         status: enrollStatus,
-                        payment_method: payment_method_id || 'mercadopago',
-                        updated_at: new Date().toISOString()
+                        payment_method: payment_method_id || 'mercadopago'
                     })
                     .eq('id', external_reference)
                     .select();

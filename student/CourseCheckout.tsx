@@ -124,7 +124,7 @@ const CourseCheckout: React.FC = () => {
             if (result.status === 'Ativo') {
                 // Fallback de segurança: Tenta atualizar status no frontend caso backend falhe por falta de chave
                 try {
-                    await supabase.from('enrollments').update({ status: 'Ativo', updated_at: new Date().toISOString() }).eq('id', idToVerify);
+                    await supabase.from('enrollments').update({ status: 'Ativo' }).eq('id', idToVerify);
                 } catch (e) {
                     console.log('Update frontend falhou, dependendo do backend:', e);
                 }
