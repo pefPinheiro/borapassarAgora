@@ -59,8 +59,22 @@ export default async function handler(req, res) {
         else if (status === 'rejected' || status === 'cancelled') enrollStatus = 'Cancelado';
 
         // 2. Atualizar no Banco de Dados
-        if (supabase) {
-            const { data, error: dbError } = await supabase
+        
+        let clientToUse = supabase;
+        
+        // Se não tivermos o Service Role Key, tentamos usar o token de acesso do próprio usuário (enviado via header)
+        if (!clientToUse && req.headers.authorization && SUPABASE_URL) {
+            const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+            if (anonKey) {
+                clientToUse = createClient(SUPABASE_URL, anonKey, {
+                    global: { headers: { Authorization: req.headers.authorization } }
+                });
+            }
+        }
+
+        if (clientToUse) {
+            const { data, error: dbError } = await clientToUse
+
                 .from('enrollments')
                 .update({
                     status: enrollStatus,

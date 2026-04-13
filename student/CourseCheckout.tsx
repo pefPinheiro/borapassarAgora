@@ -102,9 +102,15 @@ const CourseCheckout: React.FC = () => {
 
     const checkPaymentStatus = async (idToVerify: string, isManual: boolean = true) => {
         try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const headers: any = { 'Content-Type': 'application/json' };
+            if (session?.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
+
             const response = await fetch('/api/verify-payment', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({ enrollment_id: idToVerify })
             });
             const result = await response.json();
@@ -299,20 +305,25 @@ const CourseCheckout: React.FC = () => {
 
                         <div className="max-h-[350px] overflow-y-auto pr-4 space-y-6 text-sm text-slate-600 custom-scrollbar text-justify font-medium leading-relaxed">
                             <p>
-                                Ao clicar em aceitar, você concorda expressamente com os Termos de Uso e Política de Privacidade estipulados pela plataforma <strong>Bora Passar Agora</strong>.
+                                Ao clicar em "Confirmar e Pagar", você estará manifestando sua plena e expressa concordância com os Termos de Uso e a Política de Privacidade estipulados pela plataforma <strong>Bora Passar Agora</strong>.
                             </p>
                             <p>
-                                O curso ora adquirido representa um <strong>Conteúdo Digital em formato de Vídeos e PDF</strong>, cujo acesso será concedido à sua conta pessoal e intransferível de Aluno imediatamente após a confirmação sistêmica do pagamento.
+                                <strong>1. Objeto e Liberação de Acesso:</strong> O produto objeto desta transação é um material exclusivamente digital, desprovido de videoaulas. O conteúdo adquirido engloba: <strong>Apostilas Interativas, Banco de Questões exclusivas e Simulados estrategicamente elaborados.</strong> O acesso a esses recursos será liberado em sua conta na plataforma logo após a confirmação sistêmica do pagamento via PIX.
                             </p>
-                            <div className="p-5 bg-orange-50 text-orange-800 rounded-2xl border border-orange-100">
-                                <h4 className="font-black uppercase tracking-widest text-[10px] mb-2 flex items-center gap-2"><span className="material-symbols-outlined text-sm">warning</span> Importante Saber</h4>
-                                <ul className="list-disc pl-4 space-y-2 text-xs">
-                                    <li>Evite compartilhar sua senha com terceiros, sob risco de bloqueio definitivo sem aviso prévio.</li>
-                                    <li>Nosso ambiente dispõe de tecnologia antibirataria que rastreia IPs e acessos simultâneos irregulares.</li>
-                                </ul>
+                            <p>
+                                <strong>2. Direitos Autorais e Antipirataria:</strong> Todo o material oferecido é protegido pela Lei Geral de Direitos Autorais (Lei nº 9.610/98). É terminantemente proibida a cópia, reprodução, distribuição, rateio, venda ou compartilhamento – pago ou gratuito – de qualquer parte deste conteúdo. A plataforma possui rastreamento por IP, metadados em PDF e bloqueio automático para acessos simultâneos não autorizados. Identificadas infrações, a conta será bloqueada sem aviso prévio, e as medidas judiciais cabíveis serão adotadas.
+                            </p>
+                            <div className="p-5 bg-blue-50 text-blue-900 rounded-2xl border border-blue-200">
+                                <h4 className="font-black uppercase tracking-widest text-[10px] mb-2 flex items-center gap-2"><span className="material-symbols-outlined text-sm">update</span> Atualização do Material</h4>
+                                <p className="text-xs">
+                                    O <strong>Bora Passar Agora</strong> se reserva o direito de realizar atualizações contínuas no material. Você terá acesso aos simulados e questões mais recentes adicionados ao pacote enquanto sua matrícula estiver vigente.
+                                </p>
                             </div>
                             <p>
-                                De acordo com o Código de Defesa do Consumidor (Art. 49), garantimos o <strong>Direito de Arrependimento Incondicional em até 7 dias</strong>. Se dentro deste período você perceber que o material não atende sua expectativa, devolveremos 100% do seu investimento.
+                                <strong>3. Garantia e Devolução:</strong> Em conformidade com o Artigo 49 do Código de Defesa do Consumidor, garantimos a você o "Direito de Arrependimento". Caso sinta que o material não condiz com as suas expectativas, você poderá solicitar o cancelamento e reembolso de 100% do seu investimento no prazo máximo de <strong>7 (sete) dias corridos</strong> a partir da data e hora da liberação do pagamento.
+                            </p>
+                            <p>
+                                Ao prosseguir, declaro sob as penas da lei ter lido e compreendido perfeitamente os termos acima.
                             </p>
                         </div>
 
