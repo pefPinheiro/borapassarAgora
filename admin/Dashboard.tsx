@@ -168,7 +168,7 @@ const Dashboard: React.FC = () => {
 
   // Se o usuário for Professor, mostra o Perfil Público (Preview) no Dashboard
   if (userProfile?.role === 'teacher') {
-    return <ProfessorProfile />;
+    return <ProfessorProfile isDashboard={true} />;
   }
 
   const isFin = userProfile?.role === 'super' || userProfile?.view_finance === true;

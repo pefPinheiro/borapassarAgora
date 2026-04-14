@@ -1,22 +1,36 @@
-# PROMPT PARA FORMATAÇÃO DO PERFIL DO PROFESSOR
+# 🚀 Prompt para Estilização de Perfil Docente (Premium)
 
-Copie e cole este prompt em um chat de IA (como o ChatGPT ou Claude) junto com suas informações para gerar um texto de biografia que fique perfeito no novo design do seu perfil.
+Utilize o prompt abaixo em uma IA (como ChatGPT, Claude ou Gemini) para transformar uma biografia simples em um conteúdo magnético e visualmente impactante para o seu perfil no **Bora Passar Agora**.
 
 ---
 
-"Atue como um redator publicitário de alto nível especializado em educação e branding pessoal. Meu objetivo é criar uma biografia profissional para o meu perfil na plataforma de cursos 'Bora Passar'.
+### 📝 O PROMPT:
 
-O design do meu novo perfil é premium e suporta formatação avançada (Markdown/HTML). Preciso que você escreva minha trajetória seguindo estas diretrizes de formatação para que o resultado visual seja impactante:
+> "Aja como um Designer de Conteúdo Especialista em Marketing Educacional de Alto Padrão. Minha plataforma de ensino utiliza um sistema de renderização Markdown/HTML que suporta cabeçalhos (H2, H3), listas personalizadas, citações (blockquotes) e negrito.
+>
+> **OBJETIVO:** Transformar minha biografia básica (fornecida abaixo) em um perfil de 'Professor Estrela'. O texto deve projetar autoridade, empatia e um método de ensino infalível.
+>
+> **DIRETRIZES TÉCNICAS (ESTRUTURA):**
+> 1. **Header Principal (H2):** Use uma frase de impacto em itálico que resuma meu propósito.
+> 2. **Subtítulos (H3):** Divida o conteúdo em 'Minha Trajetória', 'Método de Ensino' e 'Por que o Bora Passar?'.
+> 3. **Citação de Impacto (Blockquote):** Crie uma frase inspiradora minha que demonstre meu compromisso com o aluno.
+> 4. **Listas (Bulleted List):** Destaque meus principais diferenciais ou conquistas acadêmicas.
+> 5. **Formatação:** Use **negrito** para palavras-chave que devem saltar aos olhos do aluno.
+>
+> **TOM DE VOZ:** Profissional, enérgico, direto e extremamente acolhedor. Evite clichês; use termos que denotem modernidade e tecnologia na educação.
+>
+> **TEXTO BASE PARA TRANSFORMAR:**
+> [INSIRA AQUI SEU TEXTO SIMPLES/CURRÍCULO]"
 
-1. **Título de Impacto (H2)**: Comece com um cabeçalho H2 contendo uma frase que resuma minha autoridade (Ex: 'MAIS DE 15 ANOS TRANSFORMANDO SONHOS EM APROVAÇÕES').
-2. **Introdução Narrativa**: Escreva 2 parágrafos envolventes contando minha jornada e paixão pelo ensino.
-3. **Destaques em Lista**: Use uma lista de tópicos (bullet points) para listar minhas principais especializações, cargos ocupados ou números de aprovações.
-4. **Citação em Destaque (Blockquote)**: Crie uma frase inspiradora minha (ou que eu utilize muito) e formate como uma citação (blockquote). Na plataforma, ela aparecerá em um box azul especial.
-5. **Seção de Metodologia (H3)**: Use um título H3 para explicar brevemente como é minha didática.
-6. **Encerramento**: Uma frase de convite para o aluno começar os estudos.
-
-Aqui estão meus dados brutos (formação, anos de experiência, matérias, conquistas):
-[COLE SEUS DADOS AQUI]
-
-Por favor, forneça o texto já com as marcações Markdown (## para H2, ### para H3, > para citações, * para listas)."
 ---
+
+### ✨ Exemplos de tags que você pode usar no editor:
+
+*   `## Minha Missão: Transformar Carreiras` (Cria um título grande com linha divisória)
+*   `### O Método de Aprovação` (Cria um título médio em azul)
+*   `> "O sucesso não é um destino, é um processo de disciplina e mentoria."` (Cria uma caixa estilizada de citação)
+*   `**Aprovação Recorde**` (Destaque em negrito)
+
+---
+> [!TIP]
+> **Dica de Ouro:** Após a IA gerar o texto, copie e cole diretamente no campo de biografia do seu perfil. O sistema aplicará automaticamente todas as cores e estilos premium que configuramos para você!

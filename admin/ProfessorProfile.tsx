@@ -3,7 +3,11 @@ import { supabase } from '../lib/supabase';
 import { Teacher } from '../types';
 import TiptapEditor from './TiptapEditor';
 
-const ProfessorProfile: React.FC = () => {
+interface ProfessorProfileProps {
+    isDashboard?: boolean;
+}
+
+const ProfessorProfile: React.FC<ProfessorProfileProps> = ({ isDashboard = false }) => {
     const [viewMode, setViewMode] = useState<'preview' | 'edit'>('preview');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -216,16 +220,18 @@ const ProfessorProfile: React.FC = () => {
                              </div>
                         </div>
 
-                        {/* Top Actions */}
-                        <div className="absolute top-8 right-8 flex gap-3">
-                            <button 
-                                onClick={() => setViewMode('edit')}
-                                className="px-8 py-4 bg-white text-slate-900 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-110 active:scale-95 transition-all flex items-center gap-3"
-                            >
-                                <span className="material-symbols-outlined text-[20px]">edit</span>
-                                Editar Apresentação
-                            </button>
-                        </div>
+                        {/* Top Actions - Only visible if not in Dashboard */}
+                        {!isDashboard && (
+                            <div className="absolute top-8 right-8 flex gap-3">
+                                <button 
+                                    onClick={() => setViewMode('edit')}
+                                    className="px-8 py-4 bg-white text-slate-900 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-110 active:scale-95 transition-all flex items-center gap-3"
+                                >
+                                    <span className="material-symbols-outlined text-[20px]">edit</span>
+                                    Editar Minha Bio
+                                </button>
+                            </div>
+                        )}
 
                         {/* Text Overlay */}
                         <div className="absolute bottom-16 left-16 right-16 flex flex-col md:flex-row items-end gap-10">
@@ -247,107 +253,139 @@ const ProfessorProfile: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Content Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-16 px-6">
-                    <div className="lg:col-span-8 space-y-12">
-                        {/* Bio Section */}
-                        <div className="space-y-10">
-                            <style>{`
-                                .professor-bio-content h2 { 
-                                    font-size: 1.875rem; 
-                                    line-height: 2.25rem; 
-                                    font-weight: 900; 
-                                    text-transform: uppercase; 
-                                    letter-spacing: -0.05em; 
-                                    margin-top: 3rem; 
-                                    border-bottom: 2px solid #f1f5f9; 
-                                    padding-bottom: 1rem;
-                                    color: #0f172a;
-                                }
-                                .professor-bio-content h3 { 
-                                    font-size: 1.25rem; 
-                                    font-weight: 900; 
-                                    color: #137fec; 
-                                    margin-top: 2rem;
-                                    text-transform: uppercase;
-                                }
-                                .professor-bio-content p { margin-bottom: 1.5rem; line-height: 1.8; }
-                                .professor-bio-content ul { list-style-type: none; padding-left: 0.5rem; }
-                                .professor-bio-content ul li { position: relative; padding-left: 1.5rem; margin-bottom: 0.75rem; }
-                                .professor-bio-content ul li::before { 
-                                    content: "•"; 
-                                    color: #137fec; 
-                                    font-weight: 900; 
-                                    position: absolute; 
-                                    left: 0; 
-                                    font-size: 1.2rem;
-                                }
-                                .professor-bio-content blockquote { 
-                                    border-left: 4px solid #137fec; 
-                                    background: #f8fafc; 
-                                    padding: 2rem; 
-                                    border-radius: 0 2rem 2rem 0; 
-                                    font-style: italic; 
-                                    color: #475569;
-                                    margin: 2rem 0;
-                                }
-                                .professor-bio-content strong { color: #0f172a; font-weight: 900; }
-                                .professor-bio-content hr { border: 0; border-top: 2px solid #f1f5f9; margin: 3rem 0; }
-                            `}</style>
-                            <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-4">
-                                <span className="w-10 h-[2px] bg-[#137fec]" />
-                                Biografia & Trajetória
-                            </h3>
-                            <div 
-                                className={bioContentClass}
-                                dangerouslySetInnerHTML={{ __html: teacherData.description || '<p class="text-slate-400 italic">Nenhuma biografia cadastrada.</p>' }}
-                            />
-                        </div>
-
-                        {/* Gallery Section */}
-                        {(teacherData.ad_images || []).length > 1 && (
-                            <div className="space-y-6">
-                                <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-4">
-                                    <span className="size-2 bg-[#137fec] rounded-full" />
-                                    Portfólio & Mídia
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {(teacherData.ad_images || []).slice(1).map((img, i) => (
-                                        <div key={i} className="aspect-video rounded-[40px] overflow-hidden shadow-xl hover:scale-[1.02] transition-transform duration-500">
-                                            <img src={img} className="w-full h-full object-cover" alt={`Mídia ${i}`} />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                {/* Content Area */}
+                <div className="mt-16 px-6 space-y-20">
+                    {/* Bio Section */}
+                    <div className="max-w-4xl mx-auto space-y-10">
+                        <style>{`
+                            .professor-bio-content h2 { 
+                                font-size: 2.25rem; 
+                                line-height: 2.5rem; 
+                                font-weight: 900; 
+                                text-transform: uppercase; 
+                                letter-spacing: -0.05em; 
+                                margin-top: 4rem; 
+                                border-bottom: 2px solid #f1f5f9; 
+                                padding-bottom: 1.5rem;
+                                color: #0f172a;
+                                font-style: italic;
+                            }
+                            .professor-bio-content h3 { 
+                                font-size: 1.5rem; 
+                                font-weight: 900; 
+                                color: #137fec; 
+                                margin-top: 3rem;
+                                text-transform: uppercase;
+                                letter-spacing: -0.02em;
+                            }
+                            .professor-bio-content p { margin-bottom: 1.75rem; line-height: 1.8; font-size: 1.125rem; }
+                            .professor-bio-content ul { list-style-type: none; padding-left: 0.5rem; margin-bottom: 2.5rem; }
+                            .professor-bio-content ul li { position: relative; padding-left: 2rem; margin-bottom: 1rem; font-size: 1.1rem; }
+                            .professor-bio-content ul li::before { 
+                                content: "✓"; 
+                                color: #137fec; 
+                                font-weight: 900; 
+                                position: absolute; 
+                                left: 0; 
+                                font-size: 1.2rem;
+                            }
+                            .professor-bio-content blockquote { 
+                                border-left: 8px solid #137fec; 
+                                background: linear-gradient(to right, #f0f9ff, #ffffff); 
+                                padding: 3rem; 
+                                border-radius: 0 40px 40px 0; 
+                                font-style: italic; 
+                                color: #334155;
+                                margin: 3rem 0;
+                                position: relative;
+                            }
+                            .professor-bio-content blockquote::after {
+                                content: '"';
+                                position: absolute;
+                                top: -20px;
+                                right: 30px;
+                                font-size: 8rem;
+                                color: #137fec;
+                                opacity: 0.1;
+                                font-family: serif;
+                            }
+                            .professor-bio-content strong { color: #0f172a; font-weight: 900; }
+                            .professor-bio-content hr { border: 0; border-top: 4px solid #f8fafc; margin: 4rem 0; }
+                        `}</style>
+                        <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-4">
+                            <span className="w-10 h-[2px] bg-[#137fec]" />
+                            Perfil do Professor
+                        </h3>
+                        <div 
+                            className={bioContentClass}
+                            dangerouslySetInnerHTML={{ __html: teacherData.description || '<p class="text-slate-400 italic">Nenhuma biografia cadastrada.</p>' }}
+                        />
                     </div>
 
-                    <div className="lg:col-span-4 space-y-8">
+                    {/* Bottom Info Cards: Stylized & Colorful */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {/* Expertise Card */}
-                        <div className="bg-slate-50 border border-slate-100 rounded-[48px] p-10 space-y-8">
-                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Áreas de Atuação</h4>
-                            <div className="space-y-4">
-                                {disciplinas.filter(d => teacherData.disciplines_ids?.includes(d.id)).map(d => (
-                                    <div key={d.id} className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 shadow-sm group">
-                                        <div className="size-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-all">
-                                            <span className="material-symbols-outlined">menu_book</span>
-                                        </div>
-                                        <span className="font-black text-sm text-slate-800 uppercase tracking-tight">{d.name}</span>
+                        <div className="relative overflow-hidden bg-gradient-to-br from-[#137fec] to-[#0d59a8] rounded-[60px] p-12 text-white shadow-2xl group">
+                            <div className="absolute top-[-10%] right-[-10%] size-64 bg-white/10 rounded-full blur-[80px]" />
+                            <div className="relative z-10 space-y-8">
+                                <div className="flex items-center gap-4">
+                                    <div className="size-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-3xl">school</span>
                                     </div>
-                                ))}
+                                    <h4 className="text-xl font-black uppercase tracking-tighter italic">Áreas de Especialidade</h4>
+                                </div>
+                                <div className="flex flex-wrap gap-3">
+                                    {disciplinas.filter(d => teacherData.disciplines_ids?.includes(d.id)).map(d => (
+                                        <div key={d.id} className="px-6 py-3 bg-white/20 backdrop-blur-xl border border-white/20 rounded-2xl flex items-center gap-3 hover:bg-white hover:text-[#137fec] transition-all duration-500 cursor-default">
+                                            <span className="material-symbols-outlined text-sm">check_circle</span>
+                                            <span className="font-black text-xs uppercase tracking-widest">{d.name}</span>
+                                        </div>
+                                    ))}
+                                    {(!teacherData.disciplines_ids || teacherData.disciplines_ids.length === 0) && (
+                                        <p className="text-white/60 italic font-medium">Aguardando definição de disciplinas...</p>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
                         {/* Contact Card */}
-                        <div className="bg-slate-900 rounded-[48px] p-10 text-white shadow-2xl space-y-6 relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 size-32 bg-blue-500/20 blur-3xl -mr-10 -mt-10 group-hover:bg-blue-500/40 transition-all duration-700" />
-                            <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em]">Contato Corporativo</h4>
-                            <div className="space-y-4">
-                                <p className="text-xl font-black">{teacherData.corporate_email || profile?.email}</p>
-                                <p className="text-xs text-slate-400 font-medium">Docente verificado pela coordenação pedagógica.</p>
+                        <div className="group relative bg-slate-900 rounded-[60px] p-12 text-white shadow-2xl overflow-hidden">
+                            <div className="absolute bottom-[-10%] left-[-10%] size-64 bg-[#137fec]/20 rounded-full blur-[80px]" />
+                            <div className="relative z-10 space-y-8">
+                                <div className="flex items-center gap-4">
+                                    <div className="size-14 bg-blue-500/20 rounded-2xl flex items-center justify-center text-blue-400">
+                                        <span className="material-symbols-outlined text-3xl">alternate_email</span>
+                                    </div>
+                                    <h4 className="text-xl font-black uppercase tracking-tighter italic text-blue-400">Contato Direto</h4>
+                                </div>
+                                <div className="space-y-2">
+                                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">Email Corporativo</p>
+                                    <p className="text-2xl md:text-3xl font-black tracking-tight hover:text-[#137fec] transition-colors">{teacherData.corporate_email || profile?.email}</p>
+                                </div>
+                                <div className="pt-4 border-t border-white/5 flex items-center gap-3">
+                                    <div className="size-2 rounded-full bg-emerald-400" />
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Docente Oficial Verificado</span>
+                                </div>
                             </div>
                         </div>
                     </div>
+
+                    {/* Gallery Section - Full Width at bottom if exists */}
+                    {(teacherData.ad_images || []).length > 1 && (
+                        <div className="space-y-8 pb-10">
+                            <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-4">
+                                <span className="size-2 bg-[#137fec] rounded-full" />
+                                Galeria de Mídia
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                {(teacherData.ad_images || []).slice(1).map((img, i) => (
+                                    <div key={i} className="aspect-square rounded-[48px] overflow-hidden shadow-xl hover:scale-105 transition-all duration-700 cursor-zoom-in">
+                                        <img src={img} className="w-full h-full object-cover" alt={`Mídia ${i}`} />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         );
