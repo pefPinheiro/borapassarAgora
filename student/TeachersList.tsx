@@ -71,11 +71,13 @@ const TeachersList: React.FC = () => {
                             className="group bg-white rounded-[40px] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-[#137fec]/10 transition-all duration-500 overflow-hidden cursor-pointer flex flex-col hover:-translate-y-2"
                         >
                             {/* Banner Section */}
-                            <div className="h-40 relative overflow-hidden bg-slate-900">
+                            <div className="h-40 absolute inset-0 w-full overflow-hidden bg-slate-900 z-0">
                                 {teacherBanner ? (
-                                    <img src={teacherBanner} className="size-full object-cover group-hover:scale-110 transition-transform duration-1000" alt="Banner" />
+                                    <img src={teacherBanner} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" alt="Banner" />
                                 ) : (
-                                    <div className="size-full bg-gradient-to-br from-slate-800 to-slate-900" />
+                                    <div className="w-full h-full bg-gradient-to-br from-slate-800 to-indigo-950 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-6xl text-white/5 font-thin tracking-widest uppercase italic">BORA PASSAR</span>
+                                    </div>
                                 )}
                                 <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-white via-white/50 to-transparent" />
                             </div>
@@ -121,8 +123,9 @@ const TeachersList: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                    );
-                })}
+                    </div>
+                );
+            })}
             </div>
 
             {/* Reuse Teacher Profile Modal */}
@@ -194,11 +197,15 @@ const TeacherProfileModal: React.FC<{
                     </div>
                 ) : teacher ? (
                     <div className="flex flex-col">
-                        <div className="h-48 md:h-80 relative bg-slate-900">
-                            {teacherBanner && (
-                                <img src={teacherBanner} className="size-full object-cover" alt="Banner" />
+                        <div className="h-48 md:h-80 relative bg-slate-900 overflow-hidden rounded-t-[40px]">
+                            {teacherBanner ? (
+                                <img src={teacherBanner} className="absolute inset-0 w-full h-full object-cover" alt="Banner" />
+                            ) : (
+                                <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-slate-800 to-indigo-950 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-[120px] text-white/5 font-thin tracking-widest uppercase italic">BORA PASSAR</span>
+                                </div>
                             )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-slate-900/10" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent pointer-events-none" />
                             
                             <div className="absolute -bottom-10 left-10 flex items-end gap-6">
                                 <div className="size-24 md:size-32 rounded-[32px] bg-white p-2 shadow-2xl relative z-10">

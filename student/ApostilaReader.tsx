@@ -1566,12 +1566,15 @@ const TeacherProfileModal: React.FC<{
                     </div>
                 ) : teacher ? (
                     <div className="flex flex-col">
-                        {/* Banner & Avatar Area */}
-                        <div className="h-48 md:h-80 relative bg-slate-900">
-                            {teacherBanner && (
-                                <img src={teacherBanner} className="size-full object-cover" alt="Banner" />
+                        <div className="h-48 md:h-80 relative bg-slate-900 overflow-hidden rounded-t-[40px]">
+                            {teacherBanner ? (
+                                <img src={teacherBanner} className="absolute inset-0 w-full h-full object-cover" alt="Banner" />
+                            ) : (
+                                <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-slate-800 to-indigo-950 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-[120px] text-white/5 font-thin tracking-widest uppercase italic">BORA PASSAR</span>
+                                </div>
                             )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-slate-900/10" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent pointer-events-none" />
                             
                             <div className="absolute -bottom-10 left-10 flex items-end gap-6">
                                 <div className="size-24 md:size-32 rounded-[32px] bg-white p-2 shadow-2xl relative z-10">
