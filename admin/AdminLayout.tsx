@@ -117,6 +117,7 @@ const AdminLayout: React.FC = () => {
   const hasAccess = (moduleId: string) => {
     if (!profile) return false;
     if (profile.role === 'super') return true; // Super Admin vê tudo
+    if (moduleId === 'dashboard') return true; // Dashboard é a home, sempre permitida se ativo
     const allowed = profile.allowed_modules || [];
     return allowed.includes(moduleId);
   };
