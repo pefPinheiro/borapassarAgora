@@ -294,7 +294,9 @@ const CourseCheckout: React.FC = () => {
                         </div>
                     )}
                 </div>
-                 {showTerms && (
+            </div>
+
+            {showTerms && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xl overflow-y-auto">
                     <div className="bg-white rounded-[48px] shadow-2xl border border-white max-w-2xl w-full flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300 overflow-hidden">
                         {/* Header do Modal */}
