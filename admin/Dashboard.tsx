@@ -6,6 +6,7 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [teacherData, setTeacherData] = useState<any>(null);
 
   // Dashboard Data State
   const [data, setData] = useState({
@@ -37,6 +38,21 @@ const Dashboard: React.FC = () => {
 
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       setUserProfile(profile);
+
+      // Fetch teacher specific info if applicable
+      const { data: teacher } = await supabase
+        .from('teachers')
+        .select('*')
+        .eq('linked_profile_id', user.id)
+        .maybeSingle();
+      
+      if (teacher) {
+        const { data: discs } = await supabase
+          .from('disciplinas')
+          .select('name')
+          .in('id', teacher.disciplines_ids || []);
+        setTeacherData({ ...teacher, disciplines: discs || [] });
+      }
 
       const isSuperOrAdmin = profile.role === 'super' || profile.role === 'admin';
       const isFin = profile.role === 'super' || profile.view_finance === true;
@@ -151,7 +167,7 @@ const Dashboard: React.FC = () => {
 
   // Se o usuário for Professor, mostra a Cartilha (Tutorial)
   if (userProfile?.role === 'teacher') {
-    return <ProfessorTutorial />;
+    return <ProfessorTutorial teacher={teacherData} profile={userProfile} />;
   }
 
   const isFin = userProfile?.role === 'super' || userProfile?.view_finance === true;
@@ -380,16 +396,31 @@ const Dashboard: React.FC = () => {
 
 // --- COMPONENTES DA CARTILHA DO PROFESSOR ---
 
-const ProfessorTutorial: React.FC = () => {
+const ProfessorTutorial: React.FC<{ teacher: any; profile: any }> = ({ teacher, profile }) => {
   return (
     <div className="space-y-12 pb-20 animate-in fade-in duration-700">
       {/* Header da Cartilha */}
-      <div className="text-center space-y-4 max-w-3xl mx-auto mb-16">
-        <div className="size-20 bg-blue-50 text-blue-600 rounded-[32px] flex items-center justify-center mx-auto mb-6 shadow-sm">
-          <span className="material-symbols-outlined text-4xl">school</span>
+      <div className="text-center space-y-4 max-w-4xl mx-auto mb-16">
+        <div className="size-24 bg-blue-50 text-blue-600 rounded-[40px] flex items-center justify-center mx-auto mb-8 shadow-sm">
+          <span className="material-symbols-outlined text-5xl">school</span>
         </div>
-        <h1 className="text-4xl font-black text-slate-900 uppercase italic tracking-tight">Bem-vindo, Professor!</h1>
-        <p className="text-slate-500 font-medium text-lg">
+        <h1 className="text-4xl font-black text-slate-900 uppercase italic tracking-tight">Bem-vindo, {teacher?.name || profile?.full_name}!</h1>
+        
+        {/* Disciplinas em destaque */}
+        <div className="flex flex-wrap justify-center gap-2 mt-4">
+          {teacher?.disciplines?.map((d: any, i: number) => (
+            <span key={i} className="px-4 py-2 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl">
+              {d.name}
+            </span>
+          ))}
+          {(!teacher?.disciplines || teacher.disciplines.length === 0) && (
+             <span className="px-4 py-2 bg-slate-100 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest italic border border-slate-200">
+               Aguardando atribuição de disciplinas
+             </span>
+          )}
+        </div>
+
+        <p className="text-slate-500 font-medium text-lg pt-4">
           Preparamos este guia didático para você dominar todas as ferramentas da nossa plataforma.
           O objetivo é facilitar o seu trabalho e potencializar o aprendizado dos seus alunos.
         </p>
