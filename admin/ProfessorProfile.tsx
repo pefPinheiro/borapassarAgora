@@ -4,6 +4,7 @@ import { Teacher } from '../types';
 import TiptapEditor from './TiptapEditor';
 
 const ProfessorProfile: React.FC = () => {
+    const [viewMode, setViewMode] = useState<'preview' | 'edit'>('preview');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [profile, setProfile] = useState<any>(null);
@@ -49,8 +50,6 @@ const ProfessorProfile: React.FC = () => {
             if (tData) {
                 setTeacherData(tData);
             } else {
-                // If not linked, maybe create a draft? Or just wait for admin.
-                // For now let's assume if they are a teacher they should have a record.
                 setTeacherData({
                     name: profData?.full_name || '',
                     avatar_url: profData?.avatar_url || '',
@@ -108,7 +107,7 @@ const ProfessorProfile: React.FC = () => {
             if (url) {
                 setTeacherData(prev => ({
                     ...prev,
-                    ad_images: [url, ...(prev.ad_images || []).slice(0, 4)] // Keep first as banner, others as gallery
+                    ad_images: [url, ...(prev.ad_images || []).slice(0, 4)]
                 }));
             }
         }
@@ -133,13 +132,13 @@ const ProfessorProfile: React.FC = () => {
 
             if (error) throw error;
 
-            // Also update profile avatar if changed
             if (teacherData.avatar_url && teacherData.avatar_url !== profile?.avatar_url) {
                 await supabase.from('profiles').update({ avatar_url: teacherData.avatar_url }).eq('id', user.id);
             }
 
             setMessage({ type: 'success', text: 'Perfil atualizado com sucesso!' });
             fetchData();
+            setViewMode('preview');
         } catch (e: any) {
             setMessage({ type: 'error', text: 'Erro ao salvar: ' + e.message });
         } finally {
@@ -148,66 +147,159 @@ const ProfessorProfile: React.FC = () => {
     };
 
     if (loading) return (
-        <div className="h-96 flex items-center justify-center">
+        <div className="h-[600px] flex items-center justify-center">
             <div className="size-12 border-4 border-slate-100 border-t-[#137fec] rounded-full animate-spin"></div>
         </div>
     );
 
     const mainBanner = teacherData.ad_images && teacherData.ad_images.length > 0 ? teacherData.ad_images[0] : null;
 
-    return (
-        <div className="max-w-6xl mx-auto pb-20 animate-in fade-in duration-700">
-            {/* Header / Brand Zone */}
-            <div className="relative mb-32">
-                {/* Banner Hero */}
-                <div className="relative h-64 md:h-80 w-full rounded-[48px] overflow-hidden bg-slate-900 shadow-2xl group">
-                    {mainBanner ? (
-                        <img src={mainBanner} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-60" alt="Banner" />
-                    ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center text-slate-700">
-                            <span className="material-symbols-outlined text-8xl opacity-10">landscape</span>
+    if (viewMode === 'preview') {
+        return (
+            <div className="max-w-6xl mx-auto pb-20 animate-in fade-in zoom-in-95 duration-700">
+                {/* Visual Section */}
+                <div className="relative group">
+                    <div className="h-[450px] w-full rounded-[60px] overflow-hidden bg-slate-900 shadow-2xl relative">
+                        {mainBanner ? (
+                            <img src={mainBanner} className="w-full h-full object-cover opacity-60" alt="Banner" />
+                        ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-slate-800 to-indigo-950 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-[120px] text-white/5 font-thin tracking-widest uppercase italic">BORA PASSAR</span>
+                            </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+                        
+                        {/* Status Overlay */}
+                        <div className="absolute top-8 left-8">
+                             <div className="px-5 py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center gap-2">
+                                <div className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                                <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Perfil Público Ativado</span>
+                             </div>
                         </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-12">
-                        <div className="space-y-1">
-                            <h1 className="text-4xl font-black text-white uppercase tracking-tighter">Meu Painel Docente</h1>
-                            <p className="text-slate-300 font-medium">Personalize sua presença na plataforma Bora Passar.</p>
+
+                        {/* Top Actions */}
+                        <div className="absolute top-8 right-8 flex gap-3">
+                            <button 
+                                onClick={() => setViewMode('edit')}
+                                className="px-8 py-4 bg-white text-slate-900 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-110 active:scale-95 transition-all flex items-center gap-3"
+                            >
+                                <span className="material-symbols-outlined text-[20px]">edit</span>
+                                Editar Apresentação
+                            </button>
+                        </div>
+
+                        {/* Text Overlay */}
+                        <div className="absolute bottom-16 left-16 right-16 flex flex-col md:flex-row items-end gap-10">
+                            <div className="size-48 rounded-[56px] border-[10px] border-white/10 backdrop-blur-2xl overflow-hidden shadow-2xl shrink-0 group-hover:scale-105 transition-transform duration-700">
+                                <img src={teacherData.avatar_url || 'https://picsum.photos/400/400'} className="w-full h-full object-cover" alt="Avatar" />
+                            </div>
+                            <div className="flex-1 pb-4">
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    {(teacherData.disciplines_ids || []).map(dId => (
+                                        <span key={dId} className="px-3 py-1 bg-[#137fec] text-white rounded-lg text-[9px] font-black uppercase tracking-widest">
+                                            {disciplinas.find(d => d.id === dId)?.name || 'Disciplina'}
+                                        </span>
+                                    ))}
+                                </div>
+                                <h1 className="text-6xl font-black text-white uppercase tracking-tighter leading-none mb-2">{teacherData.name || profile?.full_name}</h1>
+                                <p className="text-blue-400 text-lg font-bold tracking-tight italic opacity-80">Professor(a) Especialista da Plataforma Bora Passar</p>
+                            </div>
                         </div>
                     </div>
-                    <button 
-                        onClick={() => bannerInputRef.current?.click()}
-                        className="absolute top-6 right-6 px-6 py-3 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white hover:text-slate-900 transition-all shadow-xl"
-                    >
-                        {uploading ? 'Processando...' : 'Trocar Banner'}
-                    </button>
-                    <input type="file" ref={bannerInputRef} className="hidden" accept="image/*" onChange={handleBannerUpload} />
                 </div>
 
-                {/* Profile Float Card */}
-                <div className="absolute -bottom-20 left-12 flex items-end gap-6">
-                    <div className="relative group">
-                        <div className="size-40 rounded-[48px] border-[8px] border-white bg-white shadow-2xl overflow-hidden">
-                            <img src={teacherData.avatar_url || 'https://picsum.photos/400/400'} className="w-full h-full object-cover" alt="Avatar" />
+                {/* Content Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-16 px-6">
+                    <div className="lg:col-span-8 space-y-12">
+                        {/* Bio Section */}
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-4">
+                                <span className="size-2 bg-[#137fec] rounded-full" />
+                                Sobre o Professor
+                            </h3>
+                            <div 
+                                className="prose prose-slate prose-lg max-w-none text-slate-700 font-medium leading-relaxed"
+                                dangerouslySetInnerHTML={{ __html: teacherData.description || '<p class="text-slate-400 italic">Nenhuma biografia cadastrada.</p>' }}
+                            />
                         </div>
-                        <button 
-                            onClick={() => avatarInputRef.current?.click()}
-                            className="absolute bottom-2 right-2 size-10 bg-[#137fec] text-white rounded-2xl flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all"
-                        >
-                            <span className="material-symbols-outlined text-lg">photo_camera</span>
-                        </button>
-                        <input type="file" ref={avatarInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload} />
+
+                        {/* Gallery Section */}
+                        {(teacherData.ad_images || []).length > 1 && (
+                            <div className="space-y-6">
+                                <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-4">
+                                    <span className="size-2 bg-[#137fec] rounded-full" />
+                                    Portfólio & Mídia
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {(teacherData.ad_images || []).slice(1).map((img, i) => (
+                                        <div key={i} className="aspect-video rounded-[40px] overflow-hidden shadow-xl hover:scale-[1.02] transition-transform duration-500">
+                                            <img src={img} className="w-full h-full object-cover" alt={`Mídia ${i}`} />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
-                    <div className="pb-4">
-                        <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tight">{teacherData.name || profile?.full_name}</h2>
-                        <div className="flex gap-2 mt-1">
-                            <span className="px-3 py-1 bg-[#137fec]/10 text-[#137fec] rounded-full text-[9px] font-black uppercase tracking-widest">Professor Especialista</span>
-                            <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest">{teacherData.status}</span>
+
+                    <div className="lg:col-span-4 space-y-8">
+                        {/* Expertise Card */}
+                        <div className="bg-slate-50 border border-slate-100 rounded-[48px] p-10 space-y-8">
+                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Áreas de Atuação</h4>
+                            <div className="space-y-4">
+                                {disciplinas.filter(d => teacherData.disciplines_ids?.includes(d.id)).map(d => (
+                                    <div key={d.id} className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 shadow-sm group">
+                                        <div className="size-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-all">
+                                            <span className="material-symbols-outlined">menu_book</span>
+                                        </div>
+                                        <span className="font-black text-sm text-slate-800 uppercase tracking-tight">{d.name}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Contact Card */}
+                        <div className="bg-slate-900 rounded-[48px] p-10 text-white shadow-2xl space-y-6 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 size-32 bg-blue-500/20 blur-3xl -mr-10 -mt-10 group-hover:bg-blue-500/40 transition-all duration-700" />
+                            <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em]">Contato Corporativo</h4>
+                            <div className="space-y-4">
+                                <p className="text-xl font-black">{teacherData.corporate_email || profile?.email}</p>
+                                <p className="text-xs text-slate-400 font-medium">Docente verificado pela coordenação pedagógica.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+        );
+    }
 
-            {/* Form Area */}
+    return (
+        <div className="max-w-6xl mx-auto pb-20 animate-in slide-in-from-right duration-500">
+            {/* Form Header */}
+            <div className="flex items-center justify-between mb-12">
+                <div className="flex items-center gap-6">
+                    <button 
+                        onClick={() => setViewMode('preview')}
+                        className="size-14 flex items-center justify-center bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-slate-900 transition-all"
+                    >
+                        <span className="material-symbols-outlined">arrow_back</span>
+                    </button>
+                    <div>
+                        <h2 className="text-3xl font-black text-slate-900 tracking-tighter">Editando Meu Perfil</h2>
+                        <p className="text-sm text-slate-500 font-bold uppercase tracking-widest opacity-60 italic">Mode de personalização avançada</p>
+                    </div>
+                </div>
+                <div className="flex gap-4">
+                    <button onClick={() => setViewMode('preview')} className="px-8 py-3 bg-white border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400">Cancelar</button>
+                    <button 
+                        onClick={handleSave} 
+                        disabled={saving}
+                        className="px-10 py-3 bg-[#137fec] text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl shadow-blue-500/20 active:scale-95 disabled:opacity-50"
+                    >
+                        {saving ? 'Gravando...' : 'Salvar Alterações'}
+                    </button>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 <div className="lg:col-span-8 space-y-8">
                     {message && (
@@ -222,100 +314,84 @@ const ProfessorProfile: React.FC = () => {
                             <div className="size-12 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center">
                                 <span className="material-symbols-outlined">history_edu</span>
                             </div>
-                            <div>
-                                <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Biografia & Formação</h3>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Conte sua história para seus alunos</p>
-                            </div>
+                            <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Apresentação & Bio</h3>
                         </div>
 
                         <div className="space-y-4">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Apresentação Profissional (Bio)</label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Biografia Profissional</label>
                             <TiptapEditor 
                                 content={teacherData.description || ''}
                                 onChange={v => setTeacherData(prev => ({ ...prev, description: v }))}
                                 minHeight="400px"
-                                placeholder="Conte sobre sua jornada, aprovações, especializações e metodologia..."
+                                placeholder="Descreva sua formação, conquistas e método de ensino..."
                             />
-                        </div>
-
-                        <div className="pt-8 border-t border-slate-50 flex justify-end">
-                            <button 
-                                onClick={handleSave}
-                                disabled={saving}
-                                className="px-12 py-4 bg-[#111418] text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-2xl shadow-slate-900/40 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
-                            >
-                                {saving ? 'Salvando...' : 'Salvar Alterações'}
-                            </button>
                         </div>
                     </div>
                 </div>
 
                 <div className="lg:col-span-4 space-y-8">
-                    <div className="bg-slate-900 rounded-[48px] p-10 text-white shadow-2xl space-y-8">
-                        <div>
-                            <h3 className="text-xs font-black uppercase tracking-widest text-blue-400 mb-2">Poder do Professor</h3>
-                            <p className="text-sm font-medium text-slate-400 leading-relaxed">Seu perfil é o seu cartão de visitas. Imagens de alta qualidade e uma bio inspiradora aumentam o engajamento dos alunos com seu conteúdo.</p>
+                    {/* Media Management */}
+                    <div className="bg-white rounded-[48px] border border-slate-200 p-10 space-y-8">
+                        <div className="text-center group relative">
+                            <div 
+                                className="size-32 rounded-[40px] mx-auto border-4 border-slate-50 shadow-xl overflow-hidden cursor-pointer relative"
+                                onClick={() => avatarInputRef.current?.click()}
+                            >
+                                <img src={teacherData.avatar_url || 'https://picsum.photos/400/400'} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-white">upload</span>
+                                </div>
+                            </div>
+                            <input type="file" ref={avatarInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload} />
+                            <h4 className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Foto de Perfil</h4>
                         </div>
 
                         <div className="space-y-4">
-                            <div className="flex items-center gap-3 p-4 bg-white/5 rounded-2xl border border-white/5">
-                                <span className="material-symbols-outlined text-blue-500">check_circle</span>
-                                <span className="text-xs font-bold">Autoridade Acadêmica</span>
-                            </div>
-                            <div className="flex items-center gap-3 p-4 bg-white/5 rounded-2xl border border-white/5">
-                                <span className="material-symbols-outlined text-blue-500">check_circle</span>
-                                <span className="text-xs font-bold">Identidade Visual</span>
-                            </div>
-                            <div className="flex items-center gap-3 p-4 bg-white/5 rounded-2xl border border-white/5">
-                                <span className="material-symbols-outlined text-blue-500">check_circle</span>
-                                <span className="text-xs font-bold">Conexão Aluno-Professor</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-[48px] border border-slate-200 p-10 space-y-6">
-                        <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Minha Galeria</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            {(teacherData.ad_images || []).map((img, i) => (
-                                <div key={i} className="aspect-square rounded-3xl overflow-hidden border-4 border-slate-50 shadow-sm relative group">
-                                    <img src={img} className="w-full h-full object-cover" alt={`Galeira ${i}`} />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                        <button 
-                                            onClick={() => setTeacherData(prev => ({ ...prev, ad_images: prev.ad_images?.filter(x => x !== img) }))}
-                                            className="size-8 bg-red-500 text-white rounded-full flex items-center justify-center"
-                                        >
-                                            <span className="material-symbols-outlined text-[20px]">close</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
                             <button 
                                 onClick={() => bannerInputRef.current?.click()}
-                                className="aspect-square rounded-3xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-slate-300 hover:border-blue-200 hover:text-blue-400 transition-all"
+                                className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-[#137fec] transition-all"
                             >
-                                <span className="material-symbols-outlined">add_photo_alternate</span>
+                                <span className="material-symbols-outlined text-[18px]">panorama</span>
+                                Trocar Banner Herói
                             </button>
+                            <input type="file" ref={bannerInputRef} className="hidden" accept="image/*" onChange={handleBannerUpload} />
+                        </div>
+
+                        <div className="pt-6 border-t border-slate-50">
+                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Galeria Auxiliar</h4>
+                            <div className="grid grid-cols-2 gap-3">
+                                {(teacherData.ad_images || []).map((img, i) => (
+                                    <div key={i} className="aspect-square rounded-2xl overflow-hidden border-2 border-slate-50 relative group">
+                                        <img src={img} className="w-full h-full object-cover" />
+                                        <button 
+                                            onClick={() => setTeacherData(prev => ({ ...prev, ad_images: prev.ad_images?.filter(x => x !== img) }))}
+                                            className="absolute top-1 right-1 size-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-75"
+                                        >
+                                            <span className="material-symbols-outlined text-[14px]">close</span>
+                                        </button>
+                                    </div>
+                                ))}
+                                <button 
+                                    onClick={() => bannerInputRef.current?.click()}
+                                    className="aspect-square rounded-2xl border-2 border-dashed border-slate-100 flex items-center justify-center text-slate-300 hover:text-blue-500"
+                                >
+                                    <span className="material-symbols-outlined">add</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
-
-                    <div className="bg-white rounded-[48px] border border-slate-200 p-10 space-y-6">
-                        <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-slate-400 text-sm">menu_book</span>
-                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Suas Disciplinas</h3>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {(teacherData.disciplines_ids || []).map(dId => {
-                                const dName = disciplinas.find(d => d.id === dId)?.name || 'Disciplina';
-                                return (
-                                    <span key={dId} className="px-3 py-1.5 bg-slate-50 text-slate-600 border border-slate-100 rounded-xl text-[10px] font-bold uppercase tracking-wider">
-                                        {dName}
-                                    </span>
-                                );
-                            })}
-                            {(teacherData.disciplines_ids || []).length === 0 && (
-                                <p className="text-[10px] text-slate-400 italic">Nenhuma disciplina vinculada pelo administrador.</p>
-                            )}
-                        </div>
+                    
+                    {/* Read-only disciplines during edit */}
+                    <div className="bg-slate-50 rounded-[40px] p-8 space-y-4">
+                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Disciplinas Atuais</h4>
+                         <div className="flex flex-wrap gap-2">
+                            {(teacherData.disciplines_ids || []).map(dId => (
+                                <span key={dId} className="px-3 py-1.5 bg-white border border-slate-100 rounded-xl text-[10px] font-bold text-slate-600 uppercase">
+                                    {disciplinas.find(d => d.id === dId)?.name}
+                                </span>
+                            ))}
+                         </div>
+                         <p className="text-[9px] text-slate-400 italic">Vínculos de disciplina são gerenciados apenas pelo Super Admin.</p>
                     </div>
                 </div>
             </div>
