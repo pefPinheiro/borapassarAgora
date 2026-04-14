@@ -50,6 +50,7 @@ const ApostilaReader: React.FC = () => {
     const [profile, setProfile] = useState<Profile | null>(null);
     const [loading, setLoading] = useState(true);
     const [notebooks, setNotebooks] = useState<any[]>([]);
+    const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -1391,22 +1392,27 @@ const ApostilaReader: React.FC = () => {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-4 text-sm font-bold text-slate-500 mb-8 px-4">
-                        <div className="flex items-center gap-2">
-                            <div className="size-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 overflow-hidden">
+                        <button 
+                            onClick={() => setIsTeacherModalOpen(true)}
+                            className="flex items-center gap-2 hover:bg-slate-50 p-1 pr-3 rounded-full transition-all group"
+                        >
+                            <div className="size-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 overflow-hidden ring-2 ring-transparent group-hover:ring-blue-500/20 transition-all">
                                 {apostila.teacher?.avatar_url ? (
                                     <img src={apostila.teacher.avatar_url} className="size-full object-cover" alt={apostila.teacher.name} />
                                 ) : (
                                     <span className="material-symbols-outlined text-sm">person</span>
                                 )}
                             </div>
-                            <span>{apostila.teacher ? `Professor: ${apostila.teacher.name}` : `Prof. ${apostila.author?.full_name?.split(' ')[0]}`}</span>
-                        </div>
+                            <span className="group-hover:text-blue-600 transition-colors">
+                                {apostila.teacher ? `Professor: ${apostila.teacher.name}` : `Prof. ${apostila.author?.full_name?.split(' ')[0]}`}
+                            </span>
+                        </button>
                         {apostila.estimated_time && (
                             <>
                                 <div className="size-1 bg-slate-200 rounded-full"></div>
                                 <div className="flex items-center gap-2">
                                     <span className="material-symbols-outlined text-slate-300">timer</span>
-                                    <span>Tempo de Leitura: {apostila.estimated_time}</span>
+                                    <span>Tempo de Leitura: {apostila.estimated_time}min</span>
                                 </div>
                             </>
                         )}
@@ -1487,6 +1493,162 @@ const ApostilaReader: React.FC = () => {
                     <span className="material-symbols-outlined text-xl">close_fullscreen</span>
                 </button>
             )}
+
+            {/* Professor Profile Modal */}
+            <TeacherProfileModal 
+                isOpen={isTeacherModalOpen} 
+                onClose={() => setIsTeacherModalOpen(false)} 
+                teacherId={apostila?.teacher?.id}
+                fallbackName={apostila?.author?.full_name}
+                fallbackAvatar={null}
+            />
+        </div>
+    );
+};
+
+// Internal Modal Component for Teacher Profile
+const TeacherProfileModal: React.FC<{ 
+    isOpen: boolean; 
+    onClose: () => void; 
+    teacherId?: string;
+    fallbackName?: string;
+    fallbackAvatar?: string | null;
+}> = ({ isOpen, onClose, teacherId, fallbackName, fallbackAvatar }) => {
+    const [teacher, setTeacher] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+    const [disciplinas, setDisciplinas] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (isOpen && teacherId) {
+            fetchTeacher();
+        }
+    }, [isOpen, teacherId]);
+
+    const fetchTeacher = async () => {
+        setLoading(true);
+        try {
+            const { data } = await supabase
+                .from('teachers')
+                .select('*')
+                .eq('id', teacherId)
+                .single();
+            setTeacher(data);
+
+            const { data: dData } = await supabase.from('disciplinas').select('id, name');
+            if (dData) setDisciplinas(dData);
+        } catch (e) {
+            console.error('Error fetching teacher for modal:', e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-300">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={onClose} />
+            
+            <div className="relative bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[40px] shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-10 duration-500 no-scrollbar">
+                {/* Close Button */}
+                <button 
+                    onClick={onClose}
+                    className="absolute top-6 right-6 z-20 size-12 bg-white/10 hover:bg-white/20 backdrop-blur-xl text-white rounded-full flex items-center justify-center transition-all"
+                >
+                    <span className="material-symbols-outlined">close</span>
+                </button>
+
+                {loading ? (
+                    <div className="h-96 flex items-center justify-center">
+                        <div className="size-10 border-4 border-slate-100 border-t-blue-500 rounded-full animate-spin"></div>
+                    </div>
+                ) : teacher ? (
+                    <div className="flex flex-col">
+                        {/* Banner & Avatar Area */}
+                        <div className="h-48 md:h-64 relative bg-slate-900">
+                            {teacher.banner_url && (
+                                <img src={teacher.banner_url} className="size-full object-cover opacity-60" alt="Banner" />
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent" />
+                            
+                            <div className="absolute -bottom-10 left-10 flex items-end gap-6">
+                                <div className="size-24 md:size-32 rounded-[32px] bg-white p-2 shadow-2xl relative z-10">
+                                    <div className="size-full rounded-[24px] bg-slate-100 overflow-hidden">
+                                        {teacher.avatar_url ? (
+                                            <img src={teacher.avatar_url} className="size-full object-cover" alt={teacher.name} />
+                                        ) : (
+                                            <div className="size-full flex items-center justify-center text-slate-300">
+                                                <span className="material-symbols-outlined text-4xl">person</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="pb-4 block">
+                                    <h2 className="text-2xl md:text-3xl font-black text-slate-900 uppercase tracking-tight italic">{teacher.name}</h2>
+                                    <p className="text-[10px] font-black text-[#137fec] uppercase tracking-[0.3em]">Professor Oficial</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Content Area */}
+                        <div className="mt-20 p-10 space-y-12">
+                            {/* Bio */}
+                            <div className="space-y-6">
+                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-4">
+                                    <span className="w-8 h-[2px] bg-[#137fec]" />
+                                    Apresentação
+                                </h3>
+                                <div 
+                                    className="text-slate-600 leading-relaxed ql-editor p-0"
+                                    dangerouslySetInnerHTML={{ __html: teacher.description || '<p className="italic">O professor ainda não publicou seu perfil.</p>' }}
+                                />
+                            </div>
+
+                            {/* Info Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="bg-slate-50 border border-slate-100 rounded-[32px] p-8 space-y-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="size-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center">
+                                            <span className="material-symbols-outlined">school</span>
+                                        </div>
+                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Especialidades</h4>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {disciplinas.filter(d => teacher.disciplines_ids?.includes(d.id)).map(d => (
+                                            <div key={d.id} className="px-4 py-2 bg-white border border-slate-100 rounded-2xl flex items-center gap-2">
+                                                <div className="size-2 rounded-full bg-blue-400" />
+                                                <span className="font-black text-[10px] uppercase tracking-wider text-slate-600">{d.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-900 rounded-[32px] p-8 text-white space-y-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="size-10 bg-white/10 rounded-xl flex items-center justify-center text-blue-400">
+                                            <span className="material-symbols-outlined">alternate_email</span>
+                                        </div>
+                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Contato Direto</h4>
+                                    </div>
+                                    <div>
+                                        <p className="text-xl font-black truncate">{teacher.corporate_email || "contato@borapassar.com"}</p>
+                                        <div className="mt-4 flex items-center gap-3 pt-4 border-t border-white/5">
+                                            <div className="size-2 rounded-full bg-emerald-400" />
+                                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Docente Oficial Verificado</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="h-96 flex flex-col items-center justify-center gap-4">
+                         <span className="material-symbols-outlined text-6xl text-slate-200">sentiment_dissatisfied</span>
+                         <h2 className="text-xl font-black text-slate-900 uppercase">{fallbackName || 'Professor'}</h2>
+                         <p className="text-sm text-slate-400">Perfil público não encontrado.</p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
