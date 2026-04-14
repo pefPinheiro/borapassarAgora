@@ -341,6 +341,13 @@ const CourseCheckout: React.FC = () => {
                                         <p>
                                             Ao confirmar esta inscrição, você declara estar ciente de que o <strong>Bora Passar Agora</strong> fornece um ecossistema de aprendizagem estratégica focado em desempenho.
                                         </p>
+
+                                        <div className="p-6 bg-rose-50 rounded-3xl border border-rose-100 text-rose-900 space-y-2">
+                                            <h5 className="font-black text-xs uppercase tracking-widest flex items-center gap-2 text-rose-600"><span className="material-symbols-outlined text-lg">videocam_off</span> Aviso Importante: Natureza do Material</h5>
+                                            <p className="text-xs font-bold leading-relaxed">
+                                                Este curso foi estrategicamente desenvolvido para o estudo ativo. Portanto, <strong>NÃO é um curso baseado em videoaulas tradicionais</strong>. Nosso foco total é a aprovação através de <strong>Apostilas Digitais Interativas</strong> (com exportação para PDF), Banco de Questões e Simulados. Eventuais vídeos podem existir como complementos pontuais de algum assunto, mas a metodologia central é baseada em leitura estratégica e prática de questões.
+                                            </p>
+                                        </div>
                                         
                                         <div className="p-6 bg-amber-50 rounded-3xl border border-amber-100 text-amber-900 space-y-4">
                                             <h5 className="font-black text-xs uppercase tracking-widest flex items-center gap-2"><span className="material-symbols-outlined text-lg">database</span> Sobre o Acervo de Questões</h5>
