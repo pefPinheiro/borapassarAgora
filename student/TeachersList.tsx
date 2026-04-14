@@ -121,8 +121,8 @@ const TeachersList: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Reuse Teacher Profile Modal */}
