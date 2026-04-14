@@ -322,49 +322,43 @@ const ProfessorProfile: React.FC<ProfessorProfileProps> = ({ isDashboard = false
                         />
                     </div>
 
-                    {/* Bottom Info Cards: Stylized & Colorful */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Bottom Info Cards: Small & Discrete */}
+                    <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 pb-12">
                         {/* Expertise Card */}
-                        <div className="relative overflow-hidden bg-gradient-to-br from-[#137fec] to-[#0d59a8] rounded-[60px] p-12 text-white shadow-2xl group">
-                            <div className="absolute top-[-10%] right-[-10%] size-64 bg-white/10 rounded-full blur-[80px]" />
-                            <div className="relative z-10 space-y-8">
-                                <div className="flex items-center gap-4">
-                                    <div className="size-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-3xl">school</span>
+                        <div className="bg-slate-50 border border-slate-100 rounded-[32px] p-6 space-y-4">
+                            <div className="flex items-center gap-3">
+                                <div className="size-8 bg-blue-50 text-blue-500 rounded-lg flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-xl">school</span>
+                                </div>
+                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Especialidades</h4>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {disciplinas.filter(d => teacherData.disciplines_ids?.includes(d.id)).map(d => (
+                                    <div key={d.id} className="px-3 py-1.5 bg-white border border-slate-100 rounded-xl flex items-center gap-2">
+                                        <div className="size-1.5 rounded-full bg-blue-400" />
+                                        <span className="font-bold text-[9px] uppercase tracking-wider text-slate-600">{d.name}</span>
                                     </div>
-                                    <h4 className="text-xl font-black uppercase tracking-tighter italic">Áreas de Especialidade</h4>
-                                </div>
-                                <div className="flex flex-wrap gap-3">
-                                    {disciplinas.filter(d => teacherData.disciplines_ids?.includes(d.id)).map(d => (
-                                        <div key={d.id} className="px-6 py-3 bg-white/20 backdrop-blur-xl border border-white/20 rounded-2xl flex items-center gap-3 hover:bg-white hover:text-[#137fec] transition-all duration-500 cursor-default">
-                                            <span className="material-symbols-outlined text-sm">check_circle</span>
-                                            <span className="font-black text-xs uppercase tracking-widest">{d.name}</span>
-                                        </div>
-                                    ))}
-                                    {(!teacherData.disciplines_ids || teacherData.disciplines_ids.length === 0) && (
-                                        <p className="text-white/60 italic font-medium">Aguardando definição de disciplinas...</p>
-                                    )}
-                                </div>
+                                ))}
+                                {(!teacherData.disciplines_ids || teacherData.disciplines_ids.length === 0) && (
+                                    <p className="text-slate-400 italic text-[10px]">Aguardando especialidades...</p>
+                                )}
                             </div>
                         </div>
 
                         {/* Contact Card */}
-                        <div className="group relative bg-slate-900 rounded-[60px] p-12 text-white shadow-2xl overflow-hidden">
-                            <div className="absolute bottom-[-10%] left-[-10%] size-64 bg-[#137fec]/20 rounded-full blur-[80px]" />
-                            <div className="relative z-10 space-y-8">
-                                <div className="flex items-center gap-4">
-                                    <div className="size-14 bg-blue-500/20 rounded-2xl flex items-center justify-center text-blue-400">
-                                        <span className="material-symbols-outlined text-3xl">alternate_email</span>
-                                    </div>
-                                    <h4 className="text-xl font-black uppercase tracking-tighter italic text-blue-400">Contato Direto</h4>
+                        <div className="bg-slate-900 rounded-[32px] p-6 text-white space-y-4 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 size-24 bg-blue-500/10 blur-2xl group-hover:bg-blue-500/20 transition-all" />
+                            <div className="flex items-center gap-3 relative z-10">
+                                <div className="size-8 bg-white/10 rounded-lg flex items-center justify-center text-blue-400">
+                                    <span className="material-symbols-outlined text-xl">alternate_email</span>
                                 </div>
-                                <div className="space-y-2">
-                                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">Email Corporativo</p>
-                                    <p className="text-2xl md:text-3xl font-black tracking-tight hover:text-[#137fec] transition-colors">{teacherData.corporate_email || profile?.email}</p>
-                                </div>
-                                <div className="pt-4 border-t border-white/5 flex items-center gap-3">
-                                    <div className="size-2 rounded-full bg-emerald-400" />
-                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Docente Oficial Verificado</span>
+                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Contato</h4>
+                            </div>
+                            <div className="relative z-10">
+                                <p className="text-sm font-black tracking-tight truncate">{teacherData.corporate_email || profile?.email}</p>
+                                <div className="mt-2 flex items-center gap-2">
+                                    <div className="size-1 rounded-full bg-emerald-400" />
+                                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Docente Verificado</span>
                                 </div>
                             </div>
                         </div>
