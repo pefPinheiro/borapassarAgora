@@ -64,6 +64,7 @@ const Cursos: React.FC = () => {
 
     // Form State
     const [editingCourse, setEditingCourse] = useState<CourseDb | null>(null);
+    const [promoConfig, setPromoConfig] = useState({ isActive: false, title: '' });
     const [formData, setFormData] = useState<Partial<CourseDb>>({
         title: '', description: '', area: '', cargo: '', banca_id: '',
         video_type: 'url', video_url: '', price_base: 0, price_offer: 0,
@@ -196,8 +197,13 @@ const Cursos: React.FC = () => {
 
     const handleOpenForm = async (course?: CourseDb) => {
         if (course) {
+            const promoObj = (course.coupons_json || []).find(c => c.name.startsWith('__PROMO__'));
+            setPromoConfig({ isActive: !!promoObj, title: promoObj ? promoObj.name.replace('__PROMO__', '') : '' });
+            
+            const filteredCoupons = (course.coupons_json || []).filter(c => !c.name.startsWith('__PROMO__'));
+            
             setEditingCourse(course);
-            setFormData(course);
+            setFormData({ ...course, coupons_json: filteredCoupons });
 
             const [aps, sims, mats] = await Promise.all([
                 supabase.from('course_items').select('apostila_id, position').eq('course_id', course.id).order('position'),
@@ -209,6 +215,7 @@ const Cursos: React.FC = () => {
             setSelectedSimulados(sims.data?.map(s => ({ id: s.simulado_id, position: s.position, release_days: s.release_days })) || []);
             setMaterials(mats.data || []);
         } else {
+            setPromoConfig({ isActive: false, title: '' });
             setEditingCourse(null);
             setFormData({
                 title: '', description: '', area: '', cargo: '', banca_id: '',
@@ -232,7 +239,15 @@ const Cursos: React.FC = () => {
     const handleSubmit = async () => {
         setLoading(true);
         try {
-            const { id, created_at, bancas, ...cleanData } = formData as any;
+            const { id, created_at, bancas, lp_config, ...cleanData } = formData as any;
+            
+            // Handle Promo Serializing
+            const validCoupons = (cleanData.coupons_json || []).filter((c: any) => !c.name.startsWith('__PROMO__'));
+            if (promoConfig.isActive && promoConfig.title) {
+                validCoupons.push({ name: `__PROMO__${promoConfig.title}`, discount_type: 'valor', discount_value: 0 });
+            }
+            cleanData.coupons_json = validCoupons;
+
             const payload = { ...cleanData, updated_at: new Date().toISOString() };
             if (!payload.banca_id) delete payload.banca_id;
             if (payload.test_date === '') payload.test_date = null;
@@ -834,22 +849,22 @@ const Cursos: React.FC = () => {
                                                     <input
                                                         type="checkbox"
                                                         id="promo_toggle"
-                                                        checked={formData.lp_config?.is_promo_active || false}
-                                                        onChange={e => setFormData({ ...formData, lp_config: { ...(formData.lp_config || {}), is_promo_active: e.target.checked } })}
+                                                        checked={promoConfig.isActive}
+                                                        onChange={e => setPromoConfig({ ...promoConfig, isActive: e.target.checked })}
                                                         className="peer absolute w-10 h-5 opacity-0 z-10 cursor-pointer"
                                                     />
-                                                    <label htmlFor="promo_toggle" className={`block overflow-hidden h-5 rounded-full bg-slate-700 cursor-pointer transition-colors duration-200 ${formData.lp_config?.is_promo_active ? 'bg-rose-500' : ''}`}></label>
-                                                    <div className={`absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${formData.lp_config?.is_promo_active ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                                                    <label htmlFor="promo_toggle" className={`block overflow-hidden h-5 rounded-full bg-slate-700 cursor-pointer transition-colors duration-200 ${promoConfig.isActive ? 'bg-rose-500' : ''}`}></label>
+                                                    <div className={`absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${promoConfig.isActive ? 'translate-x-5' : 'translate-x-0'}`}></div>
                                                 </div>
                                             </div>
                                             
-                                            {formData.lp_config?.is_promo_active && (
+                                            {promoConfig.isActive && (
                                                 <div className="space-y-2 animate-in fade-in zoom-in-95">
                                                     <label className="text-[10px] font-black uppercase text-slate-400">Título da Promoção (Ex: Black Friday, Dia das Mães)</label>
                                                     <input 
                                                         type="text" 
-                                                        value={formData.lp_config?.promo_title || ''} 
-                                                        onChange={e => setFormData({ ...formData, lp_config: { ...(formData.lp_config || {}), promo_title: e.target.value } })} 
+                                                        value={promoConfig.title} 
+                                                        onChange={e => setPromoConfig({ ...promoConfig, title: e.target.value })} 
                                                         className="w-full h-12 bg-rose-500/10 border border-rose-500/30 rounded-xl px-4 font-bold text-sm text-rose-100 outline-none focus:border-rose-400 transition-all placeholder:text-rose-500/30" 
                                                         placeholder="Natal, Relâmpago..."
                                                     />

@@ -18,7 +18,7 @@ interface CourseData {
     simulados_count: number;
     questions_count: number;
     lp_model?: string;
-    lp_config?: any;
+    coupons_json?: { name: string, discount_type: string, discount_value: number }[];
 }
 
 const CourseLandingPage: React.FC = () => {
@@ -83,11 +83,15 @@ const CourseLandingPage: React.FC = () => {
     const CTA_TEXT = isFree ? 'Quero Acesso Grátis' : 'Quero Minha Aprovação';
 
     const PromoBadge = ({ className = "" }: { className?: string }) => {
-        if (!course.lp_config?.is_promo_active) return null;
+        const promoObj = course.coupons_json?.find(c => c.name.startsWith('__PROMO__'));
+        if (!promoObj) return null;
+        
+        const title = promoObj.name.replace('__PROMO__', '');
+        
         return (
             <div className={`bg-gradient-to-r from-red-600 to-rose-600 text-white text-[10px] md:text-sm font-black px-8 py-3 rounded-full uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(225,29,72,0.6)] animate-pulse flex items-center justify-center gap-3 border-2 border-rose-300 w-fit whitespace-nowrap z-50 ${className}`}>
                 <span className="material-symbols-outlined text-[18px]">campaign</span>
-                {course.lp_config.promo_title || 'Mega Promoção Ativa!'}
+                {title || 'Mega Promoção Ativa!'}
             </div>
         );
     };
