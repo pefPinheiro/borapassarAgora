@@ -42,11 +42,20 @@ const TiptapEditor = React.forwardRef<TiptapRef, TiptapEditorProps>(({ content, 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const extensions = React.useMemo(() => [
-        StarterKit,
+        StarterKit.configure({
+            // Desativa se houver colisão de nomes interna
+            history: true,
+        }),
         Underline,
         TextAlign.configure({ types: ['heading', 'paragraph'] }),
         Image.configure({ inline: true, allowBase64: true }),
-        Link.configure({ openOnClick: false }),
+        Link.configure({ 
+            openOnClick: false,
+            HTMLAttributes: {
+                rel: 'noopener noreferrer',
+                target: '_blank',
+            },
+        }),
         Highlight,
         Youtube.configure({ width: 640, height: 480 }),
         Placeholder.configure({ placeholder: placeholder || 'Comece a escrever...' }),

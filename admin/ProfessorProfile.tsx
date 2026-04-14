@@ -126,21 +126,46 @@ const ProfessorProfile: React.FC = () => {
                 updated_at: new Date().toISOString()
             };
 
-            const { error } = await supabase
+            // Verificação manual para evitar erro de UNIQUE constraint se ela não existir no BD
+            const { data: existing } = await supabase
                 .from('teachers')
-                .upsert(payload, { onConflict: 'linked_profile_id' });
+                .select('id')
+                .eq('linked_profile_id', user.id)
+                .maybeSingle();
 
-            if (error) throw error;
+            let saveError;
+            if (existing) {
+                // Remove ID do payload se existir para evitar confusão no update
+                const { id, ...updatePayload } = payload;
+                const { error } = await supabase
+                    .from('teachers')
+                    .update(updatePayload)
+                    .eq('id', existing.id);
+                saveError = error;
+            } else {
+                const { error } = await supabase
+                    .from('teachers')
+                    .insert(payload);
+                saveError = error;
+            }
 
+            if (saveError) throw saveError;
+
+            // Também atualiza o avatar no perfil se foi alterado
             if (teacherData.avatar_url && teacherData.avatar_url !== profile?.avatar_url) {
                 await supabase.from('profiles').update({ avatar_url: teacherData.avatar_url }).eq('id', user.id);
             }
 
             setMessage({ type: 'success', text: 'Perfil atualizado com sucesso!' });
-            fetchData();
-            setViewMode('preview');
+            
+            // Recarrega e volta para o modo preview após um pequeno delay para o usuário ver a mensagem
+            setTimeout(() => {
+                fetchData();
+                setViewMode('preview');
+            }, 1000);
         } catch (e: any) {
-            setMessage({ type: 'error', text: 'Erro ao salvar: ' + e.message });
+            console.error('Save error:', e);
+            setMessage({ type: 'error', text: 'Erro ao salvar: ' + (e.message || 'Erro desconhecido no banco de dados.') });
         } finally {
             setSaving(false);
         }

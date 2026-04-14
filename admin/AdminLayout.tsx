@@ -103,6 +103,7 @@ const AdminLayout: React.FC = () => {
       icon: 'workspace_premium',
       items: [
         { id: 'perfil-professor', icon: 'account_circle', label: 'Meu Perfil Público', path: '/admin/perfil-professor' },
+        { id: 'guia-professor', icon: 'auto_stories', label: 'Guia de Uso Docente', path: '/admin/guia-professor' },
       ]
     }
   ];
@@ -125,8 +126,8 @@ const AdminLayout: React.FC = () => {
   const hasAccess = (moduleId: string) => {
     if (!profile) return false;
     if (profile.role === 'super') return true; // Super Admin vê tudo
-    if (moduleId === 'dashboard') return true; // Dashboard é a home, sempre permitida se ativo
-    if (moduleId === 'perfil-professor' && profile.role === 'teacher') return true; // Professor vê seu próprio perfil
+    if (moduleId === 'dashboard') return true; 
+    if ((moduleId === 'perfil-professor' || moduleId === 'guia-professor') && profile.role === 'teacher') return true; 
     const allowed = profile.allowed_modules || [];
     return allowed.includes(moduleId);
   };
@@ -326,6 +327,7 @@ const AdminLayout: React.FC = () => {
               // 3. Special Routes whitelist (Config is always allowed for logged users)
               const isWhitelisted = location.pathname.includes('/admin/config') || 
                                   location.pathname.includes('/admin/mail') || 
+                                  location.pathname.includes('/admin/guia-professor') || 
                                   location.pathname.includes('/admin/perfil-professor');
 
               // 4. Check Access
