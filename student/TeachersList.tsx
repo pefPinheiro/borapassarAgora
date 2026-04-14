@@ -61,21 +61,24 @@ const TeachersList: React.FC = () => {
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {teachers.map(teacher => (
-                    <div 
-                        key={teacher.id}
-                        onClick={() => handleOpenProfile(teacher.id)}
-                        className="group bg-white rounded-[40px] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-[#137fec]/10 transition-all duration-500 overflow-hidden cursor-pointer flex flex-col hover:-translate-y-2"
-                    >
-                        {/* Banner Section */}
-                        <div className="h-40 relative overflow-hidden bg-slate-900">
-                            {teacher.banner_url ? (
-                                <img src={teacher.banner_url} className="size-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-1000" alt="Banner" />
-                            ) : (
-                                <div className="size-full bg-gradient-to-br from-slate-800 to-slate-900" />
-                            )}
-                            <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-white via-white/50 to-transparent" />
-                        </div>
+                {teachers.map(teacher => {
+                    const teacherBanner = teacher.banner_url || (teacher.ad_images && teacher.ad_images.length > 0 ? teacher.ad_images[0] : null);
+                    
+                    return (
+                        <div 
+                            key={teacher.id}
+                            onClick={() => handleOpenProfile(teacher.id)}
+                            className="group bg-white rounded-[40px] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-[#137fec]/10 transition-all duration-500 overflow-hidden cursor-pointer flex flex-col hover:-translate-y-2"
+                        >
+                            {/* Banner Section */}
+                            <div className="h-40 relative overflow-hidden bg-slate-900">
+                                {teacherBanner ? (
+                                    <img src={teacherBanner} className="size-full object-cover group-hover:scale-110 transition-transform duration-1000" alt="Banner" />
+                                ) : (
+                                    <div className="size-full bg-gradient-to-br from-slate-800 to-slate-900" />
+                                )}
+                                <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-white via-white/50 to-transparent" />
+                            </div>
 
                         {/* Profile Info Overlay Positioned */}
                         <div className="px-8 pb-8 -mt-12 relative z-10 flex flex-col items-center text-center space-y-4 flex-1">
@@ -171,6 +174,8 @@ const TeacherProfileModal: React.FC<{
 
     if (!isOpen) return null;
 
+    const teacherBanner = teacher?.banner_url || (teacher?.ad_images && teacher?.ad_images.length > 0 ? teacher?.ad_images[0] : null);
+
     return (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-300">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={onClose} />
@@ -190,8 +195,8 @@ const TeacherProfileModal: React.FC<{
                 ) : teacher ? (
                     <div className="flex flex-col">
                         <div className="h-48 md:h-80 relative bg-slate-900">
-                            {teacher.banner_url && (
-                                <img src={teacher.banner_url} className="size-full object-cover" alt="Banner" />
+                            {teacherBanner && (
+                                <img src={teacherBanner} className="size-full object-cover" alt="Banner" />
                             )}
                             <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-slate-900/10" />
                             

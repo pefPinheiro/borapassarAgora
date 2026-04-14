@@ -1545,6 +1545,8 @@ const TeacherProfileModal: React.FC<{
 
     if (!isOpen) return null;
 
+    const teacherBanner = teacher?.banner_url || (teacher?.ad_images && teacher?.ad_images.length > 0 ? teacher?.ad_images[0] : null);
+
     return (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-300">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={onClose} />
@@ -1566,8 +1568,8 @@ const TeacherProfileModal: React.FC<{
                     <div className="flex flex-col">
                         {/* Banner & Avatar Area */}
                         <div className="h-48 md:h-80 relative bg-slate-900">
-                            {teacher.banner_url && (
-                                <img src={teacher.banner_url} className="size-full object-cover" alt="Banner" />
+                            {teacherBanner && (
+                                <img src={teacherBanner} className="size-full object-cover" alt="Banner" />
                             )}
                             <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-slate-900/10" />
                             
