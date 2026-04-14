@@ -30,6 +30,7 @@ import CourseCheckout from './student/CourseCheckout';
 import ApostilaReader from './student/ApostilaReader';
 import CadernoView from './student/CadernoView';
 import FaqStudent from './student/FaqStudent';
+import TeachersList from './student/TeachersList';
 
 // Admin Pages
 import Dashboard from './admin/Dashboard';
@@ -91,6 +92,7 @@ const App: React.FC = () => {
           <Route path="curso/:id/checkout" element={<CourseCheckout />} />
           <Route path="suporte" element={<SupportTicket />} /> {/* Legacy/Tickets */}
           <Route path="faq" element={<FaqStudent />} />
+          <Route path="professores" element={<TeachersList />} />
           <Route path="config" element={<ProfileConfig />} />
         </Route>
 

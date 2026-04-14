@@ -80,7 +80,8 @@ const StudentLayout: React.FC = () => {
 
   const baseItems = [
     { icon: 'explore', label: 'Catálogo', path: '/aluno/catalogo' },
-    { icon: 'quiz', label: 'Questões', path: '/aluno/questoes' },
+    {icon: 'quiz', label: 'Questões', path: '/aluno/questoes' },
+    { icon: 'school', label: 'Professores', path: '/aluno/professores' },
     { icon: 'support_agent', label: 'Suporte', path: '/aluno/suporte' },
     { icon: 'help', label: 'Perguntas', path: '/aluno/faq' },
   ];
