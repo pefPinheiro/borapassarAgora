@@ -345,7 +345,7 @@ const CourseCheckout: React.FC = () => {
                                         <div className="p-6 bg-amber-50 rounded-3xl border border-amber-100 text-amber-900 space-y-4">
                                             <h5 className="font-black text-xs uppercase tracking-widest flex items-center gap-2"><span className="material-symbols-outlined text-lg">database</span> Sobre o Acervo de Questões</h5>
                                             <p className="text-xs leading-relaxed">
-                                                Declaramos que o volume de questões disponível na plataforma é dinâmico e diversificado, incluindo: **Questões de múltiplas Bancas Examinadoras** (focadas no edital), **Questões Inéditas** (desenvolvidas por nosso time pedagógico), questões vinculadas a **módulos interativos**, além de acesso integral a **Cadernos** e **Simulados** periódicos.
+                                                Declaramos que o volume de questões disponível na plataforma é dinâmico e diversificado, incluindo: <strong>Questões de múltiplas Bancas Examinadoras</strong> (focadas no edital), <strong>Questões Inéditas</strong> (desenvolvidas por nosso time pedagógico), questões vinculadas a <strong>módulos interativos</strong>, além de acesso integral a <strong>Cadernos</strong> e <strong>Simulados</strong> periódicos.
                                             </p>
                                         </div>
 
@@ -354,7 +354,7 @@ const CourseCheckout: React.FC = () => {
                                         </p>
 
                                         <p>
-                                            <strong>2. Prazo de Garantia:</strong> Respeitamos integralmente o seu direito de arrependimento (Art. 49 do CDC). Você tem o prazo incondicional de **7 (sete) dias corridos** para solicitar o cancelamento e obter reembolso total, caso o material não atenda suas expectativas.
+                                            <strong>2. Prazo de Garantia:</strong> Respeitamos integralmente o seu direito de arrependimento (Art. 49 do CDC). Você tem o prazo incondicional de <strong>7 (sete) dias corridos</strong> para solicitar o cancelamento e obter reembolso total, caso o material não atenda suas expectativas.
                                         </p>
 
                                         <p>
