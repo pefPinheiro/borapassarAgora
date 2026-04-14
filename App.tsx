@@ -1,12 +1,14 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import Login from './pages/Login';
-import Register from './pages/Register';
+import Login from './student/Login';
+import Register from './student/Register';
 import LandingPage from './pages/LandingPage';
 import CourseLandingPage from './pages/CourseLandingPage';
-import AlunoLayout from './student/AlunoLayout';
-import AlunoDashboard from './student/AlunoDashboard';
-import CoursePlayer from './student/CoursePlayer';
+import AboutUs from './pages/AboutUs';
+import Terms from './pages/Terms';
+import AlunoLayout from './student/StudentLayout';
+import MyCourses from './student/MyCourses';
+import CourseView from './student/CourseView';
 import ApostilaReader from './student/ApostilaReader';
 import SimuladoPlayer from './student/relax/SimuladoPlayer';
 import SimuladoResults from './student/relax/SimuladoResults';
@@ -32,7 +34,7 @@ import FaqAdmin from './admin/FaqAdmin';
 import TicketsAdmin from './admin/TicketsAdmin';
 import ChatAdmin from './admin/ChatAdmin';
 import MailAdmin from './admin/MailAdmin';
-import ProfileConfig from './admin/ProfileConfig';
+import ProfileConfig from './student/ProfileConfig';
 import InvestidoresAdmin from './admin/InvestidoresAdmin';
 import ProfessorProfile from './admin/ProfessorProfile';
 import ProfessorGuide from './admin/ProfessorGuide';
@@ -51,12 +53,15 @@ const App: React.FC = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/curso/:id" element={<CourseLandingPage />} />
+      <Route path="/quem-somos" element={<AboutUs />} />
+      <Route path="/termos" element={<Terms />} />
       <Route path="/aluno/redirect" element={<StudentRedirect />} />
       
       {/* Aluno Routes */}
       <Route path="/aluno" element={<AlunoLayout />}>
-        <Route index element={<AlunoDashboard />} />
-        <Route path="curso/:id" element={<CoursePlayer />} />
+        <Route index element={<MyCourses />} />
+        <Route path="meus-cursos" element={<MyCourses />} />
+        <Route path="curso/:id" element={<CourseView />} />
         <Route path="apostila/:id" element={<ApostilaReader />} />
         <Route path="relax" element={<RelaxHub />} />
         <Route path="relax/simulados" element={<RelaxSimulados />} />
@@ -65,6 +70,7 @@ const App: React.FC = () => {
         <Route path="relax/simulado/:id" element={<SimuladoPlayer />} />
         <Route path="relax/simulado/resultado/:id" element={<SimuladoResults />} />
         <Route path="relax/caderno/:id" element={<NotebookPlayer />} />
+        <Route path="config" element={<ProfileConfig />} />
       </Route>
 
       {/* Admin/Teacher Routes */}
