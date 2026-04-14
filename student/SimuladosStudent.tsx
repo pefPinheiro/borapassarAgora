@@ -51,7 +51,7 @@ const SimuladosStudent: React.FC = () => {
 
             if (!enrollmentData) {
                 const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-                if (profile?.role !== 'admin' && profile?.role !== 'super') {
+                if (!['admin', 'super', 'teacher', 'editor', 'moderator', 'collaborator'].includes(profile?.role)) {
                     console.error('Sem acesso ao simulado: Matrícula não ativa.');
                     alert('Você não tem uma matrícula ativa em um curso que ofereça este simulado.');
                     navigate('/aluno/cursos');

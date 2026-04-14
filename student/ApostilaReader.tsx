@@ -95,7 +95,7 @@ const ApostilaReader: React.FC = () => {
 
             if (!enrollmentData) {
                 const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-                if (profile?.role !== 'admin' && profile?.role !== 'super') {
+                if (!['admin', 'super', 'teacher', 'editor', 'moderator', 'collaborator'].includes(profile?.role)) {
                     console.error('Sem acesso à apostila: Matrícula não ativa.');
                     alert('Você não tem uma matrícula ativa para acessar este material.');
                     navigate('/aluno/cursos');
