@@ -1565,11 +1565,11 @@ const TeacherProfileModal: React.FC<{
                 ) : teacher ? (
                     <div className="flex flex-col">
                         {/* Banner & Avatar Area */}
-                        <div className="h-48 md:h-64 relative bg-slate-900">
+                        <div className="h-48 md:h-80 relative bg-slate-900">
                             {teacher.banner_url && (
-                                <img src={teacher.banner_url} className="size-full object-cover opacity-60" alt="Banner" />
+                                <img src={teacher.banner_url} className="size-full object-cover" alt="Banner" />
                             )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-slate-900/10" />
                             
                             <div className="absolute -bottom-10 left-10 flex items-end gap-6">
                                 <div className="size-24 md:size-32 rounded-[32px] bg-white p-2 shadow-2xl relative z-10">

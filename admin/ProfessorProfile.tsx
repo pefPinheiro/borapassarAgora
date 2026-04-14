@@ -204,7 +204,7 @@ const ProfessorProfile: React.FC<ProfessorProfileProps> = ({ isDashboard = false
                 <div className="relative group">
                     <div className="h-[450px] w-full rounded-[60px] overflow-hidden bg-slate-900 shadow-2xl relative">
                         {mainBanner ? (
-                            <img src={mainBanner} className="w-full h-full object-cover opacity-60" alt="Banner" />
+                            <img src={mainBanner} className="w-full h-full object-cover" alt="Banner" />
                         ) : (
                             <div className="w-full h-full bg-gradient-to-br from-slate-800 to-indigo-950 flex items-center justify-center">
                                 <span className="material-symbols-outlined text-[120px] text-white/5 font-thin tracking-widest uppercase italic">BORA PASSAR</span>
