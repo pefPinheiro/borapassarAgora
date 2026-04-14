@@ -18,6 +18,7 @@ interface CourseData {
     simulados_count: number;
     questions_count: number;
     lp_model?: string;
+    lp_config?: any;
 }
 
 const CourseLandingPage: React.FC = () => {
@@ -81,6 +82,16 @@ const CourseLandingPage: React.FC = () => {
     const formatPrice = (p: number) => p.toFixed(2).replace('.', ',');
     const CTA_TEXT = isFree ? 'Quero Acesso Grátis' : 'Quero Minha Aprovação';
 
+    const PromoBadge = ({ className = "" }: { className?: string }) => {
+        if (!course.lp_config?.is_promo_active) return null;
+        return (
+            <div className={`bg-gradient-to-r from-red-600 to-rose-600 text-white text-[10px] md:text-sm font-black px-8 py-3 rounded-full uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(225,29,72,0.6)] animate-pulse flex items-center justify-center gap-3 border-2 border-rose-300 w-fit whitespace-nowrap z-50 ${className}`}>
+                <span className="material-symbols-outlined text-[18px]">campaign</span>
+                {course.lp_config.promo_title || 'Mega Promoção Ativa!'}
+            </div>
+        );
+    };
+
     const Features = [
         { title: 'Videoaulas Focadas', desc: 'Teoria sem enrolação direto ao ponto nas questões.', icon: 'play_circle' },
         { title: 'Apostilas Digitais', desc: 'Material estratégico otimizado para sua leitura rápida.', icon: 'auto_stories' },
@@ -122,7 +133,8 @@ const CourseLandingPage: React.FC = () => {
                             <p className="text-xl lg:text-3xl text-white/50 font-medium max-w-4xl mx-auto leading-relaxed">Prepare-se para <span className="text-white font-black">{course.title}</span> com o curso mais completo e atualizado.</p>
 
                             <div className="flex flex-col items-center gap-8 py-10">
-                                <div className="flex flex-col gap-2 relative">
+                                <div className="flex flex-col items-center gap-2 relative">
+                                    <PromoBadge className="mb-6 scale-110" />
                                     {course.coupon_name && (
                                         <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-yellow-500 text-black text-[10px] font-black px-4 py-1 rounded-full uppercase tracking-widest whitespace-nowrap"> Cupom: {course.coupon_name} </div>
                                     )}
@@ -194,6 +206,7 @@ const CourseLandingPage: React.FC = () => {
                             <p className="text-xl font-medium text-slate-400 pl-8">A estratégia perfeita para passar agora!</p>
                         </div>
                         <div className="flex flex-col gap-8">
+                            <PromoBadge className="mb-2" />
                             <div className="flex items-baseline gap-6">
                                 <span className="text-8xl font-black tracking-tighter">R$ {formatPrice(course.price_offer)}</span>
                                 {hasDiscount && <span className="text-3xl text-slate-300 line-through font-bold">R$ {formatPrice(course.price_base)}</span>}
@@ -264,7 +277,8 @@ const CourseLandingPage: React.FC = () => {
                     </div>
 
                     <div className="space-y-6">
-                        <div className="flex flex-col gap-2 relative">
+                        <div className="flex flex-col items-center gap-2 relative">
+                            <PromoBadge className="mb-6 scale-110 shadow-[0_0_40px_rgba(225,29,72,0.8)]" />
                             {course.coupon_name && (
                                 <div className="text-xs font-black uppercase tracking-[0.4em] text-cyan-500 animate-pulse">// ACTIVE_COUPON: {course.coupon_name}</div>
                             )}
@@ -320,6 +334,7 @@ const CourseLandingPage: React.FC = () => {
 
                             <div className="bg-white/5 border border-white/10 p-8 rounded-3xl space-y-8 max-w-lg">
                                 <div className="flex flex-col gap-1">
+                                    <PromoBadge className="mb-6" />
                                     {course.coupon_name && <span className="text-[10px] font-black uppercase tracking-widest text-amber-500 animate-pulse">CÓDIGO_ATIVO: {course.coupon_name}</span>}
                                     {hasDiscount && <span className="text-white/30 line-through text-lg font-bold">R$ {formatPrice(course.price_base)}</span>}
                                     <div className="flex items-baseline gap-4">
@@ -390,7 +405,8 @@ const CourseLandingPage: React.FC = () => {
                             <h1 className="text-7xl lg:text-[140px] font-black leading-[0.8] tracking-tighter uppercase -ml-4 italic">SEM <br /> <span className="text-orange-600">FOLGA.</span></h1>
                             <p className="text-2xl font-bold italic opacity-60 leading-tight">O conteúdo mais agressivo para detonar no cuncurso e garantir a aprovação!.</p>
                             <div className="p-8 bg-orange-50 border-4 border-black shadow-[15px_15px_0_#000] rotate-2 space-y-4">
-                                <div className="space-y-1">
+                                <div className="space-y-1 relative">
+                                    <PromoBadge className="mb-6 -rotate-2" />
                                     {course.coupon_name && <p className="text-xs font-black uppercase text-orange-600 tracking-widest animate-pulse">CUMPOM ATIVO: {course.coupon_name}</p>}
                                     {hasDiscount && <p className="text-2xl text-black/20 line-through font-black italic">R$ {formatPrice(course.price_base)}</p>}
                                     <span className="text-7xl lg:text-9xl font-black italic block italic leading-none">R$ {formatPrice(course.price_offer)}</span>
@@ -468,6 +484,7 @@ const CourseLandingPage: React.FC = () => {
                             <div className="space-y-4">
                                 <h2 className="text-4xl lg:text-6xl font-black leading-tight">Garantir a sua posse é questão de estratégia.</h2>
                                 <div className="space-y-2">
+                                    <PromoBadge className="mb-6" />
                                     {course.coupon_name && <p className="text-[10px] font-black uppercase tracking-widest text-emerald-200 animate-pulse">Cupom Ativo: {course.coupon_name}</p>}
                                     {hasDiscount && <p className="text-2xl text-white/30 line-through font-black italic">R$ {formatPrice(course.price_base)}</p>}
                                     <div className="text-8xl lg:text-[140px] font-black italic tracking-tighter leading-none">R$ {formatPrice(course.price_offer)}</div>
@@ -542,7 +559,8 @@ const CourseLandingPage: React.FC = () => {
                             </div>
 
                             <div className="flex flex-col items-center gap-10">
-                                <div className="space-y-4">
+                                <div className="space-y-4 flex flex-col items-center">
+                                    <PromoBadge className="mb-4" />
                                     {course.coupon_name && <p className="text-[11px] font-black text-[#d4af37] uppercase tracking-[0.4em] animate-pulse"># CUPOM_ATIVADO: {course.coupon_name}</p>}
                                     <div className="flex items-center justify-center gap-8">
                                         {hasDiscount && <span className="text-3xl text-white/10 line-through font-bold">R$ {formatPrice(course.price_base)}</span>}
@@ -657,7 +675,8 @@ const CourseLandingPage: React.FC = () => {
                             </div>
 
                             <div className="flex flex-col lg:flex-row items-center gap-12 pt-10 border-t border-white/5">
-                                <div className="space-y-2 text-center lg:text-left">
+                                <div className="space-y-2 text-center lg:text-left flex flex-col items-center lg:items-start">
+                                    <PromoBadge className="mb-4" />
                                     {course.coupon_name && <p className="text-[10px] font-black uppercase tracking-widest text-[#00ffc3] animate-pulse">CÓDIGO_VITAL: {course.coupon_name}</p>}
                                     <div className="flex flex-col">
                                         {hasDiscount && <span className="text-2xl text-white/10 line-through font-black italic italic leading-none">R$ {formatPrice(course.price_base)}</span>}
@@ -702,7 +721,8 @@ const CourseLandingPage: React.FC = () => {
                             <p className="text-2xl font-black uppercase tracking-widest bg-white border-4 border-black px-6 py-4 inline-block -rotate-2">{course.title}</p>
 
                             <div className="flex flex-col gap-4">
-                                {course.coupon_name && <p className="text-xs font-black uppercase tracking-widest bg-black text-white px-4 py-1 w-fit rotate-2">CUPOM: {course.coupon_name}</p>}
+                                <PromoBadge className="mb-2 rotate-2 scale-110 z-20" />
+                                {course.coupon_name && <p className="text-xs font-black uppercase tracking-widest bg-black text-white px-4 py-1 w-fit rotate-2 mt-4">CUPOM: {course.coupon_name}</p>}
                                 <div className="flex flex-wrap items-end gap-10">
                                     <div className="flex flex-col">
                                         {hasDiscount && <span className="text-3xl font-black text-black/20 line-through -mb-4 ml-6 rotate-[-5deg] z-10">R${formatPrice(course.price_base)}</span>}
@@ -776,7 +796,8 @@ const CourseLandingPage: React.FC = () => {
                     </div>
                     <div className="lg:col-span-5">
                         <div className="sticky top-40 bg-white border border-slate-100 p-10 lg:p-16 text-center space-y-12 shadow-huge transform hover:-translate-y-4 transition-all rounded-[40px]">
-                            <div className="space-y-2">
+                            <div className="space-y-2 flex flex-col items-center">
+                                <PromoBadge className="mb-6 -mt-6" />
                                 <p className="font-black uppercase tracking-widest text-slate-400 text-[10px]">Investimento na Carreira:</p>
                                 <div className="flex flex-col items-center gap-2">
                                     {hasDiscount && <span className="text-2xl line-through text-slate-200 font-bold decoration-red-500">R$ {formatPrice(course.price_base)}</span>}

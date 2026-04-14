@@ -800,7 +800,18 @@ const Cursos: React.FC = () => {
                                         </div>
 
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase text-slate-400">Preço com Oferta (R$)</label>
+                                            <label className="text-[10px] font-black uppercase text-slate-400">Desconto Fixo (R$)</label>
+                                            <input 
+                                                type="number" 
+                                                step="0.01" 
+                                                value={formData.discount_value} 
+                                                onChange={e => handlePricingChange('discount_value', e.target.value)} 
+                                                className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-6 font-black text-xl text-slate-300 outline-none focus:border-red-500/50 transition-all" 
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-slate-400">Preço Calculado (R$)</label>
                                             <div className="relative">
                                                 <input
                                                     type="number"
@@ -812,7 +823,38 @@ const Cursos: React.FC = () => {
                                                     <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-emerald-500/30">Calculado</span>
                                                 </div>
                                             </div>
-                                            <p className="text-[10px] text-slate-500 font-bold italic">O preço final é calculado automaticamente com base no desconto informado.</p>
+                                            <p className="text-[10px] text-slate-500 font-bold italic">O preço com desconto é gerado automaticamente.</p>
+                                        </div>
+
+                                        {/* PROMOÇÃO SECTION */}
+                                        <div className="pt-6 border-t border-white/10 space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="text-[10px] font-black text-rose-400 uppercase tracking-widest flex items-center gap-2"><span className="material-symbols-outlined text-[16px]">campaign</span> Oferta / Promoção Ativa</h4>
+                                                <div className="relative inline-block w-10 h-5 transition duration-200 ease-in-out">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="promo_toggle"
+                                                        checked={formData.lp_config?.is_promo_active || false}
+                                                        onChange={e => setFormData({ ...formData, lp_config: { ...(formData.lp_config || {}), is_promo_active: e.target.checked } })}
+                                                        className="peer absolute w-10 h-5 opacity-0 z-10 cursor-pointer"
+                                                    />
+                                                    <label htmlFor="promo_toggle" className={`block overflow-hidden h-5 rounded-full bg-slate-700 cursor-pointer transition-colors duration-200 ${formData.lp_config?.is_promo_active ? 'bg-rose-500' : ''}`}></label>
+                                                    <div className={`absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${formData.lp_config?.is_promo_active ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                                                </div>
+                                            </div>
+                                            
+                                            {formData.lp_config?.is_promo_active && (
+                                                <div className="space-y-2 animate-in fade-in zoom-in-95">
+                                                    <label className="text-[10px] font-black uppercase text-slate-400">Título da Promoção (Ex: Black Friday, Dia das Mães)</label>
+                                                    <input 
+                                                        type="text" 
+                                                        value={formData.lp_config?.promo_title || ''} 
+                                                        onChange={e => setFormData({ ...formData, lp_config: { ...(formData.lp_config || {}), promo_title: e.target.value } })} 
+                                                        className="w-full h-12 bg-rose-500/10 border border-rose-500/30 rounded-xl px-4 font-bold text-sm text-rose-100 outline-none focus:border-rose-400 transition-all placeholder:text-rose-500/30" 
+                                                        placeholder="Natal, Relâmpago..."
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </section>
