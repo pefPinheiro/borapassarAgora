@@ -154,6 +154,20 @@ const ProfessorProfile: React.FC = () => {
 
     const mainBanner = teacherData.ad_images && teacherData.ad_images.length > 0 ? teacherData.ad_images[0] : null;
 
+    const bioContentClass = `
+        professor-bio-content
+        prose prose-slate prose-lg max-w-none 
+        text-slate-700 font-medium leading-relaxed
+        prose-headings:text-slate-900 prose-headings:font-black prose-headings:uppercase prose-headings:tracking-tighter
+        prose-h2:text-3xl prose-h2:border-b prose-h2:border-slate-100 prose-h2:pb-4 prose-h2:mt-12
+        prose-h3:text-xl prose-h3:text-[#137fec]
+        prose-p:mb-6
+        prose-li:marker:text-[#137fec] prose-li:mb-2
+        prose-strong:text-slate-900 prose-strong:font-black
+        prose-blockquote:border-l-4 prose-blockquote:border-[#137fec] prose-blockquote:bg-blue-50/50 prose-blockquote:p-8 prose-blockquote:rounded-r-3xl prose-blockquote:italic prose-blockquote:text-lg prose-blockquote:text-slate-600
+        prose-img:rounded-[40px] prose-img:shadow-2xl
+    `;
+
     if (viewMode === 'preview') {
         return (
             <div className="max-w-6xl mx-auto pb-20 animate-in fade-in zoom-in-95 duration-700">
@@ -212,13 +226,55 @@ const ProfessorProfile: React.FC = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-16 px-6">
                     <div className="lg:col-span-8 space-y-12">
                         {/* Bio Section */}
-                        <div className="space-y-6">
-                            <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-4">
-                                <span className="size-2 bg-[#137fec] rounded-full" />
-                                Sobre o Professor
+                        <div className="space-y-10">
+                            <style>{`
+                                .professor-bio-content h2 { 
+                                    font-size: 1.875rem; 
+                                    line-height: 2.25rem; 
+                                    font-weight: 900; 
+                                    text-transform: uppercase; 
+                                    letter-spacing: -0.05em; 
+                                    margin-top: 3rem; 
+                                    border-bottom: 2px solid #f1f5f9; 
+                                    padding-bottom: 1rem;
+                                    color: #0f172a;
+                                }
+                                .professor-bio-content h3 { 
+                                    font-size: 1.25rem; 
+                                    font-weight: 900; 
+                                    color: #137fec; 
+                                    margin-top: 2rem;
+                                    text-transform: uppercase;
+                                }
+                                .professor-bio-content p { margin-bottom: 1.5rem; line-height: 1.8; }
+                                .professor-bio-content ul { list-style-type: none; padding-left: 0.5rem; }
+                                .professor-bio-content ul li { position: relative; padding-left: 1.5rem; margin-bottom: 0.75rem; }
+                                .professor-bio-content ul li::before { 
+                                    content: "•"; 
+                                    color: #137fec; 
+                                    font-weight: 900; 
+                                    position: absolute; 
+                                    left: 0; 
+                                    font-size: 1.2rem;
+                                }
+                                .professor-bio-content blockquote { 
+                                    border-left: 4px solid #137fec; 
+                                    background: #f8fafc; 
+                                    padding: 2rem; 
+                                    border-radius: 0 2rem 2rem 0; 
+                                    font-style: italic; 
+                                    color: #475569;
+                                    margin: 2rem 0;
+                                }
+                                .professor-bio-content strong { color: #0f172a; font-weight: 900; }
+                                .professor-bio-content hr { border: 0; border-top: 2px solid #f1f5f9; margin: 3rem 0; }
+                            `}</style>
+                            <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-4">
+                                <span className="w-10 h-[2px] bg-[#137fec]" />
+                                Biografia & Trajetória
                             </h3>
                             <div 
-                                className="prose prose-slate prose-lg max-w-none text-slate-700 font-medium leading-relaxed"
+                                className={bioContentClass}
                                 dangerouslySetInnerHTML={{ __html: teacherData.description || '<p class="text-slate-400 italic">Nenhuma biografia cadastrada.</p>' }}
                             />
                         </div>
