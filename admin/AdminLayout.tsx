@@ -96,6 +96,14 @@ const AdminLayout: React.FC = () => {
         { id: 'faq', icon: 'help', label: 'FAQ', path: '/admin/faq' },
         { id: 'chat', icon: 'chat', label: 'Chat', path: '/admin/chat' },
       ]
+    },
+    {
+      id: 'perfil_docente',
+      label: 'Área do Professor',
+      icon: 'workspace_premium',
+      items: [
+        { id: 'perfil-professor', icon: 'account_circle', label: 'Meu Perfil Público', path: '/admin/perfil-professor' },
+      ]
     }
   ];
 
@@ -118,6 +126,7 @@ const AdminLayout: React.FC = () => {
     if (!profile) return false;
     if (profile.role === 'super') return true; // Super Admin vê tudo
     if (moduleId === 'dashboard') return true; // Dashboard é a home, sempre permitida se ativo
+    if (moduleId === 'perfil-professor' && profile.role === 'teacher') return true; // Professor vê seu próprio perfil
     const allowed = profile.allowed_modules || [];
     return allowed.includes(moduleId);
   };
@@ -315,7 +324,9 @@ const AdminLayout: React.FC = () => {
                 .find(item => location.pathname.startsWith(item.path));
 
               // 3. Special Routes whitelist (Config is always allowed for logged users)
-              const isWhitelisted = location.pathname.includes('/admin/config') || location.pathname.includes('/admin/mail');
+              const isWhitelisted = location.pathname.includes('/admin/config') || 
+                                  location.pathname.includes('/admin/mail') || 
+                                  location.pathname.includes('/admin/perfil-professor');
 
               // 4. Check Access
               // If it matches a module, check permission. If not module and not whitelist, we might allow or block.

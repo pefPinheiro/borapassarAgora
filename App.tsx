@@ -57,6 +57,7 @@ import CadernosAdmin from './admin/CadernosAdmin';
 import InvestidoresAdmin from './admin/InvestidoresAdmin';
 import FinancialBalance from './admin/FinancialBalance';
 import ProfessorsAdmin from './admin/ProfessorsAdmin';
+import ProfessorProfile from './admin/ProfessorProfile';
 import StudentRedirect from './student/StudentRedirect';
 
 import RelaxHub from './student/relax/RelaxHub';
@@ -137,6 +138,7 @@ const App: React.FC = () => {
           <Route path="chat" element={<ChatAdmin />} />
           <Route path="mail" element={<MailAdmin />} />
           <Route path="config" element={<ProfileConfig />} />
+          <Route path="perfil-professor" element={<ProfessorProfile />} />
         </Route>
 
         {/* Catch-all */}
