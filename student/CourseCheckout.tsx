@@ -294,72 +294,103 @@ const CourseCheckout: React.FC = () => {
                         </div>
                     )}
                 </div>
-            </div>
-
-            {showTerms && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
-                    <div className="bg-white rounded-[40px] shadow-2xl border border-white max-w-xl w-full p-10 space-y-8 animate-in zoom-in-95 duration-300">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-6">
-                            <div>
-                                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">Termos de <span className="text-[#137fec]">Adesão.</span></h3>
-                                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mt-1">Leia com atenção antes de confirmar sua inscrição</p>
+                 {showTerms && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xl overflow-y-auto">
+                    <div className="bg-white rounded-[48px] shadow-2xl border border-white max-w-2xl w-full flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300 overflow-hidden">
+                        {/* Header do Modal */}
+                        <div className="bg-slate-50 p-8 md:p-10 border-b border-slate-100 flex items-center justify-between">
+                            <div className="space-y-1">
+                                <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter italic leading-none">Contrato de <span className="text-blue-500">Adesão.</span></h3>
+                                <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.3em]">Leia os detalhes da sua inscrição abaixo</p>
                             </div>
-                            <div className="size-12 bg-blue-50 rounded-2xl flex items-center justify-center text-[#137fec]">
-                                <span className="material-symbols-outlined font-bold">gavel</span>
+                            <div className="size-14 bg-white shadow-xl rounded-2xl flex items-center justify-center text-blue-500 border border-slate-100">
+                                <span className="material-symbols-outlined text-3xl">verified_user</span>
                             </div>
                         </div>
 
-                        <div className="max-h-[350px] overflow-y-auto pr-4 space-y-6 text-sm text-slate-600 custom-scrollbar text-justify font-medium leading-relaxed">
-                            <p>
-                                Ao clicar em "Confirmar e Pagar", você estará manifestando sua plena e expressa concordância com os Termos de Uso e a Política de Privacidade estipulados pela plataforma <strong>Bora Passar Agora</strong>.
-                            </p>
-                            <p>
-                                <strong>1. Objeto e Liberação de Acesso:</strong> O produto objeto desta transação é um material exclusivamente digital, desprovido de videoaulas. O conteúdo adquirido engloba: <strong>Apostilas Interativas, Banco de Questões exclusivas e Simulados estrategicamente elaborados.</strong> O acesso a esses recursos será liberado em sua conta na plataforma logo após a confirmação sistêmica do pagamento via PIX.
-                            </p>
-                            <p>
-                                <strong>2. Direitos Autorais e Antipirataria:</strong> Todo o material oferecido é protegido pela Lei Geral de Direitos Autorais (Lei nº 9.610/98). É terminantemente proibida a cópia, reprodução, distribuição, rateio, venda ou compartilhamento – pago ou gratuito – de qualquer parte deste conteúdo. A plataforma possui rastreamento por IP, metadados em PDF e bloqueio automático para acessos simultâneos não autorizados. Identificadas infrações, a conta será bloqueada sem aviso prévio, e as medidas judiciais cabíveis serão adotadas.
-                            </p>
-                            <div className="p-5 bg-blue-50 text-blue-900 rounded-2xl border border-blue-200">
-                                <h4 className="font-black uppercase tracking-widest text-[10px] mb-2 flex items-center gap-2"><span className="material-symbols-outlined text-sm">update</span> Atualização do Material</h4>
-                                <p className="text-xs">
-                                    O <strong>Bora Passar Agora</strong> se reserva o direito de realizar atualizações contínuas no material. Você terá acesso aos simulados e questões mais recentes adicionados ao pacote enquanto sua matrícula estiver vigente.
-                                </p>
+                        {/* Corpo do Modal - Resumo em Destaque */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            <div className="p-8 md:p-10 space-y-10">
+                                
+                                {/* Box de Destaque dos Dados do Curso */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="md:col-span-3 p-6 bg-blue-600 text-white rounded-[32px] shadow-lg shadow-blue-500/20 relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 size-32 bg-white/10 rounded-full -translate-x-1/2 -translate-y-1/2 blur-2xl"></div>
+                                        <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-60 mb-2">Você está adquirindo:</p>
+                                        <h4 className="text-2xl font-black italic leading-tight">{course.title}</h4>
+                                    </div>
+                                    <div className="p-5 bg-slate-50 border border-slate-100 rounded-3xl text-center">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Investimento</p>
+                                        <p className="text-xl font-black text-slate-900 leading-none">R$ {currentPrice.toFixed(2).replace('.', ',')}</p>
+                                    </div>
+                                    <div className="p-5 bg-slate-50 border border-slate-100 rounded-3xl text-center">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Duração do Acesso</p>
+                                        <p className="text-xl font-black text-slate-900 leading-none">{course.access_days || 365} Dias</p>
+                                    </div>
+                                    <div className="p-5 bg-slate-50 border border-slate-100 rounded-3xl text-center">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Conteúdo</p>
+                                        <p className="text-xl font-black text-slate-900 leading-none italic uppercase">Digital</p>
+                                    </div>
+                                </div>
+
+                                {/* Texto dos Termos */}
+                                <div className="space-y-6 text-sm text-slate-600 font-medium leading-relaxed">
+                                    <div className="space-y-4 text-justify">
+                                        <p>
+                                            Ao confirmar esta inscrição, você declara estar ciente de que o <strong>Bora Passar Agora</strong> fornece um ecossistema de aprendizagem estratégica focado em desempenho.
+                                        </p>
+                                        
+                                        <div className="p-6 bg-amber-50 rounded-3xl border border-amber-100 text-amber-900 space-y-4">
+                                            <h5 className="font-black text-xs uppercase tracking-widest flex items-center gap-2"><span className="material-symbols-outlined text-lg">database</span> Sobre o Acervo de Questões</h5>
+                                            <p className="text-xs leading-relaxed">
+                                                Declaramos que o volume de questões disponível na plataforma é dinâmico e diversificado, incluindo: **Questões de múltiplas Bancas Examinadoras** (focadas no edital), **Questões Inéditas** (desenvolvidas por nosso time pedagógico), questões vinculadas a **módulos interativos**, além de acesso integral a **Cadernos** e **Simulados** periódicos.
+                                            </p>
+                                        </div>
+
+                                        <p>
+                                            <strong>1. Direitos sobre o Conteúdo:</strong> O material é protegido pela Lei de Direitos Autorais. A cópia, o rateio, a venda ou o compartilhamento das credenciais de acesso é crime e resultará em banimento imediato sem restituição de valores, além de sanções civis e criminais.
+                                        </p>
+
+                                        <p>
+                                            <strong>2. Prazo de Garantia:</strong> Respeitamos integralmente o seu direito de arrependimento (Art. 49 do CDC). Você tem o prazo incondicional de **7 (sete) dias corridos** para solicitar o cancelamento e obter reembolso total, caso o material não atenda suas expectativas.
+                                        </p>
+
+                                        <p>
+                                            <strong>3. Atualizações:</strong> Por se tratar de um material digital para concursos, atualizações de novos Simulados e questões ocorrerão conforme necessidade pedagógica e publicações de novos editais/retificações durante o seu período de acesso.
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                            <p>
-                                <strong>3. Garantia e Devolução:</strong> Em conformidade com o Artigo 49 do Código de Defesa do Consumidor, garantimos a você o "Direito de Arrependimento". Caso sinta que o material não condiz com as suas expectativas, você poderá solicitar o cancelamento e reembolso de 100% do seu investimento no prazo máximo de <strong>7 (sete) dias corridos</strong> a partir da data e hora da liberação do pagamento.
-                            </p>
-                            <p>
-                                Ao prosseguir, declaro sob as penas da lei ter lido e compreendido perfeitamente os termos acima.
-                            </p>
                         </div>
 
-                        <div className="pt-6 border-t border-slate-100">
-                            <label className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all cursor-pointer ${agreed ? 'bg-blue-50 border-[#137fec] text-[#137fec]' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 group'}`}>
+                        {/* Footer do Modal com Checkbox e Submissão */}
+                        <div className="p-8 md:p-10 bg-slate-50 border-t border-slate-100 space-y-6">
+                            <label className={`flex items-center gap-4 p-5 rounded-3xl border-2 transition-all cursor-pointer ${agreed ? 'bg-blue-600 border-blue-600 text-white shadow-xl shadow-blue-500/20' : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300'}`}>
                                 <input 
                                     type="checkbox" 
                                     checked={agreed} 
                                     onChange={e => setAgreed(e.target.checked)} 
-                                    className="size-6 text-[#137fec] border-2 border-slate-300 rounded-lg focus:ring-[#137fec]" 
+                                    className="size-6 text-blue-600 border-2 border-slate-300 rounded-lg focus:ring-blue-500" 
                                 />
-                                <span className="font-black uppercase tracking-widest text-[11px] group-hover:text-slate-900 transition-colors">Li e concordo expressamente com os termos</span>
+                                <span className={`font-black uppercase tracking-widest text-[11px] ${agreed ? 'text-white' : 'text-slate-500'}`}>Li e concordo com todos os termos acima</span>
                             </label>
 
-                            <div className="flex gap-4 mt-8">
+                            <div className="flex gap-4">
                                 <button 
                                     onClick={() => setShowTerms(false)} 
-                                    className="px-8 py-5 rounded-2xl font-black uppercase tracking-widest text-[#137fec] bg-blue-50 hover:bg-blue-100 transition-colors text-xs"
+                                    className="px-8 py-5 rounded-3xl font-black uppercase tracking-widest text-slate-400 bg-white border border-slate-200 hover:bg-slate-50 transition-colors text-xs"
                                 >
-                                    Voltar
+                                    Cancelar
                                 </button>
                                 <button 
                                     onClick={handlePlaceOrder} 
                                     disabled={!agreed || submitting} 
-                                    className={`flex-1 py-5 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all text-white text-xs ${agreed && !submitting ? 'bg-emerald-500 hover:bg-emerald-600 shadow-xl shadow-emerald-500/20' : 'bg-slate-200 cursor-not-allowed'}`}
+                                    className={`flex-1 py-5 rounded-3xl font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all text-white text-xs ${agreed && !submitting ? 'bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-600/30' : 'bg-slate-300 cursor-not-allowed'}`}
                                 >
                                     {submitting ? (
-                                        <><span className="material-symbols-outlined animate-spin">refresh</span> Processando...</>
+                                        <><span className="material-symbols-outlined animate-spin">refresh</span> Validando...</>
                                     ) : (
-                                        <><span className="material-symbols-outlined">check_circle</span> Confirmar Inscrição</>
+                                        <><span className="material-symbols-outlined">rocket_launch</span> Confirmar e Pagar</>
                                     )}
                                 </button>
                             </div>
