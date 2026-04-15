@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Questao, Alternativa, Disciplina, Assunto, Subassunto, Subsubassunto, TextBase, Profile } from '../types';
 import TiptapEditor from './TiptapEditor';
 import InteractiveQuestion from '../components/InteractiveQuestion';
+import QuestionSolver from '../components/QuestionSolver';
 
 // Interfaces extras para os selects
 interface Banca {
@@ -76,6 +77,8 @@ const QuestionsAdmin: React.FC = () => {
     banca_id: '',
     is_validada: undefined as boolean | undefined
   });
+
+  const [activeSolverQuestion, setActiveSolverQuestion] = useState<Questao | null>(null);
 
   const fileInputImportRef = useRef<HTMLInputElement>(null);
 
@@ -1383,6 +1386,13 @@ EXEMPLO DE ALTERNATIVAS:
                   </td>
                   <td className="px-8 py-6 text-right">
                     <div className="flex justify-end gap-2 transition-all">
+                      <button 
+                        onClick={() => setActiveSolverQuestion(q)} 
+                        className="size-10 flex items-center justify-center text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all" 
+                        title="Resolver Questão"
+                      >
+                        <span className="material-symbols-outlined text-[22px]">stylus</span>
+                      </button>
                       <button onClick={() => setPreviewQuestion(q)} className="size-10 flex items-center justify-center text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all" title="Visualizar Questão"><span className="material-symbols-outlined text-[22px]">visibility</span></button>
                       <button onClick={() => handleEdit(q)} className="size-10 flex items-center justify-center text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"><span className="material-symbols-outlined text-[22px]">edit</span></button>
                       <button onClick={() => handleDelete(q.id)} className="size-10 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><span className="material-symbols-outlined text-[22px]">delete</span></button>
@@ -1645,6 +1655,12 @@ EXEMPLO DE ALTERNATIVAS:
             </div>
           </div>
         </div>
+      )}
+      {activeSolverQuestion && (
+        <QuestionSolver 
+          questionText={activeSolverQuestion.enunciado.replace(/<[^>]*>/g, '')}
+          onClose={() => setActiveSolverQuestion(null)}
+        />
       )}
     </div>
   );
