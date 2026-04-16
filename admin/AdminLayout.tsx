@@ -128,7 +128,7 @@ const AdminLayout: React.FC = () => {
     if (!profile) return false;
     if (profile.role === 'super') return true; // Super Admin vê tudo
     if (moduleId === 'dashboard') return true; 
-    if ((moduleId === 'perfil-professor' || moduleId === 'guia-professor') && profile.role === 'teacher') return true; 
+    if ((moduleId === 'perfil-professor' || moduleId === 'guia-professor' || moduleId === 'resolver-questoes') && profile.role === 'teacher') return true; 
     const allowed = profile.allowed_modules || [];
     return allowed.includes(moduleId);
   };
