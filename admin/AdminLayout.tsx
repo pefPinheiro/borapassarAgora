@@ -103,6 +103,7 @@ const AdminLayout: React.FC = () => {
       icon: 'workspace_premium',
       items: [
         { id: 'perfil-professor', icon: 'account_circle', label: 'Meu Perfil Público', path: '/admin/perfil-professor' },
+        { id: 'resolver-questoes', icon: 'stylus', label: 'Resolver Questões', path: '/admin/resolver-questoes' },
         { id: 'guia-professor', icon: 'auto_stories', label: 'Guia de Uso Docente', path: '/admin/guia-professor' },
       ]
     }

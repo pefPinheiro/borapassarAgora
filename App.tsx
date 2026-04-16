@@ -60,6 +60,7 @@ import FinancialBalance from './admin/FinancialBalance';
 import ProfessorsAdmin from './admin/ProfessorsAdmin';
 import ProfessorProfile from './admin/ProfessorProfile';
 import ProfessorGuide from './admin/ProfessorGuide';
+import ResolverQuestoes from './admin/ResolverQuestoes';
 import StudentRedirect from './student/StudentRedirect';
 
 import RelaxHub from './student/relax/RelaxHub';
@@ -143,6 +144,7 @@ const App: React.FC = () => {
           <Route path="config" element={<ProfileConfig />} />
           <Route path="perfil-professor" element={<ProfessorProfile />} />
           <Route path="guia-professor" element={<ProfessorGuide />} />
+          <Route path="resolver-questoes" element={<ResolverQuestoes />} />
         </Route>
 
         {/* Catch-all */}
