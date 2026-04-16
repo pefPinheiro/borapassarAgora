@@ -178,6 +178,7 @@ export interface Apostila {
     questions: boolean;
     professional_validation?: boolean;
   };
+  is_resolution_notebook?: boolean;
 }
 
 export interface Teacher {

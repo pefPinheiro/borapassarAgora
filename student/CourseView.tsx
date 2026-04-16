@@ -60,6 +60,7 @@ const CourseView: React.FC = () => {
             apostila:apostilas (
                 id,
                 title,
+                is_resolution_notebook,
                 disciplina:disciplinas (name)
             )
         `)
@@ -236,8 +237,16 @@ const CourseView: React.FC = () => {
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
 
-  // Group items by discipline and effect to collapse all by default
-  const groupedItems = useMemo(() => items.reduce((acc: any, curr) => {
+  // Group standard apostilas
+  const groupedItems = useMemo(() => items.filter(i => !i.apostila?.is_resolution_notebook).reduce((acc: any, curr) => {
+    const disciplineName = curr.apostila?.disciplina?.name || 'Geral';
+    if (!acc[disciplineName]) acc[disciplineName] = [];
+    acc[disciplineName].push(curr);
+    return acc;
+  }, {}), [items]);
+
+  // Group resolution cadernos
+  const groupedResolutions = useMemo(() => items.filter(i => i.apostila?.is_resolution_notebook).reduce((acc: any, curr) => {
     const disciplineName = curr.apostila?.disciplina?.name || 'Geral';
     if (!acc[disciplineName]) acc[disciplineName] = [];
     acc[disciplineName].push(curr);
@@ -425,6 +434,7 @@ const CourseView: React.FC = () => {
             {[
               { id: 'apostilas', label: 'Manual de Estudo', icon: 'auto_stories' },
               { id: 'simulados', label: 'Laboratório (Simulados)', icon: 'speed' },
+              { id: 'resolucoes', label: 'Cadernos Resolvidos', icon: 'menu_book' },
               { id: 'materiais', label: 'Arsenal Extra', icon: 'token' }
             ].map(tab => (
               <button
@@ -440,15 +450,21 @@ const CourseView: React.FC = () => {
           </div>
 
           <div className="space-y-6">
-            {activeTab === 'apostilas' && (
+            {(activeTab === 'apostilas' || activeTab === 'resolucoes') && (
               <div className="space-y-10">
-                {Object.keys(groupedItems).length === 0 && (
-                  <div className="py-20 text-center bg-white rounded-[40px] border border-dashed border-slate-200">
-                    <span className="material-symbols-outlined text-slate-200 text-5xl mb-4">inventory_2</span>
-                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">Nesta trilha ainda não há materiais.</p>
-                  </div>
-                )}
-                {Object.entries(groupedItems).map(([discipline, disciplineItems]: [string, any]) => {
+                {(() => {
+                  const currentGroups = activeTab === 'apostilas' ? groupedItems : groupedResolutions;
+                  return (
+                    <>
+                      {Object.keys(currentGroups).length === 0 && (
+                        <div className="py-20 text-center bg-white rounded-[40px] border border-dashed border-slate-200">
+                          <span className="material-symbols-outlined text-slate-200 text-5xl mb-4">inventory_2</span>
+                          <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">
+                            {activeTab === 'apostilas' ? 'Nesta trilha ainda não há materiais.' : 'Nesta trilha ainda não há cadernos de resolução.'}
+                          </p>
+                        </div>
+                      )}
+                      {Object.entries(currentGroups).map(([discipline, disciplineItems]: [string, any]) => {
                   const isCollapsed = collapsedDisciplines.includes(discipline);
                   return (
                     <div key={discipline} className="space-y-4 bg-white/50 rounded-[40px] border border-slate-100 p-2 overflow-hidden shadow-sm">
@@ -509,6 +525,9 @@ const CourseView: React.FC = () => {
                     </div>
                   );
                 })}
+                    </>
+                  );
+                })()}
               </div>
             )}
 

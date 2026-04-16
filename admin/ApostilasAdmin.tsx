@@ -94,7 +94,8 @@ const ApostilasAdmin: React.FC = () => {
             subsubassuntos_ids: []
         } as any,
         commission_valid_until: '',
-        professor_id: null
+        professor_id: null,
+        is_resolution_notebook: false
     });
 
     // Cadernos State
@@ -303,7 +304,8 @@ const ApostilasAdmin: React.FC = () => {
                     subsubassuntos_ids: apostila.filters?.subsubassuntos_ids || []
                 },
                 commission_valid_until: apostila.commission_valid_until || '',
-                professor_id: apostila.professor_id || null
+                professor_id: apostila.professor_id || null,
+                is_resolution_notebook: apostila.is_resolution_notebook || false
             });
 
             fetchLinkedNotebooks(apostila.id);
@@ -328,7 +330,8 @@ const ApostilasAdmin: React.FC = () => {
                     subsubassuntos_ids: []
                 },
                 commission_valid_until: '',
-                professor_id: (currentUser?.role === 'teacher' && currentTeacher) ? currentTeacher.id : null
+                professor_id: (currentUser?.role === 'teacher' && currentTeacher) ? currentTeacher.id : null,
+                is_resolution_notebook: false
             });
             setNotebooks([]);
         }
@@ -1324,6 +1327,28 @@ const ApostilasAdmin: React.FC = () => {
                                                 {s === 'Ativo' ? 'Publicado' : 'Rascunho'}
                                             </button>
                                         ))}
+                                    </div>
+
+                                     <div className="space-y-4 pt-6 border-t border-white/5 mt-6">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="material-symbols-outlined text-purple-500">book_4</span>
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tipo de Apostila</label>
+                                        </div>
+                                        <label className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-2xl cursor-pointer group hover:border-purple-500/50 transition-all">
+                                            <div className="relative">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="peer appearance-none w-10 h-6 bg-slate-700 rounded-full checked:bg-purple-600 transition-all cursor-pointer"
+                                                    checked={formData.is_resolution_notebook || false}
+                                                    onChange={(e) => setFormData({ ...formData, is_resolution_notebook: e.target.checked })}
+                                                />
+                                                <div className="absolute top-1 left-1 size-4 bg-white rounded-full peer-checked:translate-x-4 transition-transform pointer-events-none shadow-sm"></div>
+                                            </div>
+                                            <div>
+                                                <span className="block text-xs font-black text-white group-hover:text-purple-400 transition-colors uppercase tracking-widest">Caderno de Resolução</span>
+                                                <span className="text-[9px] text-slate-500">Agrupa em uma aba separada de resolvidas pelo professor</span>
+                                            </div>
+                                        </label>
                                     </div>
 
                                     <div className="space-y-4 pt-6 border-t border-white/5 mt-6">
