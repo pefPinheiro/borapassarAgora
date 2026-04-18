@@ -18,6 +18,7 @@ const Simulados: React.FC = () => {
     const [assuntos, setAssuntos] = useState<Assunto[]>([]);
     const [allQuestions, setAllQuestions] = useState<Questao[]>([]);
     const [manualQuestionId, setManualQuestionId] = useState('');
+    const [sectionTitle, setSectionTitle] = useState('');
 
     const [editingSimulado, setEditingSimulado] = useState<Simulado | null>(null);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -25,7 +26,7 @@ const Simulados: React.FC = () => {
     const [previewQuestions, setPreviewQuestions] = useState<Questao[]>([]);
     const [previewLoading, setPreviewLoading] = useState(false);
     
-    const [formData, setFormData] = useState<Partial<Simulado & { questions: string[] }>>({
+    const [formData, setFormData] = useState<Partial<Simulado & { questions: { id: string, section?: string }[] }>>({
         title: '',
         banca_id: '',
         duration: 240,
@@ -84,7 +85,7 @@ const Simulados: React.FC = () => {
         if (simulado) {
             const { data: sqData } = await supabase
                 .from('simulado_questions')
-                .select('question_id')
+                .select('question_id, section')
                 .eq('simulado_id', simulado.id)
                 .order('position', { ascending: true });
 
@@ -102,7 +103,7 @@ const Simulados: React.FC = () => {
             setEditingSimulado(simulado);
             setFormData({
                 ...simulado,
-                questions: sqData?.map(q => q.question_id) || []
+                questions: sqData?.map(q => ({ id: q.question_id, section: q.section })) || []
             });
 
             // Buscar detalhes das questões para exibição no formulário
@@ -143,10 +144,11 @@ const Simulados: React.FC = () => {
 
     const toggleQuestion = (id: string) => {
         const current = formData.questions || [];
-        if (current.includes(id)) {
-            setFormData({ ...formData, questions: current.filter(qid => qid !== id) });
+        if (current.some(q => q.id === id)) {
+            setFormData({ ...formData, questions: current.filter(q => q.id !== id) });
         } else {
-            setFormData({ ...formData, questions: [...current, id] });
+            setFormData({ ...formData, questions: [...current, { id, section: sectionTitle }] });
+            setSectionTitle('');
         }
     };
 
@@ -160,7 +162,7 @@ const Simulados: React.FC = () => {
         
         const id = match ? match[0] : rawInput;
         
-        if (formData.questions?.includes(id)) {
+        if (formData.questions?.some(q => q.id === id)) {
             alert('Esta questão já está no simulado.');
             setManualQuestionId('');
             return;
@@ -187,9 +189,10 @@ const Simulados: React.FC = () => {
 
         setFormData({
             ...formData,
-            questions: [...(formData.questions || []), q.id]
+            questions: [...(formData.questions || []), { id: q.id, section: sectionTitle }]
         });
         setManualQuestionId('');
+        setSectionTitle('');
     };
 
     const moveQuestion = (index: number, direction: 'up' | 'down') => {
@@ -226,10 +229,11 @@ const Simulados: React.FC = () => {
             await supabase.from('simulado_questions').delete().eq('simulado_id', simuladoId);
 
             if (formData.questions && formData.questions.length > 0) {
-                const sqPayload = formData.questions.map((qid, index) => ({
+                const sqPayload = formData.questions.map((q, index) => ({
                     simulado_id: simuladoId,
-                    question_id: qid,
-                    position: index
+                    question_id: q.id,
+                    position: index,
+                    section: q.section || null
                 }));
                 const { error: sqError } = await supabase.from('simulado_questions').insert(sqPayload);
                 if (sqError) throw sqError;
@@ -267,6 +271,7 @@ const Simulados: React.FC = () => {
                 .select(`
                     question_id,
                     position,
+                    section,
                     questao:questions (
                         *,
                         alternativas,
@@ -278,7 +283,7 @@ const Simulados: React.FC = () => {
                 .order('position', { ascending: true });
 
             if (error) throw error;
-            setPreviewQuestions(data?.map((d: any) => d.questao) || []);
+            setPreviewQuestions(data?.map((d: any) => ({ ...d.questao, section: d.section })) || []);
         } catch (error) {
             console.error('Error fetching preview questions:', error);
             alert('Erro ao carregar preview do simulado');
@@ -409,7 +414,7 @@ const Simulados: React.FC = () => {
                             </div>
                             <div className="space-y-3">
                                 {(() => {
-                                    const selectedQs = allQuestions.filter(q => formData.questions?.includes(q.id));
+                                    const selectedQs = allQuestions.filter(q => formData.questions?.some(fq => fq.id === q.id));
                                     const discIds = Array.from(new Set(selectedQs.map(q => q.disciplina_id))).filter(Boolean);
 
                                     if (discIds.length === 0) {
@@ -459,12 +464,19 @@ const Simulados: React.FC = () => {
                                 <div className="flex-1">
                                     <input
                                         type="text"
+                                        placeholder="Título da Sessão (Opcional - Ex: Língua Portuguesa)"
+                                        value={sectionTitle}
+                                        onChange={e => setSectionTitle(e.target.value)}
+                                        className="w-full h-14 px-6 mb-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm placeholder:text-slate-400 focus:border-blue-500 transition-all font-mono"
+                                    />
+                                    <input
+                                        type="text"
                                         placeholder="Cole aqui o UUID da questão (ex: 550e8400-e29b-41d4-a716-446655440000)"
                                         value={manualQuestionId}
                                         onChange={e => setManualQuestionId(e.target.value)}
                                         className="w-full h-14 px-6 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm placeholder:text-slate-400 focus:border-blue-500 transition-all font-mono"
                                     />
-                                    <p className="text-[10px] font-bold text-slate-400 mt-2 px-2 uppercase tracking-tight">O simulado é montado exclusivamente através da colagem dos IDs das questões.</p>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-2 px-2 uppercase tracking-tight">O simulado é montado exclusivamente através da colagem dos IDs das questões. Título da sessão ficará antes da questão inserida.</p>
                                 </div>
                                 <button 
                                     onClick={handleAddManualId}
@@ -505,7 +517,8 @@ const Simulados: React.FC = () => {
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-1 gap-4">
-                                        {formData.questions?.map((qid, idx) => {
+                                        {formData.questions?.map((qItem, idx) => {
+                                            const qid = qItem.id;
                                             const q = allQuestions.find(x => x.id === qid);
                                             if (!q) return (
                                                 <div key={qid} className="p-6 bg-slate-50 border border-slate-200 rounded-3xl flex items-center justify-between animate-pulse">
@@ -514,8 +527,49 @@ const Simulados: React.FC = () => {
                                                 </div>
                                             );
                                             return (
-                                                <div key={qid} className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm hover:border-blue-200 transition-all group relative">
-                                                    <div className="flex gap-6">
+                                                <div key={qid} className="group/item relative">
+                                                    {!qItem.section && (
+                                                        <div className="opacity-0 group-hover/item:opacity-100 flex justify-center -mb-2 mt-2 relative z-10 transition-opacity">
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const newQs = [...(formData.questions || [])];
+                                                                    newQs[idx].section = 'Nova Sessão';
+                                                                    setFormData({ ...formData, questions: newQs });
+                                                                }}
+                                                                className="bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-blue-200 transition-colors shadow-sm flex items-center gap-1"
+                                                            >
+                                                                <span className="material-symbols-outlined text-xs">add</span> Adicionar Título
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    {qItem.section && (
+                                                        <div className="bg-blue-50 text-blue-800 font-black px-6 py-3 rounded-2xl mt-4 mb-4 text-sm uppercase tracking-widest border border-blue-200 flex items-center gap-2">
+                                                            <span className="material-symbols-outlined">label</span>
+                                                            <input 
+                                                                type="text" 
+                                                                value={qItem.section} 
+                                                                onChange={(e) => {
+                                                                    const newQs = [...(formData.questions || [])];
+                                                                    newQs[idx].section = e.target.value;
+                                                                    setFormData({ ...formData, questions: newQs });
+                                                                }}
+                                                                className="bg-transparent outline-none flex-1 placeholder:text-blue-300"
+                                                                placeholder="Título da Sessão"
+                                                            />
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const newQs = [...(formData.questions || [])];
+                                                                    delete newQs[idx].section;
+                                                                    setFormData({ ...formData, questions: newQs });
+                                                                }}
+                                                                className="text-blue-400 hover:text-blue-600"
+                                                            >
+                                                                <span className="material-symbols-outlined text-sm">close</span>
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm hover:border-blue-200 transition-all group relative">
+                                                        <div className="flex gap-6">
                                                         <div className="flex flex-col items-center gap-2">
                                                             <div className="size-10 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-sm shadow-lg">
                                                                 {idx + 1}
@@ -562,6 +616,7 @@ const Simulados: React.FC = () => {
                                                                     Remover
                                                                 </button>
                                                             </div>
+                                                        </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -713,8 +768,19 @@ const Simulados: React.FC = () => {
                                 </div>
                             ) : (
                                 previewQuestions.map((q, idx) => (
-                                    <div key={q.id} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm relative group">
-                                        <div className="absolute -left-4 top-8 size-8 bg-slate-900 text-white rounded-lg flex items-center justify-center font-black text-xs shadow-xl">{idx + 1}</div>
+                                    <div key={q.id}>
+                                        {(q as any).section && (
+                                            <div className="mb-6 mt-10 pb-2 border-b-2 border-slate-200 flex items-center gap-3">
+                                                <div className="size-8 rounded-lg bg-[#137fec] text-white flex items-center justify-center">
+                                                    <span className="material-symbols-outlined text-sm">menu_book</span>
+                                                </div>
+                                                <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest">
+                                                    {(q as any).section}
+                                                </h2>
+                                            </div>
+                                        )}
+                                        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm relative group">
+                                            <div className="absolute -left-4 top-8 size-8 bg-slate-900 text-white rounded-lg flex items-center justify-center font-black text-xs shadow-xl">{idx + 1}</div>
                                         
                                         <div className="flex flex-wrap gap-2 mb-6">
                                             <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded font-black text-[9px] uppercase tracking-widest">{q.bancas?.name}</span>
@@ -745,6 +811,7 @@ const Simulados: React.FC = () => {
                                                 <div className="text-sm font-medium text-slate-600 italic leading-relaxed break-words [&_*]:max-w-full" dangerouslySetInnerHTML={{ __html: q.resposta_professor }}></div>
                                             </div>
                                         )}
+                                        </div>
                                     </div>
                                 ))
                             )}

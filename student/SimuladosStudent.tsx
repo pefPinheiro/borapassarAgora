@@ -87,6 +87,7 @@ const SimuladosStudent: React.FC = () => {
                 .select(`
                     question_id,
                     position,
+                    section,
                     questao:questions (
                         *,
                         alternativas,
@@ -111,7 +112,7 @@ const SimuladosStudent: React.FC = () => {
             setDisciplineWeights(wMap);
 
             // Map correctly to Questao objects
-            const qs = qData.map(item => (item.questao as any));
+            const qs = qData.map(item => ({ ...(item.questao as any), section: item.section }));
             setQuestions(qs);
             setStatus('ready');
         } catch (error) {
@@ -413,6 +414,16 @@ const SimuladosStudent: React.FC = () => {
 
                             return (
                                 <div key={q.id} className="relative group break-inside-avoid">
+                                    {(q as any).section && (
+                                        <div className="mb-10 mt-16 pb-4 border-b-2 border-slate-200 print:border-black print:mt-12 print:mb-6 flex items-center gap-4">
+                                            <div className="size-10 rounded-xl bg-slate-900 text-white flex items-center justify-center print:hidden">
+                                                <span className="material-symbols-outlined">menu_book</span>
+                                            </div>
+                                            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-widest print:text-black print:text-xl">
+                                                {(q as any).section}
+                                            </h2>
+                                        </div>
+                                    )}
                                     {showTextBase && (
                                         <div className="mb-6 p-6 bg-slate-50 border-l-4 border-slate-900 print:bg-transparent print:border-l-2 print:border-black print:p-0 print:pl-4 print:mb-4 break-inside-avoid">
                                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 print:text-black">Texto Base para as questões a seguir</p>

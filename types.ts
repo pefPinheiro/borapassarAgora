@@ -133,6 +133,7 @@ export interface SimuladoQuestion {
   simulado_id: string;
   question_id: string;
   position: number;
+  section?: string;
   created_at: string;
   // Joins
   questao?: Questao;
