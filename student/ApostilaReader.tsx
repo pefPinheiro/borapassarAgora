@@ -342,7 +342,8 @@ const ApostilaReader: React.FC = () => {
 
         // 2. Regex flexível para capturar IDs de questões e vídeos
         // Permite "QUESTÃO INTERATIVA ID", "QUESTÃO INTERATIVA" e o novo formato "quest_id"
-        const tagRegex = /\[\s*(?:QUESTÃO INTERATIVA ID|QUESTÃO INTERATIVA|VÍDEO AULA|quest_id)\s*[:=]\s*(?:")?([^"\]]+)(?:")?\s*\]/gi;
+        // E o NOVO formato "QUESTÃO JSON" via bloco safer [--QUESTAO-JSON--]
+        const tagRegex = /\[\s*(?:QUESTÃO INTERATIVA ID|QUESTÃO INTERATIVA|VÍDEO AULA|quest_id)\s*[:=]\s*(?:")?([^"\]]+)(?:")?\s*\]|\[--QUESTAO-JSON--\]([\s\S]*?)\[\/--QUESTAO-JSON--\]/gi;
 
         // ... (custom tags replacement code lines 229-234 remain unchanged efficiently) ...
         // PROCESSAMENTO DE TAGS PERSONALIZADAS (Visual Vibrant Pop)
@@ -387,11 +388,30 @@ const ApostilaReader: React.FC = () => {
                 }
             }
 
-            const rawId = match[1].trim().replace(/<[^>]*>/g, ''); // Limpeza de HTML residual interno
+            const rawId = match[1]?.trim().replace(/<[^>]*>/g, '') || ''; // match[1] para tags normais
+            const jsonContent = match[2]?.trim(); // match[2] para [--QUESTAO-JSON--]
             const fullTag = match[0].toUpperCase();
 
             // Lógica unificada para detectar se é questão (support old and new formats)
-            if (fullTag.includes('QUESTÃO') || fullTag.includes('QUEST_ID')) {
+            if (jsonContent) {
+                try {
+                    // Limpar possíveis tags HTML que o editor pode ter inserido dentro do bloco JSON
+                    const cleanJson = jsonContent.replace(/<[^>]*>/g, '');
+                    const questionData = JSON.parse(cleanJson);
+                    parts.push(
+                        <div key={`q-json-${match.index}`} className="my-16 print:my-4">
+                            <InteractiveQuestion question={questionData} />
+                        </div>
+                    );
+                } catch (err) {
+                    console.error("Erro ao processar JSON da questão:", err);
+                    parts.push(
+                        <div key={`q-json-error-${match.index}`} className="my-8 p-4 bg-red-50 border border-red-100 rounded-xl text-red-500 text-[10px] font-bold uppercase tracking-widest text-center">
+                            Erro ao processar JSON da questão externa
+                        </div>
+                    );
+                }
+            } else if (fullTag.includes('QUESTÃO') || fullTag.includes('QUEST_ID')) {
                 parts.push(
                     <div key={`q-wrap-${rawId}-${match.index}`} className="my-16 print:my-4">
                         <InteractiveQuestion id={rawId} />

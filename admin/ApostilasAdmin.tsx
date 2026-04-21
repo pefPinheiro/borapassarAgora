@@ -596,7 +596,7 @@ const ApostilasAdmin: React.FC = () => {
         }
     };
 
-    const insertTag = (tagType: 'question' | 'video' | 'image' | 'math' | 'exemplo' | 'lei' | 'correcao' | 'resolve') => {
+    const insertTag = (tagType: 'question' | 'quest_json' | 'video' | 'image' | 'math' | 'exemplo' | 'lei' | 'correcao' | 'resolve') => {
         if (tagType === 'resolve') {
             const num = window.prompt("Número da Questão:", "01");
             if (num === null) return;
@@ -608,6 +608,30 @@ const ApostilasAdmin: React.FC = () => {
                 <p>[/--SOLUCAO--]</p>
                 <p>[/--RESOLVE--]</p>
             `);
+            return;
+        }
+
+        if (tagType === 'quest_json') {
+            const template = `
+<p>[--QUESTAO-JSON--]</p>
+<pre>
+{
+  "enunciado": "Digite o enunciado da questão externa aqui...",
+  "alternativas": [
+    { "id": "1", "texto": "Opção A", "isCorreta": true },
+    { "id": "2", "texto": "Opção B", "isCorreta": false },
+    { "id": "3", "texto": "Opção C", "isCorreta": false },
+    { "id": "4", "texto": "Opção D", "isCorreta": false }
+  ],
+  "resposta_professor": "Explicação do professor aqui (opcional)",
+  "ano": 2024,
+  "bancas": { "name": "Banca Externa" },
+  "disciplinas": { "name": "Disciplina" }
+}
+</pre>
+<p>[/--QUESTAO-JSON--]</p>
+<p><br/></p>`;
+            editorRef.current?.insertContent(template);
             return;
         }
 
@@ -1088,6 +1112,10 @@ const ApostilasAdmin: React.FC = () => {
                                                 <button onClick={() => insertTag('question')} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95">
                                                     <span className="material-symbols-outlined text-[18px]">quiz</span>
                                                     <span className="hidden md:inline">Questão</span>
+                                                </button>
+                                                <button onClick={() => insertTag('quest_json')} className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg shadow-violet-500/20 active:scale-95">
+                                                    <span className="material-symbols-outlined text-[18px]">terminal</span>
+                                                    <span className="hidden md:inline">Questão JSON</span>
                                                 </button>
                                                 <button onClick={() => insertTag('math')} className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-500/20 active:scale-95">
                                                     <span className="material-symbols-outlined text-[18px]">calculate</span>

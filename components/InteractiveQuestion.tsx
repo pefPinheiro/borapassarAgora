@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 export interface InteractiveQuestionProps {
     id?: string;
     question?: {
-        id: string;
+        id?: string;
         enunciado: string;
         text_bases?: { content: string; title?: string } | null;
         texto_base?: string | null;
