@@ -337,35 +337,38 @@ const ApostilaReader: React.FC = () => {
             return processed;
         };
 
-        cleanContent = processMath(cleanContent);
-        cleanContent = processMarkdown(cleanContent);
+        // 1.8.7. Process All custom tags and formatting
+        const processAll = (text: string) => {
+            let processed = processMath(text);
+            processed = processMarkdown(processed);
+            
+            // PROCESSAMENTO DE TAGS PERSONALIZADAS (Visual Vibrant Pop)
+            processed = processed
+                .replace(/\[--AVISO--\]([\s\S]*?)\[\/--AVISO--\]/g, '<div class="custom-tag tag-aviso"><div class="tag-icon-box"><span class="material-symbols-outlined">warning</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Ponto de Atenção</strong></div><div class="tag-text">$1</div></div></div>')
+                .replace(/\[--IMPORTANTE--\]([\s\S]*?)\[\/--IMPORTANTE--\]/g, '<div class="custom-tag tag-importante"><div class="tag-icon-box"><span class="material-symbols-outlined">priority_high</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Importante</strong></div><div class="tag-text">$1</div></div></div>')
+                .replace(/\[--LEI--\]([\s\S]*?)\[\/--LEI--\]/g, '<div class="custom-tag tag-lei"><div class="tag-icon-box"><span class="material-symbols-outlined">gavel</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Lei Seca / Jurisprudência</strong></div><div class="tag-text">$1</div></div></div>')
+                .replace(/\[--LINK--\]([\s\S]*?)\[\/--LINK--\]/g, '<div class="custom-tag tag-link"><div class="tag-icon-box"><span class="material-symbols-outlined">link</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Recurso Extra</strong></div><div class="tag-text">$1</div></div></div>')
+                .replace(/\[--OBSERVE--\]([\s\S]*?)\[\/--OBSERVE--\]/gi, '<div class="custom-tag tag-observe"><div class="tag-icon-box"><span class="material-symbols-outlined">visibility</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Observe</strong></div><div class="tag-text">$1</div></div></div>')
+                .replace(/\[--FREQUENTE--\]([\s\S]*?)\[\/--FREQUENTE--\]/g, '<div class="custom-tag tag-frequente"><div class="tag-icon-box"><span class="material-symbols-outlined">local_fire_department</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Cai com Frequência</strong></div><div class="tag-text">$1</div></div></div>')
+                .replace(/\[--EXTRA--\]([\s\S]*?)\[\/--EXTRA--\]/g, '<div class="custom-tag tag-extra"><div class="tag-icon-box"><span class="material-symbols-outlined">add_circle</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Conteúdo Extra</strong></div><div class="tag-text">$1</div></div></div>')
+                .replace(/\[--NOVIDADE--\]([\s\S]*?)\[\/--NOVIDADE--\]/g, '<div class="custom-tag tag-novidade"><div class="tag-icon-box"><span class="material-symbols-outlined">auto_awesome</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Novidade</strong></div><div class="tag-text">$1</div></div></div>')
+                .replace(/\[--EXEMPLO--\]([\s\S]*?)\[\/--EXEMPLO--\]/g, '<div class="custom-tag tag-exemplo"><div class="tag-icon-box"><span class="material-symbols-outlined">lightbulb</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Exemplo</strong></div><div class="tag-text">$1</div></div></div>')
+                .replace(/\[--BORA-PRATICAR--\]([\s\S]*?)\[\/--BORA-PRATICAR--\]/g, '<div class="custom-tag tag-praticar"><div class="tag-icon-box"><span class="material-symbols-outlined">fitness_center</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Bora Praticar Agora!</strong></div><div class="tag-text">$1</div></div></div>')
+                .replace(/\[--CORRECAO--\]([\s\S]*?)\[\/--CORRECAO--\]/g, '<div class="custom-tag tag-correcao"><div class="tag-icon-box"><span class="material-symbols-outlined">edit_note</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Correção Necessária</strong></div><div class="tag-text">$1</div></div></div>')
+                .replace(/\[--TITULO--\]([\s\S]*?)\[\/--TITULO--\]/g, '<div class="custom-tag tag-titulo"><div class="tag-content-wrapper"><div class="tag-text">$1</div></div></div>')
+                .replace(/\[--RESOLVE:?\s*(\d+)?--\]([\s\S]*?)\[\/--RESOLVE--\]/gi, (match, numero, inner) => {
+                    const num = numero || "00";
+                    const cleanInner = inner.replace(/\[--SOLUCAO--\]([\s\S]*?)\[\/--SOLUCAO--\]/gi, '<div class="resolve-solution">$1</div>');
+                    return `<div class="tag-resolve"><div class="resolve-header"><span>BORA PASSAR ${num}</span></div><div class="resolve-body">${cleanInner}</div></div>`;
+                });
+            
+            return processed;
+        };
 
         // 2. Regex flexível para capturar IDs de questões e vídeos
         // Permite "QUESTÃO INTERATIVA ID", "QUESTÃO INTERATIVA" e o novo formato "quest_id"
         // E o NOVO formato "QUESTÃO JSON" via bloco safer [--QUESTAO-JSON--]
         const tagRegex = /\[\s*(?:QUESTÃO INTERATIVA ID|QUESTÃO INTERATIVA|VÍDEO AULA|quest_id)\s*[:=]\s*(?:")?([^"\]]+)(?:")?\s*\]|\[--QUESTAO-JSON--\]([\s\S]*?)\[\/--QUESTAO-JSON--\]/gi;
-
-        // ... (custom tags replacement code lines 229-234 remain unchanged efficiently) ...
-        // PROCESSAMENTO DE TAGS PERSONALIZADAS (Visual Vibrant Pop)
-        cleanContent = cleanContent
-            .replace(/\[--AVISO--\]([\s\S]*?)\[\/--AVISO--\]/g, '<div class="custom-tag tag-aviso"><div class="tag-icon-box"><span class="material-symbols-outlined">warning</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Ponto de Atenção</strong></div><div class="tag-text">$1</div></div></div>')
-            .replace(/\[--IMPORTANTE--\]([\s\S]*?)\[\/--IMPORTANTE--\]/g, '<div class="custom-tag tag-importante"><div class="tag-icon-box"><span class="material-symbols-outlined">priority_high</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Importante</strong></div><div class="tag-text">$1</div></div></div>')
-            .replace(/\[--LEI--\]([\s\S]*?)\[\/--LEI--\]/g, '<div class="custom-tag tag-lei"><div class="tag-icon-box"><span class="material-symbols-outlined">gavel</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Lei Seca / Jurisprudência</strong></div><div class="tag-text">$1</div></div></div>')
-            .replace(/\[--LINK--\]([\s\S]*?)\[\/--LINK--\]/g, '<div class="custom-tag tag-link"><div class="tag-icon-box"><span class="material-symbols-outlined">link</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Recurso Extra</strong></div><div class="tag-text">$1</div></div></div>')
-            .replace(/\[--OBSERVE--\]([\s\S]*?)\[\/--OBSERVE--\]/gi, '<div class="custom-tag tag-observe"><div class="tag-icon-box"><span class="material-symbols-outlined">visibility</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Observe</strong></div><div class="tag-text">$1</div></div></div>')
-            .replace(/\[--FREQUENTE--\]([\s\S]*?)\[\/--FREQUENTE--\]/g, '<div class="custom-tag tag-frequente"><div class="tag-icon-box"><span class="material-symbols-outlined">local_fire_department</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Cai com Frequência</strong></div><div class="tag-text">$1</div></div></div>')
-            .replace(/\[--EXTRA--\]([\s\S]*?)\[\/--EXTRA--\]/g, '<div class="custom-tag tag-extra"><div class="tag-icon-box"><span class="material-symbols-outlined">add_circle</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Conteúdo Extra</strong></div><div class="tag-text">$1</div></div></div>')
-            .replace(/\[--NOVIDADE--\]([\s\S]*?)\[\/--NOVIDADE--\]/g, '<div class="custom-tag tag-novidade"><div class="tag-icon-box"><span class="material-symbols-outlined">auto_awesome</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Novidade</strong></div><div class="tag-text">$1</div></div></div>')
-            .replace(/\[--EXEMPLO--\]([\s\S]*?)\[\/--EXEMPLO--\]/g, '<div class="custom-tag tag-exemplo"><div class="tag-icon-box"><span class="material-symbols-outlined">lightbulb</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Exemplo</strong></div><div class="tag-text">$1</div></div></div>')
-            .replace(/\[--BORA-PRATICAR--\]([\s\S]*?)\[\/--BORA-PRATICAR--\]/g, '<div class="custom-tag tag-praticar"><div class="tag-icon-box"><span class="material-symbols-outlined">fitness_center</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Bora Praticar Agora!</strong></div><div class="tag-text">$1</div></div></div>')
-            .replace(/\[--CORRECAO--\]([\s\S]*?)\[\/--CORRECAO--\]/g, '<div class="custom-tag tag-correcao"><div class="tag-icon-box"><span class="material-symbols-outlined">edit_note</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Correção Necessária</strong></div><div class="tag-text">$1</div></div></div>')
-            .replace(/\[--TITULO--\]([\s\S]*?)\[\/--TITULO--\]/g, '<div class="custom-tag tag-titulo"><div class="tag-content-wrapper"><div class="tag-text">$1</div></div></div>')
-            .replace(/\[--RESOLVE:?\s*(\d+)?--\]([\s\S]*?)\[\/--RESOLVE--\]/gi, (match, numero, inner) => {
-                const num = numero || "00";
-                const cleanInner = inner.replace(/\[--SOLUCAO--\]([\s\S]*?)\[\/--SOLUCAO--\]/gi, '<div class="resolve-solution">$1</div>');
-                return `<div class="tag-resolve"><div class="resolve-header"><span>BORA PASSAR ${num}</span></div><div class="resolve-body">${cleanInner}</div></div>`;
-            });
-
 
         // 3. Encontra todas as ocorrências e cria um array de partes
         const parts: React.ReactNode[] = [];
@@ -382,7 +385,7 @@ const ApostilaReader: React.FC = () => {
                         <div
                             key={`text-${lastIndex}`}
                             className="ql-editor p-0 mb-8"
-                            dangerouslySetInnerHTML={{ __html: textBefore }}
+                            dangerouslySetInnerHTML={{ __html: processAll(textBefore) }}
                         />
                     );
                 }
@@ -397,7 +400,8 @@ const ApostilaReader: React.FC = () => {
                 try {
                     // Limpar possíveis tags HTML que o editor pode ter inserido dentro do bloco JSON
                     const cleanJson = jsonContent.replace(/<[^>]*>/g, '');
-                    const questionData = JSON.parse(cleanJson);
+                    const safeJson = cleanJson.replace(/\\/g, '\\\\');
+                    const questionData = JSON.parse(safeJson);
                     parts.push(
                         <div key={`q-json-${match.index}`} className="my-16 print:my-4">
                             <InteractiveQuestion question={questionData} />
@@ -461,14 +465,15 @@ const ApostilaReader: React.FC = () => {
                     <div
                         key={`text-${lastIndex}`}
                         className="ql-editor p-0"
-                        dangerouslySetInnerHTML={{ __html: remainingText }}
+                        dangerouslySetInnerHTML={{ __html: processAll(remainingText) }}
                     />
                 );
             }
         }
 
         // Se não houver partes complexas, renderiza o conteúdo puro
-        return parts.length > 0 ? parts : <div className="ql-editor p-0" dangerouslySetInnerHTML={{ __html: cleanContent }} />;
+        // Se não houver partes complexas, renderiza o conteúdo puro processado
+        return parts.length > 0 ? parts : <div className="ql-editor p-0" dangerouslySetInnerHTML={{ __html: processAll(cleanContent) }} />;
     };
 
     if (loading) return (

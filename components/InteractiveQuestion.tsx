@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 
 export interface InteractiveQuestionProps {
     id?: string;
@@ -34,12 +36,169 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
 
     const activeQuestion = propQuestion || localQuestion;
 
+    const processMath = (text: string) => {
+        const cleanLatex = (tex: string) => {
+            return tex
+                .replace(/&amp;/gi, '&')      // Unescape & primeiro
+                .replace(/&lt;/gi, '<')
+                .replace(/&gt;/gi, '>')
+                .replace(/<br\s*\/?>/gi, ' ') // Substituir breaks por espaço
+                .replace(/<\/?(?:p|div|br|span|strong|b|em|i|u|s|h[1-6]|ol|ul|li|pre|code|font)\b[^>]*?>/gi, ' ') // Remover apenas tags HTML conhecidas
+                .replace(/\s+/g, ' ')           // Colapsar múltiplos espaços
+                .trim();
+        };
+
+        return text
+            // 1. Converte <code> com conteúdo LaTeX para texto puro para processamento
+            .replace(/<code>([\s\S]*?\\(?:frac|sqrt|cdot|times|sum|int|align|begin|quad|implies|iff|neg|lor|land)[\s\S]*?)<\/code>/gi, '$1')
+            
+            // 2. Display Mode: $$...$$ ou \[...\]
+            .replace(/\$\$([\s\S]*?)\$\$/g, (_, tex) => {
+                try {
+                    return katex.renderToString(cleanLatex(tex).replace(/\\\\/g, '\\'), { displayMode: true, throwOnError: false });
+                } catch { return _; }
+            })
+            .replace(/\\\[([\s\S]*?)\\\]/g, (_, tex) => {
+                try {
+                    return katex.renderToString(cleanLatex(tex).replace(/\\\\/g, '\\'), { displayMode: true, throwOnError: false });
+                } catch { return _; }
+            })
+            
+            // 3. Inline Mode: \(...\) ou $...$ (apenas se tiver caracteres matemáticos para evitar falsos positivos com $)
+            .replace(/\\\(([\s\S]*?)\\\)/g, (_, tex) => {
+                try {
+                    return katex.renderToString(cleanLatex(tex).replace(/\\\\/g, '\\'), { displayMode: false, throwOnError: false });
+                } catch { return _; }
+            })
+            .replace(/\$([^\n\$]+?)\$/g, (_, tex) => {
+                // Detectar se parece math (presença de \, ^, _, {, } ou operadores comuns)
+                if (/[\\^_\{\}\+\=\-\/\(\)]/.test(tex)) {
+                    try {
+                        return katex.renderToString(cleanLatex(tex).replace(/\\\\/g, '\\'), { displayMode: false, throwOnError: false });
+                    } catch { return _; }
+                }
+                return _;
+            })
+            
+            // 4. Ambientes diretos \begin{array} ... \end{array} que podem não estar em \[ \]
+            .replace(/\\begin\{array\}([\s\S]*?)\\end\{array\}/gi, (match) => {
+                try {
+                    return katex.renderToString(cleanLatex(match).replace(/\\\\/g, '\\'), { displayMode: true, throwOnError: false });
+                } catch { return match; }
+            });
+    };
+
+    const processMarkdown = (text: string) => {
+        let processed = text;
+        
+        // 0. Process Advanced Markdown Tables (GFM Standard)
+        const potentialTableBlockRegex = /((?:(?:<p>|<div>)?\s*(?:(?!<\/?(?:p|div)).)*?\|.*?(?:\s*|<\/p>|<\/div>|<br\s*\/?>)*){2,})/gi;
+        
+        processed = processed.replace(potentialTableBlockRegex, (block) => {
+            if (block.includes('\\begin') || block.includes('\\end')) return block;
+
+            const lines = block
+                .replace(/<(?:p|div|br\s*\/?)>/gi, '\n')
+                .replace(/<\/(?:p|div)>/gi, '\n')
+                .split('\n')
+                .map(l => l.trim())
+                .filter(l => l.includes('|'));
+
+            if (lines.length < 2) return block;
+
+            const parseMarkdownRow = (line: string) => {
+                let cleaned = line.trim();
+                if (cleaned.startsWith('|')) cleaned = cleaned.slice(1);
+                if (cleaned.endsWith('|')) cleaned = cleaned.slice(0, -1);
+                const parts = [];
+                let current = '';
+                for (let i = 0; i < cleaned.length; i++) {
+                    if (cleaned[i] === '|' && (i === 0 || cleaned[i-1] !== '\\')) {
+                        parts.push(current.trim());
+                        current = '';
+                    } else {
+                        current += cleaned[i];
+                    }
+                }
+                parts.push(current.trim());
+                return parts.map(p => p.replace(/\\\|/g, '|'));
+            };
+
+            const headerRow = parseMarkdownRow(lines[0]);
+            const dividerRow = parseMarkdownRow(lines[1]);
+            
+            const isDivider = dividerRow.every(c => /^[|:\s-]+$/.test(c)) && dividerRow.some(c => c.includes('-'));
+            if (!isDivider) return block;
+
+            const alignments = dividerRow.map(c => {
+                const start = c.startsWith(':');
+                const end = c.endsWith(':');
+                if (start && end) return 'center';
+                if (end) return 'right';
+                return 'left';
+            });
+
+            const bodyRows = lines.slice(2).map(parseMarkdownRow);
+
+            let html = '<div class="table-container my-12 animate-in fade-in zoom-in-95 duration-1000"><table>';
+            html += '<thead><tr>';
+            headerRow.forEach((h, i) => {
+                const align = alignments[i] || 'left';
+                html += `<th style="text-align: ${align}">${h}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            bodyRows.forEach(row => {
+                if (row.length === 0 || (row.length === 1 && row[0] === '')) return;
+                html += '<tr>';
+                for (let i = 0; i < headerRow.length; i++) {
+                    const align = alignments[i] || 'left';
+                    html += `<td style="text-align: ${align}">${row[i] || ''}</td>`;
+                }
+                html += '</tr>';
+            });
+
+            html += '</tbody></table></div>';
+            return html;
+        });
+
+        processed = processed.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+        processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        
+        const headerRegex = /(#{2,4})\s+((?:(?!(?:<br|<\/p>|<div>|\n)).)*)/gi;
+        
+        processed = processed.replace(headerRegex, (match, hashes, content) => {
+            const level = hashes.length;
+            return `<h${level}>${content.trim()}</h${level}>`;
+        });
+
+        processed = processed.replace(/<p>\s*<\/p>/g, '');
+        
+        return processed;
+    };
+
     // Process custom BPA tags (specifically [--OBSERVE--] as requested)
     const processContent = (text: string | null | undefined) => {
         if (!text) return '';
-        return text.replace(/\[--OBSERVE--\]([\s\S]*?)\[\/--OBSERVE--\]/gi, (match, content) => {
+        
+        // Handle newlines before processing math/markdown to ensure they don't break regex
+        // Also handle literal \n strings that often appear in JSON content
+        let processed = text
+            .replace(/\\n/g, '<br/>')
+            .replace(/\n/g, '<br/>');
+
+        processed = processMath(processed);
+        processed = processMarkdown(processed);
+        
+        processed = processed.replace(/\[--OBSERVE--\]([\s\S]*?)\[\/--OBSERVE--\]/gi, (match, content) => {
             return `<div class="custom-tag tag-observe"><div class="tag-icon-box"><span class="material-symbols-outlined">visibility</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Observe</strong></div><div class="tag-text">${content}</div></div></div>`;
         });
+
+        // Add SOLUCAO tags support
+        processed = processed.replace(/\[--SOLUCAO--\]([\s\S]*?)\[\/--SOLUCAO--\]/gi, '<div class="resolve-solution">$1</div>');
+        processed = processed.replace(/\[--SOLUÇÃO--\]([\s\S]*?)\[\/--SOLUÇÃO--\]/gi, '<div class="resolve-solution">$1</div>');
+
+        return processed;
     };
 
     useEffect(() => {
@@ -201,7 +360,7 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                                 <div className={`size-8 md:size-9 flex items-center justify-center text-xs md:text-sm font-black transition-all shrink-0 rounded-full border-2 mt-0.5 ${circleClass}`}>
                                     {showAsCorrect ? <span className="material-symbols-outlined text-[18px] md:text-[20px]">check</span> : String.fromCharCode(65 + idx)}
                                 </div>
-                                <span className="text-sm md:text-[15px] font-semibold text-slate-700 flex-1 premium-question-text break-words whitespace-normal min-w-0">{alt.texto}</span>
+                                <span className="text-sm md:text-[15px] font-semibold text-slate-700 flex-1 premium-question-text break-words whitespace-normal min-w-0" dangerouslySetInnerHTML={{ __html: processContent(alt.texto) }} />
                                 {showResult && isThisCorrect && <span className="material-symbols-outlined text-emerald-500 animate-in zoom-in text-xl md:text-2xl shrink-0">check_circle</span>}
                                 {showResult && isSelected && !isThisCorrect && <span className="material-symbols-outlined text-red-500 animate-in zoom-in text-xl md:text-2xl shrink-0">cancel</span>}
                             </button>
@@ -245,6 +404,8 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                 .premium-question-wrapper .tag-content-wrapper { padding: 1.5rem; flex: 1; }
                 .premium-question-wrapper .tag-body strong { display: block; text-transform: uppercase; font-size: 0.8rem; margin-bottom: 0.5rem; color: #0e7490; }
                 .premium-question-wrapper .tag-observe { border-right: 4px solid #0891b2; }
+                .premium-question-wrapper .resolve-solution { margin-top: 1.5rem; padding: 2rem; background-color: #f0f9ff; border-radius: 16px; border: 1px solid #bae6fd; position: relative; }
+                .premium-question-wrapper .resolve-solution::before { content: 'RESPOSTA E COMENTÁRIOS'; display: block; font-family: 'Lexend', sans-serif; font-size: 0.75rem; font-weight: 800; color: #0369a1; margin-bottom: 1rem; letter-spacing: 0.1em; }
             `}</style>
         </div>
     );
