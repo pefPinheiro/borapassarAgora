@@ -1088,7 +1088,16 @@ const CourseView: React.FC = () => {
                                       if (item.type === 'apostila' || item.type === 'resolvido') navigate(`/aluno/apostila/${item.ref_id}`);
                                       else if (item.type === 'simulado') navigate(`/aluno/simulado/${item.ref_id}`);
                                       else if (item.type === 'caderno') navigate(`/aluno/caderno/${item.ref_id}`);
-                                      else if (item.type === 'questao') navigate(`/aluno/questoes`);
+                                      else if (item.type === 'questao') {
+                                        const params = new URLSearchParams();
+                                        if (item.filters?.disciplina_id) params.append('disciplinas', item.filters.disciplina_id);
+                                        if (item.filters?.assunto_id) params.append('assuntos', item.filters.assunto_id);
+                                        if (item.filters?.subassunto_id) params.append('subassuntos', item.filters.subassunto_id);
+                                        if (item.filters?.banca_id) params.append('bancas', item.filters.banca_id);
+                                        if (item.filters?.ano) params.append('anos', item.filters.ano);
+                                        if (item.filters?.modalidade) params.append('modalidades', item.filters.modalidade);
+                                        navigate(`/aluno/questoes?${params.toString()}`);
+                                      }
                                       else if (item.url) window.open(item.url, '_blank');
                                     }}
                                     className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md ${

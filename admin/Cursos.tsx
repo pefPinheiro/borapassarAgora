@@ -110,6 +110,8 @@ const Cursos: React.FC = () => {
     const [bancas, setBancas] = useState<Banca[]>([]);
     const [disciplinas, setDisciplinas] = useState<Disciplina[]>([]);
     const [assuntos, setAssuntos] = useState<Assunto[]>([]);
+    const [subassuntos, setSubassuntos] = useState<any[]>([]);
+    const [subsubassuntos, setSubsubassuntos] = useState<any[]>([]);
 
     // Filters
     const [apostilaSearch, setApostilaSearch] = useState('');
@@ -207,6 +209,18 @@ const Cursos: React.FC = () => {
             else {
                 setAllSimulados(data || []);
             }
+        } catch (e) { console.error(e); }
+
+        // Fetch Subassuntos
+        try {
+            const { data } = await supabase.from('subassuntos').select('*').order('name');
+            setSubassuntos(data || []);
+        } catch (e) { console.error(e); }
+
+        // Fetch Subsubassuntos
+        try {
+            const { data } = await supabase.from('subsubassuntos').select('*').order('name');
+            setSubsubassuntos(data || []);
         } catch (e) { console.error(e); }
 
         // Fetch Notebooks
@@ -1190,6 +1204,120 @@ const Cursos: React.FC = () => {
                                                                     </span>
                                                                     <span className="material-symbols-outlined text-[18px] text-slate-400">search</span>
                                                                 </button>
+                                                            </div>
+                                                        )}
+
+                                                        {(item.type === 'questao') && (
+                                                            <div className="md:col-span-2 bg-slate-50/50 p-6 rounded-2xl border border-slate-100 space-y-4">
+                                                                <div className="flex items-center gap-2 mb-2">
+                                                                    <span className="material-symbols-outlined text-blue-500">tune</span>
+                                                                    <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Configurar Filtro Automático</p>
+                                                                </div>
+                                                                
+                                                                <div className="grid grid-cols-2 gap-4">
+                                                                    {/* Disciplina */}
+                                                                    <div className="space-y-1">
+                                                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Disciplina</label>
+                                                                        <select 
+                                                                            value={item.filters?.disciplina_id || ''} 
+                                                                            onChange={e => {
+                                                                                const newPlan = [...(formData.study_plan_json || [])];
+                                                                                newPlan[sIndex].items[iIndex].filters = { ...(newPlan[sIndex].items[iIndex].filters || {}), disciplina_id: e.target.value };
+                                                                                setFormData({ ...formData, study_plan_json: newPlan });
+                                                                            }}
+                                                                            className="w-full h-9 bg-white border border-slate-200 rounded-lg px-3 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
+                                                                        >
+                                                                            <option value="">Todas</option>
+                                                                            {disciplinas.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                                                        </select>
+                                                                    </div>
+
+                                                                    {/* Banca */}
+                                                                    <div className="space-y-1">
+                                                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Banca</label>
+                                                                        <select 
+                                                                            value={item.filters?.banca_id || ''} 
+                                                                            onChange={e => {
+                                                                                const newPlan = [...(formData.study_plan_json || [])];
+                                                                                newPlan[sIndex].items[iIndex].filters = { ...(newPlan[sIndex].items[iIndex].filters || {}), banca_id: e.target.value };
+                                                                                setFormData({ ...formData, study_plan_json: newPlan });
+                                                                            }}
+                                                                            className="w-full h-9 bg-white border border-slate-200 rounded-lg px-3 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
+                                                                        >
+                                                                            <option value="">Todas</option>
+                                                                            {bancas.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                                                        </select>
+                                                                    </div>
+
+                                                                    {/* Assunto */}
+                                                                    <div className="space-y-1">
+                                                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Assunto</label>
+                                                                        <select 
+                                                                            value={item.filters?.assunto_id || ''} 
+                                                                            onChange={e => {
+                                                                                const newPlan = [...(formData.study_plan_json || [])];
+                                                                                newPlan[sIndex].items[iIndex].filters = { ...(newPlan[sIndex].items[iIndex].filters || {}), assunto_id: e.target.value };
+                                                                                setFormData({ ...formData, study_plan_json: newPlan });
+                                                                            }}
+                                                                            className="w-full h-9 bg-white border border-slate-200 rounded-lg px-3 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
+                                                                        >
+                                                                            <option value="">Todos</option>
+                                                                            {assuntos.filter(a => !item.filters?.disciplina_id || a.disciplina_id === item.filters.disciplina_id).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                                                                        </select>
+                                                                    </div>
+
+                                                                    {/* Ano */}
+                                                                    <div className="space-y-1">
+                                                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Ano</label>
+                                                                        <select 
+                                                                            value={item.filters?.ano || ''} 
+                                                                            onChange={e => {
+                                                                                const newPlan = [...(formData.study_plan_json || [])];
+                                                                                newPlan[sIndex].items[iIndex].filters = { ...(newPlan[sIndex].items[iIndex].filters || {}), ano: e.target.value };
+                                                                                setFormData({ ...formData, study_plan_json: newPlan });
+                                                                            }}
+                                                                            className="w-full h-9 bg-white border border-slate-200 rounded-lg px-3 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
+                                                                        >
+                                                                            <option value="">Todos</option>
+                                                                            {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(y => <option key={y} value={y}>{y}</option>)}
+                                                                        </select>
+                                                                    </div>
+
+                                                                    {/* Subassunto */}
+                                                                    <div className="space-y-1">
+                                                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Subassunto</label>
+                                                                        <select 
+                                                                            value={item.filters?.subassunto_id || ''} 
+                                                                            onChange={e => {
+                                                                                const newPlan = [...(formData.study_plan_json || [])];
+                                                                                newPlan[sIndex].items[iIndex].filters = { ...(newPlan[sIndex].items[iIndex].filters || {}), subassunto_id: e.target.value };
+                                                                                setFormData({ ...formData, study_plan_json: newPlan });
+                                                                            }}
+                                                                            className="w-full h-9 bg-white border border-slate-200 rounded-lg px-3 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
+                                                                        >
+                                                                            <option value="">Todos</option>
+                                                                            {subassuntos.filter(s => !item.filters?.assunto_id || s.assunto_id === item.filters.assunto_id).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                                                        </select>
+                                                                    </div>
+
+                                                                    {/* Modalidade */}
+                                                                    <div className="space-y-1">
+                                                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Modalidade</label>
+                                                                        <select 
+                                                                            value={item.filters?.modalidade || ''} 
+                                                                            onChange={e => {
+                                                                                const newPlan = [...(formData.study_plan_json || [])];
+                                                                                newPlan[sIndex].items[iIndex].filters = { ...(newPlan[sIndex].items[iIndex].filters || {}), modalidade: e.target.value };
+                                                                                setFormData({ ...formData, study_plan_json: newPlan });
+                                                                            }}
+                                                                            className="w-full h-9 bg-white border border-slate-200 rounded-lg px-3 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
+                                                                        >
+                                                                            <option value="">Todas</option>
+                                                                            <option value="Multipla Escolha">Múltipla Escolha</option>
+                                                                            <option value="Certo/Errado">Certo/Errado</option>
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         )}
 

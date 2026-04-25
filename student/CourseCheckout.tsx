@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
@@ -30,13 +30,152 @@ const CourseCheckout: React.FC = () => {
 
     const [pixData, setPixData] = useState<{ qr_code: string; qr_code_base64: string } | null>(null);
     const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix');
+    const [mpLoaded, setMpLoaded] = useState(false);
+    const [cardBrickLoaded, setCardBrickLoaded] = useState(false);
+    const bricksBuilder = useRef<any>(null);
 
     useEffect(() => {
         if (id) {
             fetchCourse();
             fetchUser();
         }
+
+        // Load Mercado Pago SDK
+        const script = document.createElement('script');
+        script.src = 'https://sdk.mercadopago.com/js/v2';
+        script.async = true;
+        script.onload = () => setMpLoaded(true);
+        document.body.appendChild(script);
+
+        return () => {
+            if (document.body.contains(script)) document.body.removeChild(script);
+        };
     }, [id]);
+
+    useEffect(() => {
+        if (mpLoaded && paymentMethod === 'card' && course && user && !cardBrickLoaded) {
+            initCardBrick();
+        }
+    }, [mpLoaded, paymentMethod, course, user]);
+
+    const initCardBrick = async () => {
+        // @ts-ignore
+        const mp = new window.MercadoPago('APP_USR-a02fe8ad-22b9-4e91-8e69-72840bcc0a22', { 
+            locale: 'pt-BR'
+        });
+        bricksBuilder.current = mp.bricks();
+
+        const renderPaymentBrick = async (bricksBuilder: any) => {
+            const settings = {
+                initialization: {
+                    amount: finalPrice,
+                    payer: {
+                        email: user.email,
+                        identification: {
+                            type: 'CPF',
+                            number: cpf.replace(/\D/g, '')
+                        }
+                    },
+                },
+                customization: {
+                    paymentMethods: {
+                        creditCard: 'all',
+                        debitCard: 'all',
+                        installments: finalPrice > 30 ? 12 : 1
+                    },
+                    visual: {
+                        style: {
+                            theme: 'default', // 'default' | 'dark' | 'bootstrap' | 'flat'
+                        }
+                    }
+                },
+                callbacks: {
+                    onReady: () => {
+                        setCardBrickLoaded(true);
+                    },
+                    onSubmit: ({ selectedPaymentMethod, formData }: any) => {
+                        return handleCardPayment(formData);
+                    },
+                    onError: (error: any) => {
+                        console.error(error);
+                        setPopup({ type: 'error', title: 'Erro MP', message: 'Falha ao carregar formulário de pagamento.' });
+                    },
+                },
+            };
+            window.paymentBrickController = await bricksBuilder.create(
+                'payment',
+                'paymentBrick_container',
+                settings
+            );
+        };
+        renderPaymentBrick(bricksBuilder.current);
+    };
+
+    const handleCardPayment = async (formData: any) => {
+        setSubmitting(true);
+        try {
+            // 1. Update Profile
+            await supabase.from('profiles').update({
+                cpf, phone, is_whatsapp: isWhatsApp, birth_date: birthDate, updated_at: new Date().toISOString()
+            }).eq('id', user.id);
+
+            // 2. Create/Get Enrollment
+            const { data: existing } = await supabase.from('enrollments').select('id').eq('course_id', id).eq('profile_id', user.id).maybeSingle();
+            const payload = {
+                course_id: id,
+                profile_id: user.id,
+                status: 'Pendente',
+                amount_paid: currentPrice,
+                amount_discount: discountAmount,
+                payment_method: 'card',
+                coupon_applied: appliedCoupon?.name || null
+            };
+
+            let enroll;
+            if (existing) {
+                const { data: upd } = await supabase.from('enrollments').update(payload).eq('id', existing.id).select().single();
+                enroll = upd;
+            } else {
+                const { data: ins } = await supabase.from('enrollments').insert([payload]).select().single();
+                enroll = ins;
+            }
+
+            // 3. Process Card on Backend
+            const response = await fetch('/api/process-card', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...formData,
+                    enrollment_id: enroll.id,
+                    course_id: id,
+                    payer: { 
+                        email: user.email, 
+                        identification: { 
+                            type: 'CPF', 
+                            number: cpf.replace(/\D/g, '') 
+                        } 
+                    }
+                }),
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'approved') {
+                setPopup({ type: 'success', title: 'Pagamento Aprovado!', message: 'Seu acesso foi liberado com sucesso.' });
+                setTimeout(() => navigate(`/aluno/curso/${id}`), 1500);
+            } else if (result.status === 'in_process') {
+                setPopup({ type: 'info', title: 'Em Análise', message: 'Seu pagamento está em análise pelo Mercado Pago. O acesso será liberado em breve.' });
+                setTimeout(() => navigate(`/aluno/meus-cursos`), 2000);
+            } else {
+                setPopup({ type: 'error', title: 'Pagamento Recusado', message: 'Não foi possível processar seu cartão. Verifique os dados ou tente outro método.' });
+            }
+        } catch (error: any) {
+            setPopup({ type: 'error', title: 'Erro', message: error.message || 'Falha ao processar cartão.' });
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
     const fetchCourse = async () => {
         const { data } = await supabase.from('courses').select('*').eq('id', id).single();
@@ -83,6 +222,8 @@ const CourseCheckout: React.FC = () => {
     };
 
     const currentPrice = course ? (course.price_offer - discountAmount) : 0;
+    const pixPrice = course ? (currentPrice * (1 - (course.pix_discount || 0) / 100)) : currentPrice;
+    const finalPrice = paymentMethod === 'pix' ? pixPrice : currentPrice;
 
     const handlePreSubmit = () => {
         if (cpf.replace(/\D/g, '').length !== 11) {
@@ -216,18 +357,42 @@ const CourseCheckout: React.FC = () => {
             </button>
 
             <div className="bg-white rounded-[40px] shadow-2xl border border-slate-100 overflow-hidden">
-                <div className="bg-slate-900 p-8 text-white flex justify-between items-center">
-                    <div>
-                        <p className="text-blue-400 font-black uppercase tracking-widest text-xs mb-2">Checkout PIX</p>
-                        <h1 className="text-3xl font-black italic">{course.title}</h1>
+                <div className="bg-slate-900 p-8 text-white flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="text-center md:text-left">
+                        <p className="text-blue-400 font-black uppercase tracking-widest text-[9px] mb-2">Checkout Seguro</p>
+                        <h1 className="text-2xl md:text-3xl font-black italic">{course.title}</h1>
                     </div>
-                    <div className="text-right">
-                        <p className="text-xs text-slate-400 font-bold uppercase">Total</p>
-                        <p className="text-3xl font-black text-blue-400">R$ {currentPrice.toFixed(2).replace('.', ',')}</p>
-                    </div>
+                    {!pixData && (
+                        <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 shrink-0">
+                            <button 
+                                onClick={() => setPaymentMethod('pix')}
+                                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${paymentMethod === 'pix' ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <span className="material-symbols-outlined text-sm">qr_code</span> PIX
+                            </button>
+                            <button 
+                                onClick={() => setPaymentMethod('card')}
+                                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${paymentMethod === 'card' ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <span className="material-symbols-outlined text-sm">credit_card</span> Cartão
+                            </button>
+                        </div>
+                    )}
+                    {pixData && (
+                        <div className="text-right">
+                            <p className="text-[9px] text-slate-400 font-bold uppercase">Total Pago</p>
+                            <p className="text-3xl font-black text-emerald-400">R$ {pixPrice.toFixed(2).replace('.', ',')}</p>
+                        </div>
+                    )}
+                    {!pixData && (
+                        <div className="text-right">
+                            <p className="text-[9px] text-slate-400 font-bold uppercase">Investimento</p>
+                            <p className="text-3xl font-black text-blue-400">R$ {finalPrice.toFixed(2).replace('.', ',')}</p>
+                        </div>
+                    )}
                 </div>
 
-                <div className={`p-8 ${pixData ? 'max-w-md mx-auto' : 'grid grid-cols-1 md:grid-cols-2 gap-10'}`}>
+                <div className={`p-8 ${pixData || paymentMethod === 'card' ? 'max-w-2xl mx-auto' : 'grid grid-cols-1 md:grid-cols-2 gap-10'}`}>
                     <div className="space-y-6">
                         {pixData ? (
                             <div className="bg-emerald-50/30 p-8 rounded-[40px] border-2 border-emerald-500/20 text-center space-y-6">
@@ -245,9 +410,47 @@ const CourseCheckout: React.FC = () => {
                                     <button onClick={() => enrollmentId && checkPaymentStatus(enrollmentId)} className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg">
                                         Já Paguei, Verificar
                                     </button>
-                                    <a href={`https://wa.me/55?text=Paguei o curso ${course.title}`} target="_blank" rel="noreferrer" className="w-full py-3 bg-white text-emerald-600 rounded-2xl font-black uppercase text-[10px] border border-emerald-100 flex items-center justify-center gap-2">
-                                        <span className="material-symbols-outlined text-sm">support_agent</span> Suporte WhatsApp
-                                    </a>
+                                </div>
+                            </div>
+                        ) : paymentMethod === 'card' ? (
+                            <div className="space-y-6">
+                                <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-4">
+                                    <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest flex items-center gap-2"><span className="material-symbols-outlined text-blue-500">person</span> 1. Seus Dados</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <input value={cpf} onChange={e => setCpf(formatCPF(e.target.value))} className="w-full p-4 bg-white border border-slate-200 rounded-xl text-xs" placeholder="CPF" />
+                                        <input value={phone} onChange={e => setPhone(formatPhone(e.target.value))} className="w-full p-4 bg-white border border-slate-200 rounded-xl text-xs" placeholder="Telefone" />
+                                    </div>
+                                </div>
+
+                                <div className="bg-white p-6 rounded-3xl border border-slate-100 space-y-4">
+                                    <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest flex items-center gap-2"><span className="material-symbols-outlined text-blue-500">credit_card</span> 2. Cartão de Crédito</h3>
+                                    
+                                    <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                                        <label className="flex items-center gap-3 cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={agreed} 
+                                                onChange={e => setAgreed(e.target.checked)}
+                                                className="size-5 rounded border-slate-300 text-blue-600"
+                                            />
+                                            <span className="text-[10px] font-bold text-slate-600 uppercase">Aceito os termos de adesão</span>
+                                        </label>
+                                    </div>
+
+                                    {agreed ? (
+                                        <div id="paymentBrick_container">
+                                            {!cardBrickLoaded && (
+                                                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                                                    <div className="size-8 border-2 border-slate-100 border-t-blue-500 rounded-full animate-spin"></div>
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Carregando formulário seguro...</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Marque os termos para habilitar o pagamento</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ) : (
@@ -259,8 +462,7 @@ const CourseCheckout: React.FC = () => {
                             </div>
                         )}
                     </div>
-
-                    {!pixData && (
+                    {!pixData && paymentMethod !== 'card' && (
                         <div className="flex flex-col justify-between">
                             <div className="bg-slate-900 p-6 rounded-[32px] text-white space-y-4">
                                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -279,7 +481,12 @@ const CourseCheckout: React.FC = () => {
                                 )}
                                 <div className="border-t border-white/10 pt-4 flex justify-between items-center text-xl font-black">
                                     <span className="text-xs uppercase text-slate-400">Total</span>
-                                    <span className="text-emerald-400 italic font-mono">R$ {currentPrice.toFixed(2).replace('.', ',')}</span>
+                                    <div className="text-right">
+                                        <span className="text-emerald-400 italic font-mono block">R$ {pixPrice.toFixed(2).replace('.', ',')}</span>
+                                        {(course?.pix_discount || 0) > 0 && (
+                                            <span className="text-[9px] text-blue-400 uppercase block">-{course.pix_discount}% Desconto PIX</span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
@@ -292,6 +499,19 @@ const CourseCheckout: React.FC = () => {
                                 Gerar PIX <span className="material-symbols-outlined">qr_code</span>
                             </button>
                         </div>
+                    )}
+
+                    {paymentMethod === 'card' && !pixData && (
+                         <div className="mt-6 pt-6 border-t border-slate-100 flex justify-between items-center">
+                             <div>
+                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Investimento Total</p>
+                                 <p className="text-xl font-black text-slate-900 italic">R$ {currentPrice.toFixed(2).replace('.', ',')}</p>
+                             </div>
+                             <div className="flex gap-2">
+                                 <input value={couponCode} onChange={e => setCouponCode(e.target.value)} className="w-24 p-2.5 bg-slate-50 border border-slate-200 rounded-xl uppercase text-[10px] font-bold" placeholder="CUPOM" />
+                                 <button onClick={applyCoupon} className="px-4 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase">Aplicar</button>
+                             </div>
+                         </div>
                     )}
                 </div>
             </div>
