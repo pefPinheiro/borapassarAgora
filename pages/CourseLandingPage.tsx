@@ -1,7 +1,44 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+
+const VideoPlayer = ({ url }: { url: string }) => {
+    if (!url) return null;
+
+    const getEmbedUrl = (url: string) => {
+        if (url.includes('youtube.com/watch?v=')) {
+            const id = url.split('v=')[1]?.split('&')[0];
+            return `https://www.youtube.com/embed/${id}`;
+        }
+        if (url.includes('youtu.be/')) {
+            const id = url.split('be/')[1]?.split('?')[0];
+            return `https://www.youtube.com/embed/${id}`;
+        }
+        if (url.includes('vimeo.com/')) {
+            const id = url.split('com/')[1];
+            return `https://player.vimeo.com/video/${id}`;
+        }
+        return url;
+    };
+
+    const embedUrl = getEmbedUrl(url);
+    const isEmbed = embedUrl.includes('embed') || embedUrl.includes('player.vimeo');
+
+    if (isEmbed) {
+        return (
+            <iframe 
+                src={embedUrl} 
+                className="w-full h-full border-0" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                allowFullScreen
+            />
+        );
+    }
+
+    return (
+        <video src={url} controls className="w-full h-full object-cover" />
+    );
+};
 
 interface CourseData {
     id: string;
@@ -10,6 +47,7 @@ interface CourseData {
     area: string;
     cargo: string;
     banner_url: string;
+    video_url?: string;
     price_base: number;
     price_offer: number;
     coupon_name: string;
@@ -19,6 +57,10 @@ interface CourseData {
     questions_count: number;
     lp_model?: string;
     coupons_json?: { name: string, discount_type: string, discount_value: number }[];
+    lp_images?: string[];
+    disciplinas?: string[];
+    cadernos_count: number;
+    resolved_notebooks_count?: number;
 }
 
 const CourseLandingPage: React.FC = () => {
@@ -43,20 +85,44 @@ const CourseLandingPage: React.FC = () => {
             if (courseError) throw courseError;
 
             const [apsRes, simsRes, questRes] = await Promise.all([
-                supabase.from('course_items').select('id').eq('course_id', id),
+                supabase.from('course_items').select('id, apostila_id').eq('course_id', id),
                 supabase.from('course_simulados').select('id').eq('course_id', id),
                 supabase.from('questions').select('*', { count: 'exact', head: true })
             ]);
 
+            const apostilaIds = apsRes.data?.map(a => a.apostila_id).filter(Boolean) || [];
             const apostilasCount = apsRes.data?.length || 0;
             const simuladosCount = simsRes.data?.length || 0;
             const totalQuestionsCount = questRes.count || 0;
+
+            const { data: apsWithDetails } = await supabase
+                .from('apostilas')
+                .select('is_resolution_notebook, disciplinas(name)')
+                .in('id', apostilaIds.length > 0 ? apostilaIds : ['none']);
+
+            const uniqueDisciplinas = Array.from(new Set(
+                apsWithDetails?.map((a: any) => a.disciplinas?.name).filter(Boolean)
+            )) as string[];
+
+            const resolvedCount = apsWithDetails?.filter((a: any) => a.is_resolution_notebook).length || 0;
+
+            let totalCadernosCount = 0;
+            if (apostilaIds.length > 0) {
+                const { count: nbCount } = await supabase
+                    .from('notebooks')
+                    .select('*', { count: 'exact', head: true })
+                    .in('apostila_id', apostilaIds);
+                totalCadernosCount = nbCount || 0;
+            }
 
             setCourse({
                 ...courseData,
                 apostilas_count: apostilasCount,
                 simulados_count: simuladosCount,
-                questions_count: totalQuestionsCount
+                questions_count: totalQuestionsCount,
+                disciplinas: uniqueDisciplinas,
+                cadernos_count: totalCadernosCount,
+                resolved_notebooks_count: resolvedCount
             });
         } catch (e) {
             console.error('Error:', e);
@@ -110,732 +176,794 @@ const CourseLandingPage: React.FC = () => {
         { val: '2026', label: 'Atualizado' }
     ];
 
-    // --- 10 HIGH-IMPACT MODELS ---
-
-    const Standard = () => {
-        const FeaturesStandard = [
-            { title: 'Suporte Especializado Ao Aluno', desc: 'Canal direto para tirar dúvidas com nossos especialistas.', icon: 'support_agent' },
-            { title: 'Apostilas Digitais', desc: 'Material estratégico otimizado para sua leitura rápida.', icon: 'auto_stories' },
-            { title: 'Simulados de Elite', desc: 'Treine com questões inéditas no tempo real da prova.', icon: 'quiz' },
-            { title: 'Banco de Questões', desc: 'Milhares de itens comentados e mapeados por assunto.', icon: 'database' }
+    const EliteGold = () => {
+        const FeaturesElite = [
+            { title: 'Apostilas Interativas', desc: 'Material estratégico com tecnologia de leitura dinâmica e interativa.', icon: 'menu_book' },
+            { title: 'Simulados de Elite', desc: 'Treine com simulados periódicos focados no perfil da sua banca.', icon: 'quiz' },
+            { title: 'Banco de Questões', desc: 'Milhares de questões comentadas para você dominar a banca.', icon: 'database' },
+            { title: 'Exportar em PDF', desc: 'Leve seu estudo para onde quiser com a exportação simplificada.', icon: 'picture_as_pdf' },
+            { title: 'Cadernos de Questões', desc: 'Organize seu treino por assunto com cadernos personalizados.', icon: 'auto_stories' },
+            { title: 'Controle de Estudo', desc: 'Dashboard completo para monitorar sua evolução e metas.', icon: 'analytics' },
+            { title: 'Suporte & Atualizações', desc: 'Acompanhamento total e material sempre em dia com o edital.', icon: 'verified' },
+            { title: 'Modo Relax', desc: 'Interface otimizada para reduzir o cansaço visual durante o estudo.', icon: 'visibility' }
         ];
 
+        const FAQ = [
+            { q: 'O curso é focado em qual edital?', a: 'O curso é totalmente focado no edital atualizado para este cargo, abordando todos os tópicos exigidos pela banca.' },
+            { q: 'Como funcionam as apostilas interativas?', a: 'Nossas apostilas permitem interações diretas no texto, marcações inteligentes e acesso rápido a questões relacionadas ao tema.' },
+            { q: 'Possui garantia de satisfação?', a: 'Sim, você tem 7 dias de garantia incondicional. Se não gostar, devolvemos seu dinheiro.' }
+        ];
+
+        const displayImages = course.lp_images && course.lp_images.length > 0 ? course.lp_images : [
+            'https://images.unsplash.com/photo-1434031211128-57d90e40217b?auto=format&fit=crop&q=80&w=800',
+            'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800',
+            'https://images.unsplash.com/photo-1454165833767-027ffea9e77b?auto=format&fit=crop&q=80&w=800'
+        ];
+
+        const scrollToContent = () => {
+            const el = document.getElementById('premium');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+        };
+
         return (
-            <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-yellow-500 selection:text-black">
-                <nav className="fixed top-0 inset-x-0 h-24 bg-black/80 backdrop-blur-2xl border-b border-white/5 z-[100] px-6 lg:px-20 flex items-center justify-between">
-                    <img src="/bora_passar_logo.png" className="h-10 transition-transform hover:scale-105" alt="Logo" />
-                    <button onClick={handlePurchase} className="bg-yellow-500 text-black px-10 py-3.5 rounded-full font-black uppercase text-[11px] tracking-widest hover:shadow-[0_0_30px_rgba(234,179,8,0.4)] transition-all active:scale-95">Garanta Sua Vaga</button>
+            <div className="min-h-screen bg-[#000000] text-white font-sans selection:bg-yellow-500 selection:text-black scroll-smooth">
+                {/* Header */}
+                <nav className="fixed top-0 inset-x-0 h-24 bg-black/80 backdrop-blur-md border-b border-white/5 z-[100] px-6 lg:px-20 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <img src="/bora_passar_logo.png" className="h-8 transition-transform hover:scale-105" alt="Logo" />
+                        <span className="hidden md:block w-px h-6 bg-white/10"></span>
+                        <span className="hidden md:block text-[10px] font-black uppercase tracking-widest text-yellow-500">{course.title}</span>
+                    </div>
+                    <div className="hidden lg:flex gap-10 text-[10px] font-black uppercase tracking-widest text-white/50">
+                        <a href="#hero" className="hover:text-yellow-500 transition-colors">Destaque</a>
+                        <a href="#premium" className="hover:text-yellow-500 transition-colors">Recursos</a>
+                        <a href="#disciplinas" className="hover:text-yellow-500 transition-colors">Matérias</a>
+                        <a href="#vitalicio" className="hover:text-yellow-500 transition-colors">Preço</a>
+                        <a href="#faq" className="hover:text-yellow-500 transition-colors">FAQ</a>
+                    </div>
+                    <button onClick={handlePurchase} className="bg-yellow-500 text-black px-8 py-3 rounded-full font-black uppercase text-[10px] tracking-widest hover:bg-white transition-all shadow-[0_0_20px_rgba(234,179,8,0.3)]">Matricular Agora</button>
                 </nav>
 
-                <main>
-                    {/* Hero Section */}
-                    <section className="pt-48 lg:pt-60 pb-32 text-center relative overflow-hidden">
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80vw] h-[50vh] bg-yellow-500/10 blur-[150px] pointer-events-none"></div>
-                        <div className="max-w-6xl mx-auto px-6 space-y-12">
-                            <div className="inline-flex items-center gap-3 px-6 py-2 bg-white/5 border border-white/10 rounded-full text-yellow-500 text-[10px] font-black uppercase tracking-[0.3em] animate-pulse">#REVOLUÇÃO_BPA 2026</div>
-                            <h1 className="text-6xl lg:text-[110px] font-black leading-[0.9] tracking-tighter">O MÉTODO DEFINITIVO <br /> PARA <span className="text-yellow-500 underline decoration-white/10">APROVAÇÃO</span>.</h1>
-                            <p className="text-xl lg:text-3xl text-white/50 font-medium max-w-4xl mx-auto leading-relaxed">Prepare-se para <span className="text-white font-black">{course.title}</span> com o curso mais completo e atualizado.</p>
-
-                            <div className="flex flex-col items-center gap-8 py-10">
-                                <div className="flex flex-col items-center gap-2 relative">
-                                    <PromoBadge className="mb-6 scale-110" />
-                                    {course.coupon_name && (
-                                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-yellow-500 text-black text-[10px] font-black px-4 py-1 rounded-full uppercase tracking-widest whitespace-nowrap"> Cupom: {course.coupon_name} </div>
-                                    )}
-                                    {hasDiscount && <span className="text-white/30 line-through text-2xl font-bold">R$ {formatPrice(course.price_base)}</span>}
-                                    <span className="text-7xl lg:text-[140px] font-black tracking-tighter leading-none">{isFree ? 'GRÁTIS' : `R$ ${formatPrice(course.price_offer)}`}</span>
-                                </div>
-                                <button onClick={handlePurchase} className="group relative px-20 py-8 bg-yellow-500 text-black font-black text-2xl lg:text-3xl uppercase tracking-widest rounded-3xl hover:scale-105 transition-all shadow-2xl active:translate-y-2">
-                                    {CTA_TEXT}
-                                    <span className="inline-block ml-4 group-hover:translate-x-2 transition-transform">🚀</span>
-                                </button>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Banner & Floating Stats */}
-                    <section className="max-w-7xl mx-auto px-6 py-20">
-                        <div className="relative rounded-[40px] overflow-hidden border border-white/5 shadow-[0_50px_100px_rgba(0,0,0,0.5)]">
-                            <img src={course.banner_url} className="w-full aspect-video object-cover" alt="Banner" />
-                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/20 to-transparent p-10 lg:p-20">
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-10">
-                                    {Stats.map((st, i) => (
-                                        <div key={i} className="text-center space-y-2 group">
-                                            <p className="text-4xl lg:text-7xl font-black text-yellow-500 group-hover:scale-110 transition-transform">{st.val}</p>
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-white/40">{st.label}</p>
-                                        </div>
+                {/* Hero Section */}
+                <section id="hero" className="relative pt-40 lg:pt-56 pb-20 overflow-hidden">
+                    <div className="absolute top-0 left-1/4 size-[600px] bg-yellow-500/10 blur-[150px] -z-10 animate-pulse"></div>
+                    <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
+                        <div className="space-y-10 text-center lg:text-left">
+                            <div className="space-y-4">
+                                <span className="text-yellow-500 text-xs font-black uppercase tracking-[0.4em] block animate-in slide-in-from-left duration-700">PREPARAÇÃO DE ALTO NÍVEL</span>
+                                <h1 className="text-5xl lg:text-[80px] font-black leading-[0.85] tracking-tighter uppercase italic animate-in slide-in-from-left duration-1000">
+                                    {course.title.split(' ').map((word, i) => (
+                                        <React.Fragment key={i}>
+                                            {word} {i === 1 && <br />}
+                                        </React.Fragment>
                                     ))}
+                                </h1>
+                            </div>
+                            <p className="text-xl lg:text-2xl text-white/50 font-medium leading-relaxed max-w-xl italic mx-auto lg:mx-0">
+                                Domine o edital com a tecnologia do <span className="text-yellow-500">Bora Passar Agora</span>. O ecossistema mais completo para sua aprovação.
+                            </p>
+                            <div className="flex flex-wrap justify-center lg:justify-start gap-4">
+                                <button onClick={handlePurchase} className="px-10 py-6 bg-yellow-500 text-black font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-white transition-all transform hover:-translate-y-1 shadow-2xl">Quero Meu Acesso</button>
+                                <button onClick={scrollToContent} className="px-10 py-6 bg-white/5 border border-white/10 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-white/10 transition-all">Ver Detalhes</button>
+                            </div>
+                        </div>
+                        <div className="relative group">
+                            <div className="absolute -inset-10 bg-yellow-500/5 blur-[100px] rounded-full group-hover:bg-yellow-500/10 transition-all duration-1000"></div>
+                            <div className="relative rounded-[40px] overflow-hidden border border-white/10 shadow-huge aspect-video group-hover:scale-[1.02] transition-transform duration-700 bg-slate-900">
+                                {course.video_url ? (
+                                    <VideoPlayer url={course.video_url} />
+                                ) : (
+                                    <img src={course.banner_url || displayImages[0]} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-1000" />
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60 pointer-events-none"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Categories/Stats Bar */}
+                <div className="border-y border-white/5 bg-white/[0.02] py-12">
+                    <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 lg:grid-cols-5 gap-8">
+                        <div className="text-center space-y-2">
+                            <p className="text-4xl lg:text-5xl font-black italic text-yellow-500">{course.apostilas_count || 0}</p>
+                            <span className="text-[9px] font-black uppercase tracking-widest text-white/30">Apostilas</span>
+                        </div>
+                        <div className="text-center space-y-2 border-l border-white/5">
+                            <p className="text-4xl lg:text-5xl font-black italic text-white">{course.simulados_count || 0}</p>
+                            <span className="text-[9px] font-black uppercase tracking-widest text-white/30">Simulados</span>
+                        </div>
+                        <div className="text-center space-y-2 border-l border-white/5">
+                            <p className="text-4xl lg:text-5xl font-black italic text-yellow-500">{course.questions_count || '0'}</p>
+                            <span className="text-[9px] font-black uppercase tracking-widest text-white/30">Questões</span>
+                        </div>
+                        <div className="text-center space-y-2 border-l border-white/5">
+                            <p className="text-4xl lg:text-5xl font-black italic text-white">{course.cadernos_count || 0}</p>
+                            <span className="text-[9px] font-black uppercase tracking-widest text-white/30">Cadernos</span>
+                        </div>
+                        <div className="text-center space-y-2 border-l border-white/5">
+                            <p className="text-4xl lg:text-5xl font-black italic text-yellow-500">{course.resolved_notebooks_count || 0}</p>
+                            <span className="text-[9px] font-black uppercase tracking-widest text-white/30">Resolvidos</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Conteúdo Premium */}
+                <section id="premium" className="py-32 lg:py-48 max-w-7xl mx-auto px-6 space-y-20">
+                    <div className="flex flex-col lg:flex-row justify-between items-end gap-10">
+                        <div className="space-y-4">
+                            <span className="text-yellow-500 text-xs font-black uppercase tracking-widest">O QUE VOCÊ VAI RECEBER</span>
+                            <h2 className="text-5xl lg:text-7xl font-black uppercase italic leading-none">CONTEÚDO <span className="text-yellow-500">PREMIUM</span></h2>
+                        </div>
+                        <p className="text-white/40 font-bold max-w-sm italic leading-relaxed">
+                            As ferramentas mais agressivas do mercado para garantir a sua vaga no menor espaço de tempo possível.
+                        </p>
+                    </div>
+
+                    <div className="grid lg:grid-cols-2 gap-10">
+                        {/* Big Feature */}
+                        <div className="lg:col-span-1 bg-white/[0.03] border border-white/5 rounded-[40px] p-10 space-y-12 relative overflow-hidden group">
+                            <div className="space-y-6 relative z-10">
+                                <span className="size-12 bg-yellow-500 text-black rounded-xl flex items-center justify-center font-black">01</span>
+                                <h3 className="text-4xl font-black uppercase italic tracking-tighter">APOSTILAS INTERATIVAS</h3>
+                                <p className="text-white/50 font-medium leading-relaxed">Nossa tecnologia exclusiva permite que você estude de forma ativa, com marcações, comentários e integração direta com o banco de questões.</p>
+                                <div className="flex items-center gap-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest">
+                                    <span className="material-symbols-outlined text-[16px]">check_circle</span> Tecnologia de Estudo Ativo
+                                </div>
+                            </div>
+                            <div className="relative rounded-3xl overflow-hidden aspect-video border border-white/10 group-hover:scale-105 transition-transform duration-700">
+                                <img src={displayImages[1 % displayImages.length]} className="w-full h-full object-cover grayscale opacity-40 group-hover:opacity-100 group-hover:grayscale-0 transition-all duration-700" alt="Questões" />
+                            </div>
+                        </div>
+
+                        {/* Right Grid */}
+                        <div className="space-y-10">
+                            <div className="bg-white/[0.03] border border-white/5 rounded-[40px] p-10 flex gap-10 items-center group">
+                                <div className="space-y-4 flex-1">
+                                    <span className="material-symbols-outlined text-4xl text-yellow-500">quiz</span>
+                                    <h4 className="text-2xl font-black uppercase tracking-tighter italic">SIMULADOS & QUESTÕES</h4>
+                                    <p className="text-white/40 text-sm font-medium leading-relaxed italic">Simulados periódicos e caderno de questões resolvidas para você não ter surpresas na hora da prova.</p>
+                                    <div className="flex items-center gap-2 text-yellow-500 text-[9px] font-black uppercase">
+                                        <span className="size-1.5 rounded-full bg-yellow-500"></span> Foco Total na Banca
+                                    </div>
+                                </div>
+                                <div className="size-32 rounded-2xl overflow-hidden hidden md:block">
+                                    <img src={displayImages[2 % displayImages.length]} className="w-full h-full object-cover grayscale opacity-20 group-hover:opacity-100 transition-all" alt="" />
+                                </div>
+                            </div>
+
+                            <div className="grid md:grid-cols-2 gap-10">
+                                <div className="bg-white/[0.03] border border-white/5 rounded-[40px] p-10 space-y-6 group">
+                                    <span className="material-symbols-outlined text-4xl text-white/20 group-hover:text-yellow-500 transition-colors">analytics</span>
+                                    <h4 className="text-xl font-black uppercase tracking-tighter italic leading-none">CONTROLE DE ESTUDO</h4>
+                                    <p className="text-xs text-white/30 font-medium leading-relaxed italic">Monitore seu desempenho em tempo real e saiba exatamente onde precisa melhorar.</p>
+                                    <button onClick={scrollToContent} className="inline-flex items-center gap-2 text-[10px] font-black uppercase text-white hover:text-yellow-500 transition-colors">VER DETALHES →</button>
+                                </div>
+                                <div className="bg-white/[0.03] border border-white/5 rounded-[40px] p-10 space-y-6 group relative overflow-hidden">
+                                    <div className="space-y-4 relative z-10">
+                                        <h4 className="text-xl font-black uppercase tracking-tighter italic leading-none">MODO RELAX</h4>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-3 text-[9px] font-black uppercase text-yellow-500"><span className="material-symbols-outlined text-[14px]">visibility</span> Conforto Visual</div>
+                                            <div className="flex items-center gap-3 text-[9px] font-black uppercase text-white/40"><span className="material-symbols-outlined text-[14px]">bolt</span> Estudo Prolongado</div>
+                                            <div className="flex items-center gap-3 text-[9px] font-black uppercase text-white/40"><span className="material-symbols-outlined text-[14px]">verified</span> Foco Máximo</div>
+                                        </div>
+                                    </div>
+                                    <img src={displayImages[0]} className="absolute right-[-10%] bottom-[-10%] size-48 object-cover rounded-full grayscale opacity-20 group-hover:opacity-40 group-hover:scale-110 transition-all duration-700 border-4 border-white/5" alt="" />
                                 </div>
                             </div>
                         </div>
-                    </section>
+                    </div>
+                </section>
 
-                    {/* Features */}
-                    <section className="max-w-7xl mx-auto px-6 py-40 grid lg:grid-cols-2 gap-20 items-center">
-                        <div className="space-y-8">
-                            <h2 className="text-5xl lg:text-7xl font-black tracking-tighter leading-none">POR QUE ESTUDAR <br /> COM O <span className="text-yellow-500">BORA PASSAR AGORA?</span></h2>
-                            <p className="text-white/50 text-xl leading-relaxed">Nossa plataforma foi desenhada para quem não tem tempo a perder. Conteúdo objetivo, estratégias de prova e suporte total ao aluno.</p>
+                {/* Features Grid (Full List) */}
+                <section className="py-32 bg-white/[0.01] border-y border-white/5">
+                    <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 lg:grid-cols-4 gap-12">
+                        {FeaturesElite.map((f, i) => (
+                            <div key={i} className="space-y-4 group">
+                                <span className="material-symbols-outlined text-3xl text-yellow-500 opacity-50 group-hover:opacity-100 transition-all">{f.icon}</span>
+                                <h4 className="text-lg font-black uppercase italic tracking-tighter">{f.title}</h4>
+                                <p className="text-sm text-white/40 font-medium leading-relaxed">{f.desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                {/* Conteúdo Programático (Disciplinas) */}
+                {course.disciplinas && course.disciplinas.length > 0 && (
+                    <section id="disciplinas" className="py-32 lg:py-48 max-w-7xl mx-auto px-6">
+                        <div className="flex flex-col lg:flex-row justify-between items-center mb-20 gap-10">
+                            <div className="text-center lg:text-left space-y-4">
+                                <span className="text-yellow-500 text-xs font-black uppercase tracking-[0.4em]">CHECKLIST DA APROVAÇÃO</span>
+                                <h2 className="text-5xl lg:text-7xl font-black uppercase italic tracking-tighter">CONTEÚDO <span className="text-yellow-500">PROGRAMÁTICO</span></h2>
+                            </div>
+                            <div className="bg-white/5 border border-white/10 px-8 py-4 rounded-2xl flex items-center gap-4">
+                                <span className="material-symbols-outlined text-yellow-500 text-3xl">verified</span>
+                                <div className="text-left">
+                                    <p className="text-xs font-black uppercase tracking-widest text-white">Edital 100% Coberto</p>
+                                    <p className="text-[10px] font-bold text-white/30 uppercase">Foco total no seu cargo</p>
+                                </div>
+                            </div>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            {FeaturesStandard.map((f, i) => (
-                                <div key={i} className="p-8 bg-white/5 border border-white/10 rounded-3xl hover:bg-white/10 transition-all group">
-                                    <span className="material-symbols-outlined text-4xl text-yellow-500 mb-6">{f.icon}</span>
-                                    <h4 className="text-2xl font-black mb-4">{f.title}</h4>
-                                    <p className="text-sm text-white/40 font-medium leading-relaxed">{f.desc}</p>
+
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {course.disciplinas.map((disc, idx) => (
+                                <div key={idx} className="group bg-white/[0.03] border border-white/5 p-8 rounded-3xl flex items-center justify-between hover:bg-yellow-500 transition-all duration-500 hover:scale-[1.02]">
+                                    <div className="flex items-center gap-6">
+                                        <span className="text-3xl font-black italic text-white/10 group-hover:text-black/20 transition-colors">{(idx + 1).toString().padStart(2, '0')}</span>
+                                        <h4 className="text-sm font-black uppercase tracking-widest text-white/70 group-hover:text-black transition-colors">{disc}</h4>
+                                    </div>
+                                    <span className="material-symbols-outlined text-white/10 group-hover:text-black/50 transition-colors">check_circle</span>
                                 </div>
                             ))}
                         </div>
                     </section>
-                </main>
+                )}
 
-                <footer className="py-20 border-t border-white/5 text-center text-white/20 text-[10px] font-bold uppercase tracking-widest">
-                    Bora Passar Agora © 2026 – Todos os direitos reservados.
+                {/* Pricing Section */}
+                <section id="vitalicio" className="py-32 bg-yellow-500 text-black text-center relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-full opacity-5 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
+                    <div className="max-w-4xl mx-auto px-6 space-y-12 relative z-10">
+                        <div className="space-y-4">
+                            <span className="text-black/40 font-black uppercase tracking-[0.4em] text-xs">OFERTA DE LANÇAMENTO</span>
+                            <h2 className="text-6xl lg:text-8xl font-black uppercase italic tracking-tighter leading-none">ACESSO <span className="text-white drop-shadow-lg">IMEDIATO</span></h2>
+                            <p className="text-lg font-black uppercase italic opacity-60">Invista agora no seu futuro e garanta sua aprovação.</p>
+                        </div>
+
+                        <div className="bg-black text-white p-12 rounded-[50px] shadow-2xl relative group transform hover:scale-[1.02] transition-all duration-700 border-b-[12px] border-black/20">
+                            <div className="absolute top-8 right-10 -rotate-12 bg-yellow-500 text-black px-4 py-1 font-black text-[10px] uppercase tracking-widest rounded shadow-xl animate-pulse">OFERTA LIMITADA</div>
+                            
+                            <div className="space-y-2 mb-10">
+                                <p className="text-xs font-black uppercase tracking-widest text-white/30">CURSO: {course.title}</p>
+                                
+                                {hasDiscount && (
+                                    <p className="text-xl font-black text-white/30 line-through decoration-red-500/50 italic mb-[-10px]">
+                                        De R$ {formatPrice(course.price_base)}
+                                    </p>
+                                )}
+                                
+                                <div className="flex items-baseline justify-center gap-3">
+                                    <span className="text-4xl font-black text-yellow-500 italic">R$</span>
+                                    <span className="text-8xl lg:text-[140px] font-black italic tracking-tighter leading-none">
+                                        {isFree ? 'GRÁTIS' : formatPrice(course.price_offer)}
+                                    </span>
+                                </div>
+                                <p className="text-sm font-black uppercase tracking-[0.2em] opacity-40 italic">Acesso Anual • Em até 12x no cartão</p>
+                            </div>
+
+                            <div className="grid md:grid-cols-2 gap-6 text-left border-y border-white/5 py-10">
+                                <div className="flex items-center gap-4 group">
+                                    <span className="material-symbols-outlined text-yellow-500 group-hover:scale-125 transition-transform">event_available</span>
+                                    <span className="text-xs font-black uppercase tracking-widest">Acesso por 365 dias</span>
+                                </div>
+                                <div className="flex items-center gap-4 group">
+                                    <span className="material-symbols-outlined text-yellow-500 group-hover:scale-125 transition-transform">update</span>
+                                    <span className="text-xs font-black uppercase tracking-widest">Atualização Grátis</span>
+                                </div>
+                                <div className="flex items-center gap-4 group">
+                                    <span className="material-symbols-outlined text-yellow-500 group-hover:scale-125 transition-transform">support</span>
+                                    <span className="text-xs font-black uppercase tracking-widest">Suporte Especializado</span>
+                                </div>
+                                <div className="flex items-center gap-4 group">
+                                    <span className="material-symbols-outlined text-yellow-500 group-hover:scale-125 transition-transform">ads_click</span>
+                                    <span className="text-xs font-black uppercase tracking-widest">Banco de Questões</span>
+                                </div>
+                                <div className="flex items-center gap-4 group">
+                                    <span className="material-symbols-outlined text-yellow-500 group-hover:scale-125 transition-transform">auto_stories</span>
+                                    <span className="text-xs font-black uppercase tracking-widest">Apostilas Interativas</span>
+                                </div>
+                                <div className="flex items-center gap-4 group">
+                                    <span className="material-symbols-outlined text-yellow-500 group-hover:scale-125 transition-transform">quiz</span>
+                                    <span className="text-xs font-black uppercase tracking-widest">Simulados de Elite</span>
+                                </div>
+                            </div>
+
+                            <button onClick={handlePurchase} className="w-full mt-10 py-10 bg-yellow-500 text-black font-black text-3xl uppercase italic tracking-widest rounded-3xl hover:bg-white transition-all transform hover:-translate-y-2 shadow-[0_20px_50px_rgba(234,179,8,0.2)]">QUERO APROVAR AGORA!</button>
+                            <p className="mt-6 text-[9px] font-black uppercase tracking-[0.3em] opacity-30 italic">PAGAMENTO 100% SEGURO VIA MERCADO PAGO OU PIX</p>
+                        </div>
+                    </div>
+                </section>
+
+                {/* FAQ */}
+                <section id="faq" className="py-32 lg:py-48 max-w-4xl mx-auto px-6 space-y-16">
+                    <div className="text-center space-y-4">
+                        <h2 className="text-5xl lg:text-7xl font-black uppercase italic tracking-tighter">DEBRIEFING DA <span className="text-yellow-500">MISSÃO (FAQ)</span></h2>
+                        <p className="text-white/40 font-bold uppercase tracking-widest text-xs italic">Tudo o que você precisa saber antes de começar.</p>
+                    </div>
+
+                    <div className="space-y-4">
+                        {FAQ.map((item, i) => (
+                            <details key={i} className="group bg-white/[0.02] border border-white/5 rounded-3xl overflow-hidden hover:bg-white/5 transition-all">
+                                <summary className="flex items-center justify-between p-8 cursor-pointer list-none">
+                                    <span className="text-xs lg:text-sm font-black uppercase tracking-widest group-open:text-yellow-500 transition-colors">{item.q}</span>
+                                    <span className="material-symbols-outlined text-yellow-500 group-open:rotate-180 transition-transform">expand_more</span>
+                                </summary>
+                                <div className="px-8 pb-8 text-white/50 text-sm font-medium leading-relaxed italic border-t border-white/5 pt-4">
+                                    {item.a}
+                                </div>
+                            </details>
+                        ))}
+                    </div>
+                </section>
+
+                {/* Final CTA */}
+                <section className="py-48 lg:py-72 text-center relative overflow-hidden bg-[#000]">
+                    <div className="absolute inset-0 bg-yellow-500/5 blur-[150px] animate-pulse"></div>
+                    <div className="max-w-4xl mx-auto px-6 space-y-12 relative z-10">
+                        <h2 className="text-6xl lg:text-[120px] font-black uppercase italic tracking-tighter leading-[0.8] animate-in zoom-in duration-1000">
+                            ESTEJA À FRENTE DA <br /> <span className="text-yellow-500">LINHA.</span>
+                        </h2>
+                        <p className="text-xl lg:text-3xl text-white/40 font-medium italic leading-relaxed">
+                            Prepare-se para o concurso {course.title} com quem realmente entende de aprovação.
+                        </p>
+                        <button onClick={handlePurchase} className="px-20 py-10 bg-yellow-500 text-black font-black text-3xl uppercase italic tracking-widest rounded-[40px] hover:bg-white transition-all transform hover:scale-105 shadow-[0_30px_100px_rgba(234,179,8,0.3)]">QUERO MEU ACESSO AGORA</button>
+                    </div>
+                </section>
+
+                {/* Footer */}
+                <footer className="py-20 border-t border-white/5 bg-black px-6 lg:px-20 flex flex-col lg:flex-row justify-between items-center gap-10">
+                    <img src="/bora_passar_logo.png" className="h-6 grayscale opacity-30" alt="" />
+                    <div className="flex gap-10 text-[9px] font-black uppercase tracking-widest text-white/20">
+                        <a href="#" className="hover:text-white">Termos de Uso</a>
+                        <a href="#" className="hover:text-white">Políticas de Vendas</a>
+                        <a href="#" className="hover:text-white">Suporte</a>
+                        <a href="#" className="hover:text-white">FAQ</a>
+                    </div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.5em] text-white/10">BORA PASSAR AGORA © 2026</p>
                 </footer>
             </div>
         );
     };
 
-    const Minimalist = () => (
-        <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-black selection:text-white">
-            <nav className="p-10 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-50">
-                <img src="/bora_passar_logo.png" className="h-6 invert transition-opacity hover:opacity-100 opacity-60" alt="" />
-                <button onClick={handlePurchase} className="font-bold border-b-2 border-black hover:pb-2 transition-all">Começar Jornada</button>
-            </nav>
-            <main className="max-w-6xl mx-auto px-10 py-20 lg:py-40">
-                <div className="grid lg:grid-cols-2 gap-40 items-center">
-                    <div className="space-y-12 animate-in fade-in slide-in-from-bottom duration-1000">
-                        <h1 className="text-7xl lg:text-[140px] font-black leading-[0.8] tracking-tighter">Bora <br /> Passar <br /> <span className="text-blue-600 italic">Agora!</span></h1>
-                        <div className="space-y-2">
-                            <p className="text-3xl font-black text-slate-900 border-l-8 border-blue-600 pl-6">{course.title}</p>
-                            <p className="text-xl font-medium text-slate-400 pl-8">A estratégia perfeita para passar agora!</p>
+    const ProfessionalClean = () => {
+        const Features = [
+            { title: 'Questões Comentadas', desc: 'Aprenda com o erro e o acerto. Banco de questões gigante com explicações detalhadas.', icon: 'database' },
+            { title: 'Apostilas Digitais Atualizadas', desc: 'Direto ao ponto, sem enrolação.', icon: 'menu_book' },
+            { title: 'Simulados Reais', desc: 'Treine com o tempo e a pressão da sua prova.', icon: 'quiz' },
+            { title: 'Modo Relax', desc: 'Estude sem cansar a vista. Perfeito para horas de estudo noturno.', icon: 'visibility' },
+            { title: 'Atualizações Grátis', desc: 'Edital mudou? Atualizamos seu material sem custo adicional.', icon: 'update' }
+        ];
+
+        const FAQ = [
+            { q: 'Como recebo o acesso ao curso?', a: 'Imediatamente após a confirmação do pagamento, você receberá um e-mail com seus dados de acesso exclusivos à nossa plataforma.' },
+            { q: 'O material é atualizado conforme o edital?', a: 'Sim, todos os nossos cursos são revisados e atualizados constantemente para refletir as mudanças nos editais.' },
+            { q: 'O pagamento é realmente único?', a: 'Sim, este modelo de acesso anual permite que você utilize todos os recursos por 365 dias sem mensalidades.' },
+            { q: 'E se eu não gostar do conteúdo?', a: 'Você tem 7 dias de garantia incondicional. Se não ficar satisfeito, devolvemos 100% do seu investimento.' }
+        ];
+
+        const scrollToContent = () => {
+            const el = document.getElementById('recursos');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+        };
+
+        return (
+            <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-200 selection:text-indigo-900 overflow-x-hidden">
+                {hasDiscount && (
+                    <div className="bg-gradient-to-r from-rose-500 to-orange-500 text-white text-center py-2 text-[11px] md:text-sm font-black uppercase tracking-widest px-4 relative z-[200] flex justify-center items-center gap-3 animate-pulse shadow-md">
+                        <span className="material-symbols-outlined text-[16px]">campaign</span>
+                        Promoção Ativa: Desconto Exclusivo Liberado!
+                    </div>
+                )}
+                
+                <nav className={`fixed ${hasDiscount ? 'top-8' : 'top-0'} inset-x-0 h-20 bg-white/80 backdrop-blur-xl border-b border-white/20 z-[100] px-6 lg:px-20 flex items-center justify-between shadow-sm transition-all`}>
+                    <img src="/bora_passar_logo.png" className="h-8 hover:scale-105 transition-transform" alt="Logo" />
+                    <div className="hidden lg:flex items-center gap-8 text-[11px] font-black uppercase tracking-widest text-slate-500">
+                        <a href="#hero" className="hover:text-indigo-600 transition-colors">Início</a>
+                        <a href="#recursos" className="hover:text-indigo-600 transition-colors">A plataforma</a>
+                        <a href="#materias" className="hover:text-indigo-600 transition-colors">Matérias</a>
+                        <button onClick={handlePurchase} className="px-6 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-indigo-600 hover:shadow-lg hover:shadow-indigo-500/30 transition-all transform hover:-translate-y-0.5">Assinar Agora</button>
+                    </div>
+                </nav>
+
+                <section id="hero" className="relative pt-40 pb-20 px-6 max-w-7xl mx-auto flex flex-col items-center text-center space-y-12 z-10">
+                    <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-indigo-500/10 blur-[120px] rounded-full pointer-events-none"></div>
+                    
+                    <div className="space-y-6 relative z-10 max-w-4xl mx-auto">
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm hover:shadow-md transition-shadow">
+                            <span className="material-symbols-outlined text-[14px] text-indigo-500">school</span> Preparação Oficial
                         </div>
-                        <div className="flex flex-col gap-8">
-                            <PromoBadge className="mb-2" />
-                            <div className="flex items-baseline gap-6">
-                                <span className="text-8xl font-black tracking-tighter">R$ {formatPrice(course.price_offer)}</span>
-                                {hasDiscount && <span className="text-3xl text-slate-300 line-through font-bold">R$ {formatPrice(course.price_base)}</span>}
+                        <h1 className="text-5xl lg:text-7xl font-black text-slate-900 tracking-tighter leading-[1.05]">
+                            A sua vaga em <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-500">{course.title}</span> garantida.
+                        </h1>
+                        <p className="text-lg lg:text-xl text-slate-500 font-medium leading-relaxed max-w-2xl mx-auto">
+                            Estude com inteligência. Plataforma completa com tudo que você precisa para ser aprovado, reunido em um único lugar.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-4 relative z-10">
+                        <button onClick={handlePurchase} className="px-10 py-5 bg-indigo-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-indigo-700 hover:scale-105 transition-all shadow-xl shadow-indigo-500/30">
+                            QUERO COMEÇAR AGORA
+                        </button>
+                        <button onClick={scrollToContent} className="px-10 py-5 bg-white text-slate-600 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-50 border border-slate-200 transition-all flex items-center gap-2">
+                            Ver plataforma <span className="material-symbols-outlined">arrow_downward</span>
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-6 w-full max-w-5xl pt-10 relative z-10">
+                        {[
+                            { v: course.apostilas_count || 0, l: 'Apostilas' },
+                            { v: course.simulados_count || 0, l: 'Simulados' },
+                            { v: course.questions_count || 0, l: 'Questões' },
+                            { v: course.cadernos_count || 0, l: 'Cadernos' },
+                            { v: course.resolved_notebooks_count || 0, l: 'Resolvidos' }
+                        ].map((stat, i) => (
+                            <div key={i} className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-100 flex flex-col items-center text-center group hover:-translate-y-1 transition-transform">
+                                <span className="text-4xl font-black text-indigo-600">{stat.v}</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-2">{stat.l}</span>
                             </div>
-                            <button onClick={handlePurchase} className="w-full py-8 bg-black text-white font-black text-2xl hover:bg-blue-600 transition-colors uppercase tracking-widest">Quero Minha Vaga →</button>
+                        ))}
+                    </div>
+                </section>
+
+                <section className="px-6 max-w-6xl mx-auto -mt-10 relative z-20 pb-32">
+                    <div className="rounded-[40px] overflow-hidden bg-slate-900 shadow-2xl shadow-slate-900/20 border-8 border-white group relative aspect-video flex items-center justify-center">
+                         {course.video_url ? (
+                             <VideoPlayer url={course.video_url} />
+                         ) : (
+                             <img src={course.banner_url || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800"} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 opacity-80" />
+                         )}
+                         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-40 pointer-events-none"></div>
+                    </div>
+                </section>
+
+                <section className="py-24 bg-slate-900 text-white overflow-hidden relative">
+                    <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-indigo-900/20 to-transparent pointer-events-none"></div>
+                    <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center relative z-10">
+                        <div className="space-y-8">
+                            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-500/30">
+                                <span className="material-symbols-outlined text-[14px]">visibility</span> Exclusividade
+                            </div>
+                            <h2 className="text-5xl font-black tracking-tighter">O Famoso <span className="text-indigo-400 italic">Modo Relax</span></h2>
+                            <p className="text-lg text-slate-400 font-medium leading-relaxed">
+                                Cansado de forçar a vista depois de um dia de trabalho? Nosso Modo Relax ajusta toda a interface para tons escuros suaves e contrastes inteligentes. Estude até tarde sem dores de cabeça.
+                            </p>
+                            <ul className="space-y-4">
+                                <li className="flex items-center gap-3 text-sm font-bold text-slate-300"><span className="material-symbols-outlined text-indigo-400">check_circle</span> Foco Extremo e Zero Distrações</li>
+                                <li className="flex items-center gap-3 text-sm font-bold text-slate-300"><span className="material-symbols-outlined text-indigo-400">check_circle</span> Proteção Ocular Integrada</li>
+                                <li className="flex items-center gap-3 text-sm font-bold text-slate-300"><span className="material-symbols-outlined text-indigo-400">check_circle</span> Economia de Bateria no Celular</li>
+                            </ul>
+                        </div>
+                        <div className="relative">
+                            <div className="absolute -inset-4 bg-indigo-500/20 blur-[50px] rounded-full"></div>
+                            <div className="relative aspect-square md:aspect-video lg:aspect-square bg-[#0f172a] rounded-[40px] border border-slate-700 p-8 shadow-2xl flex flex-col overflow-hidden">
+                                <div className="absolute inset-0 group-hover:scale-110 transition-transform duration-1000">
+                                    <img 
+                                        src={(course.lp_images && course.lp_images[1]) || course.banner_url || "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&q=80&w=800"} 
+                                        className="w-full h-full object-cover opacity-50 group-hover:opacity-80 transition-opacity" 
+                                        alt="Modo Relax Preview"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] via-transparent to-transparent"></div>
+                                </div>
+                                <div className="relative z-10 flex flex-col h-full">
+                                    <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-4">
+                                        <div className="h-3 w-24 bg-white/10 rounded-full"></div>
+                                        <div className="size-8 rounded-full bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                                            <span className="material-symbols-outlined text-indigo-400 text-[16px]">dark_mode</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="h-5 w-2/3 bg-white/20 rounded-lg"></div>
+                                        <div className="h-3 w-full bg-white/5 rounded-lg"></div>
+                                        <div className="h-3 w-5/6 bg-white/5 rounded-lg"></div>
+                                    </div>
+                                    <div className="mt-auto pt-6 flex gap-3">
+                                        <div className="h-8 w-20 bg-indigo-600 rounded-lg shadow-lg shadow-indigo-500/20"></div>
+                                        <div className="h-8 w-20 bg-white/5 rounded-lg"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="recursos" className="py-24 px-6 max-w-7xl mx-auto grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {Features.map((f, i) => (
+                        <div key={i} className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-100 space-y-6 group hover:-translate-y-2 hover:shadow-xl transition-all duration-300">
+                            <div className="size-14 bg-slate-50 text-indigo-600 rounded-2xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                <span className="material-symbols-outlined text-3xl">{f.icon}</span>
+                            </div>
+                            <div className="space-y-2">
+                                <h5 className="text-xl font-black text-slate-800">{f.title}</h5>
+                                <p className="text-sm text-slate-500 font-medium leading-relaxed">{f.desc}</p>
+                            </div>
+                        </div>
+                    ))}
+                    <div className="bg-gradient-to-br from-indigo-600 to-blue-500 p-8 rounded-[32px] text-white space-y-6 lg:col-span-1 shadow-lg group overflow-hidden relative">
+                        <div className="absolute top-0 right-0 p-8 opacity-10 scale-150 group-hover:scale-110 transition-transform duration-700">
+                            <span className="material-symbols-outlined text-9xl">library_books</span>
+                        </div>
+                        <div className="relative z-10 space-y-4">
+                            <span className="px-3 py-1 bg-white/20 rounded-full text-[9px] font-black uppercase tracking-widest backdrop-blur-md">Plus+</span>
+                            <h5 className="text-xl font-black">Cadernos Resolvidos</h5>
+                            <p className="text-sm text-indigo-100 font-medium leading-relaxed">
+                                Nossos cadernos vêm com resoluções completas passo-a-passo. É como ter um professor particular com você 24h por dia.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                {course.disciplinas && course.disciplinas.length > 0 && (
+                    <section id="materias" className="py-24 bg-slate-50 border-t border-slate-200/50">
+                        <div className="max-w-7xl mx-auto px-6">
+                            <div className="text-center space-y-4 mb-16">
+                                <h2 className="text-4xl font-black text-slate-900 tracking-tighter">Edital 100% Mapeado</h2>
+                                <p className="text-slate-500 font-medium">Todas as matérias que você precisa para destruir a banca.</p>
+                            </div>
+                            <div className="flex flex-wrap justify-center gap-3">
+                                {course.disciplinas.map((disc, idx) => (
+                                    <div key={idx} className="bg-white px-6 py-3 rounded-full border border-slate-200 shadow-sm text-sm font-bold text-slate-700 hover:border-indigo-500 hover:text-indigo-600 cursor-default transition-colors">
+                                        {disc}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+                )}
+
+                <section id="precos" className="py-24 lg:py-32 relative overflow-hidden bg-white">
+                    <div className="absolute bottom-0 left-0 w-full h-1/2 bg-slate-50 pointer-events-none"></div>
+                    <div className="max-w-5xl mx-auto px-6 relative z-10 grid lg:grid-cols-2 gap-12 items-center">
+                        <div className="space-y-8 text-center lg:text-left">
+                            <h2 className="text-5xl lg:text-6xl font-black text-slate-900 tracking-tighter leading-tight">
+                                Invista no seu <br/><span className="text-indigo-600">futuro hoje.</span>
+                            </h2>
+                            <p className="text-lg text-slate-500 font-medium leading-relaxed">
+                                Tudo que você precisa para ser aprovado em um único pagamento. Sem mensalidades, com atualizações gratuitas.
+                            </p>
+                            <div className="hidden lg:flex items-center gap-4 text-slate-400 font-bold">
+                                <span className="material-symbols-outlined text-green-500">verified</span> Compra 100% Segura
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-[40px] p-10 lg:p-12 shadow-[0_30px_100px_rgba(0,0,0,0.08)] border border-slate-100 relative group text-center">
+                            {hasDiscount && (
+                                <div className="absolute -top-5 inset-x-0 flex justify-center">
+                                    <span className="bg-rose-500 text-white px-6 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-lg animate-bounce">
+                                        Desconto Aplicado
+                                    </span>
+                                </div>
+                            )}
+                            
+                            <div className="space-y-6 mb-10 mt-4">
+                                <p className="text-xs font-black uppercase tracking-widest text-slate-400">{course.title}</p>
+                                
+                                <div className="flex flex-col items-center justify-center">
+                                    {hasDiscount && (
+                                        <p className="text-lg font-bold text-slate-400 line-through decoration-rose-500/50 mb-[-10px]">
+                                            De R$ {formatPrice(course.price_base)}
+                                        </p>
+                                    )}
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-3xl font-black text-slate-800">R$</span>
+                                        <span className={`text-7xl lg:text-8xl font-black tracking-tighter ${hasDiscount ? 'text-rose-600' : 'text-indigo-600'}`}>
+                                            {isFree ? 'GRÁTIS' : formatPrice(course.price_offer)}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm font-bold text-slate-400 mt-2">Acesso por 1 Ano</p>
+                                </div>
+                            </div>
+
+                            <button onClick={handlePurchase} className={`w-full py-6 text-white font-black text-xl rounded-2xl transition-all shadow-xl hover:-translate-y-1 ${hasDiscount ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/30' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/30'}`}>
+                                COMPRAR AGORA
+                            </button>
+                            <p className="mt-6 text-[10px] font-black uppercase tracking-widest text-slate-400">7 Dias de Garantia Incondicional</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section className="py-24 bg-slate-50">
+                    <div className="max-w-3xl mx-auto px-6 space-y-12">
+                        <h3 className="text-3xl font-black text-center text-slate-900 tracking-tighter">Perguntas Frequentes</h3>
+                        <div className="space-y-4">
+                            {FAQ.map((f, i) => (
+                                <details key={i} className="group bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                                    <summary className="flex items-center justify-between p-6 cursor-pointer list-none font-bold text-slate-800 group-open:text-indigo-600 transition-colors">
+                                        {f.q}
+                                        <span className="material-symbols-outlined group-open:rotate-180 transition-transform">expand_more</span>
+                                    </summary>
+                                    <div className="px-6 pb-6 text-sm text-slate-500 font-medium leading-relaxed border-t border-slate-50 pt-4">
+                                        {f.a}
+                                    </div>
+                                </details>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                <footer className="py-12 bg-white border-t border-slate-100 px-6 lg:px-20 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <img src="/bora_passar_logo.png" className="h-6 grayscale opacity-50" alt="" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">BORA PASSAR AGORA © 2026</p>
+                </footer>
+            </div>
+        );
+    };
+
+
+    const ImpactoNeon = () => {
+        const FAQ = [
+            { q: 'Por quanto tempo tenho acesso ao curso?', a: 'Você terá acesso ilimitado por 1 ano inteiro, com todas as atualizações inclusas.' },
+            { q: 'O material serve para qualquer concurso?', a: 'Este material é focado 100% no edital do curso selecionado, garantindo máxima eficiência.' },
+            { q: 'Existe garantia de reembolso?', a: 'Sim! Você tem 7 dias de garantia incondicional. Se não gostar, devolvemos 100% do seu dinheiro.' }
+        ];
+
+        const scrollToContent = () => {
+            const el = document.getElementById('ecossistema');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+        };
+
+        const displayImages = course.lp_images && course.lp_images.length > 0 ? course.lp_images : [
+            'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&q=80&w=800',
+            'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=800'
+        ];
+
+        return (
+            <div className="min-h-screen bg-[#020617] text-white font-sans selection:bg-[#00f5d4] selection:text-black overflow-x-hidden">
+                <nav className="fixed top-0 inset-x-0 h-24 bg-[#020617]/80 backdrop-blur-2xl border-b border-white/5 z-[100] px-6 lg:px-20 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="size-10 bg-gradient-to-br from-[#00f5d4] to-[#00b4d8] rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(0,245,212,0.3)]">
+                            <span className="material-symbols-outlined text-black font-black">bolt</span>
+                        </div>
+                        <img src="/bora_passar_logo.png" className="h-6" alt="Logo" />
+                    </div>
+                    <div className="hidden lg:flex items-center gap-12 text-[11px] font-black uppercase tracking-[0.2em] text-white/40">
+                        <a href="#hero" className="hover:text-[#00f5d4] transition-colors">Destaque</a>
+                        <a href="#ecossistema" className="hover:text-[#00f5d4] transition-colors">Ecossistema</a>
+                        <a href="#materias" className="hover:text-[#00f5d4] transition-colors">Matérias</a>
+                        <a href="#preco" className="hover:text-[#00f5d4] transition-colors">Acesso</a>
+                    </div>
+                    <button onClick={handlePurchase} className="bg-[#00f5d4] text-black px-8 py-3 rounded-full font-black uppercase text-[10px] tracking-widest hover:bg-white transition-all shadow-[0_0_30px_rgba(0,245,212,0.2)]">Matricular Agora</button>
+                </nav>
+
+                <section id="hero" className="relative pt-44 lg:pt-64 pb-32 px-6 max-w-7xl mx-auto grid lg:grid-cols-2 gap-20 items-center">
+                    <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_20%_30%,rgba(0,245,212,0.05)_0%,transparent_50%)] pointer-events-none"></div>
+                    <div className="space-y-10 relative z-10">
+                        <div className="inline-flex items-center gap-3 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-[#00f5d4]">
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00f5d4] opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00f5d4]"></span>
+                            </span>
+                            Inscrições Abertas 2026
+                        </div>
+                        <h1 className="text-6xl lg:text-[84px] font-black leading-[0.9] tracking-tighter uppercase italic">
+                            Aprovação <br /> Institucional com <br />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00f5d4] to-[#00b4d8]">Bora Passar Agora!</span>
+                        </h1>
+                        <p className="text-lg lg:text-xl text-white/40 font-medium leading-relaxed max-w-xl italic">
+                            Domine o edital de <span className="text-white font-black">{course.title}</span> com rigor acadêmico e ferramentas de elite.
+                        </p>
+                        <div className="flex flex-wrap gap-5">
+                            <button onClick={handlePurchase} className="px-10 py-6 bg-[#00f5d4] text-black font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-white transition-all transform hover:-translate-y-1 shadow-2xl shadow-[#00f5d4]/20">Começar Agora →</button>
+                            <button onClick={scrollToContent} className="px-10 py-6 bg-white/5 border border-white/10 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-white/10 transition-all">Ver Ecossistema</button>
                         </div>
                     </div>
                     <div className="relative group">
-                        <img src={course.banner_url} className="grayscale hover:grayscale-0 transition-all duration-1000 w-full rounded-2xl shadow-3xl" alt="" />
-                        <div className="absolute -bottom-10 -right-10 p-10 bg-white border border-slate-100 shadow-2xl rounded-2xl hidden lg:block">
-                            <div className="grid grid-cols-2 gap-10">
-                                {Stats.slice(0, 4).map((s, i) => (
-                                    <div key={i}><p className="text-3xl font-black text-blue-600">{s.val}</p><p className="text-[10px] font-bold uppercase opacity-30">{s.label}</p></div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <section className="mt-60 grid lg:grid-cols-4 gap-12">
-                    {Features.map((f, i) => (
-                        <div key={i} className="space-y-6">
-                            <span className="text-6xl font-black text-slate-100">0{i + 1}</span>
-                            <h4 className="text-2xl font-black">{f.title}</h4>
-                            <p className="text-slate-500 font-medium">{f.desc}</p>
-                        </div>
-                    ))}
-                </section>
-            </main>
-        </div>
-    );
-
-    const Futuristic = () => {
-        const FeaturesFuturistic = [
-            { title: 'Suporte Especializado Ao Aluno', desc: 'Canal direto para tirar dúvidas com nossos especialistas.', icon: 'support_agent' },
-            { title: 'Apostilas Digitais', desc: 'Material estratégico otimizado para sua leitura rápida.', icon: 'auto_stories' },
-            { title: 'Simulados de Elite', desc: 'Treine com questões inéditas no tempo real da prova.', icon: 'quiz' },
-            { title: 'Banco de Questões', desc: 'Milhares de itens comentados e mapeados por assunto.', icon: 'database' }
-        ];
-
-        return (
-            <div className="min-h-screen bg-[#020617] text-cyan-400 font-mono selection:bg-cyan-400 selection:text-black pt-10">
-                <nav className="fixed top-0 inset-x-0 h-24 bg-black/40 backdrop-blur-xl border-b border-cyan-500/10 z-[100] px-6 lg:px-20 flex items-center justify-between">
-                    <img src="/bora_passar_logo.png" className="h-10 transition-all hover:scale-105 brightness-0 invert sepia(1) saturate(100) hue-rotate(140deg) drop-shadow(0 0 10px #22d3ee)" alt="Logo" />
-                    <button onClick={handlePurchase} className="px-8 py-3 bg-cyan-500 text-black font-black uppercase text-[10px] tracking-widest hover:shadow-[0_0_30px_#22d3ee] transition-all active:scale-95">EU QUERO AGORA!</button>
-                </nav>
-
-                <div className="fixed inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none"></div>
-                <div className="size-[600px] bg-cyan-500/10 blur-[150px] absolute -top-40 left-1/2 -translate-x-1/2 -z-10 animate-pulse"></div>
-
-                <header className="max-w-7xl mx-auto px-6 flex flex-col items-center justify-center min-h-[90vh] text-center space-y-12 relative">
-                    <div className="px-6 py-2 border border-cyan-500/50 rounded-full text-[10px] tracking-[0.5em] animate-bounce uppercase">Status: Protocolo_Aprovado_Ativado</div>
-                    <h1 className="text-5xl lg:text-[120px] font-black leading-none tracking-tighter uppercase italic border-y border-cyan-500/20 py-20 w-full group overflow-hidden">
-                        <span className="block group-hover:translate-y-[-100%] transition-transform duration-700">{course.title}</span>
-                        <span className="block absolute inset-0 py-20 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-700 text-transparent stroke-cyan-400" style={{ WebkitTextStroke: '2px #22d3ee' }}>{course.title}</span>
-                    </h1>
-
-                    <div className="w-full max-w-5xl rounded-[40px] border-2 border-cyan-500/20 p-4 shadow-[0_0_50px_rgba(34,211,238,0.1)]">
-                        <img src={course.banner_url} className="w-full h-full object-cover rounded-[30px] opacity-60 grayscale hover:grayscale-0 transition-all duration-1000" alt="Banner" />
-                    </div>
-
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-20">
-                        {Stats.map((s, i) => (
-                            <div key={i} className="space-y-1 group cursor-default p-4 hover:bg-cyan-500/5 rounded-2xl transition-all hover:scale-110 active:scale-95">
-                                <p className="text-white font-black text-4xl group-hover:text-cyan-400 transition-colors">{s.val}</p>
-                                <p className="text-[8px] opacity-40 uppercase tracking-widest group-hover:opacity-100 transition-opacity">{s.label}</p>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="space-y-6">
-                        <div className="flex flex-col items-center gap-2 relative">
-                            <PromoBadge className="mb-6 scale-110 shadow-[0_0_40px_rgba(225,29,72,0.8)]" />
-                            {course.coupon_name && (
-                                <div className="text-xs font-black uppercase tracking-[0.4em] text-cyan-500 animate-pulse">// ACTIVE_COUPON: {course.coupon_name}</div>
+                        <div className="absolute -inset-1 w-full h-full bg-gradient-to-r from-[#00f5d4] to-[#00b4d8] rounded-[40px] blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+                        <div className="relative aspect-video bg-[#050914] rounded-[40px] border border-white/10 overflow-hidden shadow-huge flex items-center justify-center">
+                            {course.video_url ? (
+                                <VideoPlayer url={course.video_url} />
+                            ) : (
+                                <div className="w-full h-full relative">
+                                    <img src={course.banner_url || displayImages[0]} className="w-full h-full object-cover opacity-40 group-hover:scale-105 transition-transform duration-1000" />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="size-20 bg-[#00f5d4] rounded-full flex items-center justify-center text-black shadow-[0_0_50px_rgba(0,245,212,0.5)]">
+                                            <span className="material-symbols-outlined text-4xl font-black">play_arrow</span>
+                                        </div>
+                                    </div>
+                                </div>
                             )}
-                            <div className="flex items-center justify-center gap-6">
-                                <span className="text-7xl font-black text-white italic">R$ {formatPrice(course.price_offer)}</span>
-                                {hasDiscount && <span className="text-3xl text-cyan-900 line-through font-bold">R$ {formatPrice(course.price_base)}</span>}
-                            </div>
                         </div>
-                        <button onClick={handlePurchase} className="px-20 py-10 bg-cyan-500 text-black font-black text-3xl uppercase tracking-[0.3em] hover:shadow-[0_0_80px_rgba(34,211,238,0.5)] transition-all active:scale-95">BORA PASSAR AGORA!</button>
                     </div>
-                </header>
+                </section>
 
-                <section className="max-w-7xl mx-auto px-6 py-60">
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-px bg-cyan-500/10 border border-cyan-500/10">
-                        {FeaturesFuturistic.map((f, i) => (
-                            <div key={i} className="p-12 bg-[#020617] space-y-8 hover:bg-cyan-500/[0.05] transition-colors relative group">
-                                <span className="material-symbols-outlined text-4xl text-cyan-400">{f.icon}</span>
-                                <h4 className="text-xl font-black uppercase tracking-widest italic">{f.title}</h4>
-                                <p className="text-xs opacity-40 leading-relaxed font-mono">{f.desc}</p>
-                                <div className="absolute bottom-0 left-0 h-1 bg-cyan-500 w-0 group-hover:w-full transition-all"></div>
-                            </div>
-                        ))}
+                <section id="ecossistema" className="py-32 bg-white/[0.02] border-y border-white/5 relative">
+                    <div className="max-w-7xl mx-auto px-6 space-y-20">
+                        <div className="text-center space-y-6">
+                            <h2 className="text-4xl lg:text-6xl font-black uppercase italic tracking-tighter">Ecossistema de <span className="text-[#00f5d4]">Elite</span></h2>
+                            <p className="text-white/30 font-bold uppercase tracking-widest text-[10px]">Quantitativo completo do seu material de estudo.</p>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {[
+                                { title: `${course.questions_count || 0}+ Questões`, desc: 'Base de dados atualizada diariamente com filtros por banca e cargo.', icon: 'database' },
+                                { title: `${course.apostilas_count || 0} Livros Digitais`, desc: 'Material teórico aprofundado com tecnologia de leitura interativa.', icon: 'auto_stories' },
+                                { title: `${course.simulados_count || 0} Simulados de Elite`, desc: 'Treine com questões inéditas e cronômetro real de prova.', icon: 'quiz' },
+                                { title: `${course.cadernos_count || 0} Cadernos de Treino`, desc: 'Exercícios selecionados e organizados por assunto.', icon: 'menu_book' },
+                                { title: `${course.resolved_notebooks_count || 0} Cadernos Resolvidos`, desc: 'Resoluções detalhadas passo-a-passo pelos professores.', icon: 'verified' },
+                                { title: 'Atualizações Grátis', desc: 'Material sempre em dia com o edital vigente.', icon: 'update' }
+                            ].map((f, i) => (
+                                <div key={i} className="bg-white/[0.03] border border-white/5 p-10 rounded-[40px] space-y-8 group hover:bg-white/[0.05] transition-all relative overflow-hidden">
+                                    <span className="material-symbols-outlined text-4xl text-[#00f5d4]">{f.icon}</span>
+                                    <div className="space-y-4">
+                                        <h4 className="text-xl font-black uppercase italic leading-tight">{f.title}</h4>
+                                        <p className="text-xs text-white/30 font-medium leading-relaxed">{f.desc}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                <section className="py-32 lg:py-56 max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-20 items-center">
+                    <div className="relative group">
+                        <div className="absolute -inset-10 bg-[#00f5d4]/5 blur-[100px] rounded-full group-hover:bg-[#00f5d4]/10 transition-all duration-1000"></div>
+                        <div className="relative aspect-square md:aspect-video lg:aspect-square bg-[#050914] rounded-[60px] border border-white/10 overflow-hidden shadow-huge p-12 flex flex-col group-hover:scale-[1.02] transition-transform duration-700">
+                             <div className="absolute inset-0 opacity-20 grayscale group-hover:grayscale-0 group-hover:opacity-40 transition-all duration-1000">
+                                 <img src={displayImages[1 % displayImages.length]} className="w-full h-full object-cover" />
+                                 <div className="absolute inset-0 bg-gradient-to-t from-[#050914] via-transparent to-transparent"></div>
+                             </div>
+                             <div className="relative z-10 flex flex-col h-full">
+                                 <div className="flex justify-between items-center border-b border-white/5 pb-6 mb-6">
+                                     <div className="h-4 w-32 bg-white/10 rounded-full"></div>
+                                     <div className="size-10 rounded-full bg-[#00f5d4]/20 border border-[#00f5d4]/40 flex items-center justify-center">
+                                         <span className="material-symbols-outlined text-[#00f5d4] text-[20px]">dark_mode</span>
+                                     </div>
+                                 </div>
+                                 <div className="space-y-4">
+                                     <div className="h-8 w-3/4 bg-white/20 rounded-xl"></div>
+                                     <div className="h-4 w-full bg-white/5 rounded-lg"></div>
+                                 </div>
+                                 <div className="mt-auto flex gap-4">
+                                     <div className="h-12 w-32 bg-[#00f5d4] rounded-2xl shadow-[0_10px_30px_rgba(0,245,212,0.3)]"></div>
+                                 </div>
+                             </div>
+                        </div>
+                    </div>
+                    <div className="space-y-10 text-center lg:text-left">
+                        <div className="space-y-4">
+                            <span className="text-[#00f5d4] text-xs font-black uppercase tracking-[0.4em]">EXCLUSIVIDADE BORA PASSAR</span>
+                            <h2 className="text-5xl lg:text-7xl font-black uppercase italic tracking-tighter leading-none">MODO <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00f5d4] to-[#00b4d8]">RELAX</span></h2>
+                        </div>
+                        <p className="text-lg text-white/40 font-medium leading-relaxed italic">
+                            A única plataforma com tecnologia de conforto visual absoluto. Reduza a fadiga ocular e estude por mais tempo.
+                        </p>
+                    </div>
+                </section>
+
+                {course.disciplinas && course.disciplinas.length > 0 && (
+                    <section id="materias" className="py-32 bg-white/[0.01]">
+                        <div className="max-w-7xl mx-auto px-6 space-y-20">
+                             <div className="flex flex-col lg:flex-row justify-between items-end gap-10">
+                                 <h2 className="text-5xl lg:text-7xl font-black uppercase italic tracking-tighter leading-none">MATÉRIAS DO <br /><span className="text-[#00f5d4]">EDITAL</span></h2>
+                             </div>
+                             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                 {course.disciplinas.map((disc, idx) => (
+                                     <div key={idx} className="group bg-white/[0.02] border border-white/5 p-8 rounded-[32px] flex items-center justify-between hover:bg-[#00f5d4] transition-all duration-500 hover:scale-[1.02]">
+                                         <span className="text-sm font-black uppercase tracking-widest text-white/50 group-hover:text-black transition-colors">{disc}</span>
+                                         <span className="material-symbols-outlined text-[#00f5d4] group-hover:text-black transition-colors">check_circle</span>
+                                     </div>
+                                 ))}
+                             </div>
+                        </div>
+                    </section>
+                )}
+
+                <section id="preco" className="py-32 lg:py-56 relative overflow-hidden">
+                    <div className="max-w-4xl mx-auto px-6 relative z-10 text-center space-y-16">
+                        <div className="bg-white/[0.03] border border-white/10 rounded-[60px] p-16 lg:p-24 shadow-huge relative overflow-hidden group hover:border-[#00f5d4]/30 transition-all duration-700">
+                             <div className="space-y-8 mb-12">
+                                 {hasDiscount && (
+                                     <p className="text-xl font-black text-white/20 line-through decoration-[#00f5d4]/40 italic mb-[-15px]">
+                                         De R$ {formatPrice(course.price_base)}
+                                     </p>
+                                 )}
+                                 <div className="flex items-baseline justify-center gap-3">
+                                     <span className="text-4xl font-black italic text-white/20">R$</span>
+                                     <span className="text-8xl lg:text-[140px] font-black italic tracking-tighter leading-none text-white group-hover:text-[#00f5d4] transition-colors">
+                                         {isFree ? 'GRÁTIS' : formatPrice(course.price_offer)}
+                                     </span>
+                                 </div>
+                             </div>
+                             <button onClick={handlePurchase} className="w-full py-10 bg-[#00f5d4] text-black font-black text-3xl uppercase italic tracking-widest rounded-3xl hover:bg-white transition-all transform hover:-translate-y-2 shadow-[0_20px_50px_rgba(0,245,212,0.2)]">QUERO MINHA VAGA AGORA</button>
+                        </div>
                     </div>
                 </section>
             </div>
         );
     };
 
-    const Executive = () => {
-        const FeaturesExecutive = [
-            { title: 'Atendimento especializado ao Aluno', desc: 'Canal direto para tirar dúvidas com nossos especialistas.', icon: 'support_agent' },
-            { title: 'Apostilas Digitais', desc: 'Material estratégico otimizado para sua leitura rápida.', icon: 'auto_stories' },
-            { title: 'Simulados de Elite', desc: 'Treine com questões inéditas no tempo real da prova.', icon: 'quiz' },
-            { title: 'Banco de Questões', desc: 'Milhares de itens comentados e mapeados por assunto.', icon: 'database' }
-        ];
-
-        return (
-            <div className="min-h-screen bg-[#0f172a] text-slate-200 font-serif selection:bg-amber-500 selection:text-slate-900 overflow-x-hidden">
-                <nav className="fixed top-0 inset-x-0 h-20 bg-[#0f172a]/95 backdrop-blur-md border-b border-white/5 z-[100] px-6 lg:px-20 flex items-center justify-between">
-                    <img src="/bora_passar_logo.png" className="h-6 opacity-60 transition-opacity hover:opacity-100" alt="Logo" />
-                    <button onClick={handlePurchase} className="px-6 py-2 border border-amber-500/30 text-amber-500 font-black uppercase text-[10px] tracking-widest hover:bg-amber-500 hover:text-slate-900 transition-all active:scale-95">EU QUERO AGORA!</button>
-                </nav>
-
-                <main className="pt-20">
-                    {/* Hero Split */}
-                    <section className="max-w-7xl mx-auto px-6 py-20 lg:py-32 grid lg:grid-cols-2 gap-20 items-center">
-                        <div className="space-y-10 animate-in fade-in slide-in-from-left duration-1000">
-                            <div className="space-y-4">
-                                <span className="text-amber-500 font-black tracking-[0.5em] text-[10px] uppercase block">PREPARAÇÃO DE ALTO NÍVEL</span>
-                                <h1 className="text-5xl lg:text-8xl font-black text-white italic tracking-tighter leading-none">{course.title}</h1>
-                                <p className="text-xl lg:text-2xl text-slate-400 italic max-w-xl">Um ecossistema fechado para quem busca a vaga com autoridade absoluta.</p>
-                            </div>
-
-                            <div className="bg-white/5 border border-white/10 p-8 rounded-3xl space-y-8 max-w-lg">
-                                <div className="flex flex-col gap-1">
-                                    <PromoBadge className="mb-6" />
-                                    {course.coupon_name && <span className="text-[10px] font-black uppercase tracking-widest text-amber-500 animate-pulse">CÓDIGO_ATIVO: {course.coupon_name}</span>}
-                                    {hasDiscount && <span className="text-white/30 line-through text-lg font-bold">R$ {formatPrice(course.price_base)}</span>}
-                                    <div className="flex items-baseline gap-4">
-                                        <span className="text-6xl font-black text-white italic">R$ {formatPrice(course.price_offer)}</span>
-                                        <span className="text-xs font-bold uppercase opacity-20 tracking-widest">Investimento único</span>
-                                    </div>
-                                </div>
-                                <button onClick={handlePurchase} className="w-full py-6 bg-amber-500 text-slate-950 font-black uppercase tracking-widest text-xs hover:bg-amber-400 transition-colors shadow-2xl shadow-amber-500/20">Solicitar Admissão Imediata</button>
-                            </div>
-
-                            <div className="flex gap-12 border-t border-white/5 pt-10">
-                                {Stats.map((s, i) => (
-                                    <div key={i} className="space-y-1">
-                                        <p className="text-2xl font-black text-white italic">{s.val}</p>
-                                        <p className="text-[9px] uppercase tracking-[0.2em] opacity-30 font-serif">{s.label}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="relative group perspective-1000 hidden lg:block">
-                            <div className="absolute inset-0 bg-amber-500/10 blur-[100px] -z-10 group-hover:bg-amber-500/20 transition-all duration-1000"></div>
-                            <img src={course.banner_url} className="w-full rounded-[40px] shadow-huge border border-white/10 grayscale hover:grayscale-0 transition-all duration-1000 rotate-y-[-10deg] group-hover:rotate-y-0" alt="" />
-                        </div>
-                    </section>
-
-                    {/* Features Grid */}
-                    <section className="bg-white/[0.02] border-y border-white/5">
-                        <div className="max-w-7xl mx-auto px-6 py-20 lg:py-32 grid md:grid-cols-2 lg:grid-cols-4 gap-12">
-                            {FeaturesExecutive.map((f, i) => (
-                                <div key={i} className="space-y-6 group">
-                                    <span className="text-5xl font-black text-amber-500/10 group-hover:text-amber-500/40 transition-colors italic">0{i + 1}</span>
-                                    <div className="space-y-3">
-                                        <h4 className="text-xl font-black text-white uppercase tracking-wider">{f.title}</h4>
-                                        <p className="text-sm text-slate-400 leading-relaxed font-serif italic opacity-60">Atendimento especializado ao Aluno</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-                </main>
-
-                <footer className="py-20 text-center border-t border-white/5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.5em] opacity-20 italic">Bora Passar Elite Prep • Strategic Learning Systems</p>
-                </footer>
-            </div>
-        );
-    };
-
-    const Energetic = () => {
-        const FeaturesEnergetic = [
-            { title: 'Atendimento especializado ao Aluno', desc: 'Canal direto para tirar dúvidas com nossos especialistas.', icon: 'support_agent' },
-            { title: 'Apostilas Digitais', desc: 'Material estratégico otimizado para sua leitura rápida.', icon: 'auto_stories' },
-            { title: 'Simulados de Elite', desc: 'Treine com questões inéditas no tempo real da prova.', icon: 'quiz' },
-            { title: 'Banco de Questões', desc: 'Milhares de itens comentados e mapeados por assunto.', icon: 'database' }
-        ];
-
-        return (
-            <div className="min-h-screen bg-orange-600 text-white font-sans overflow-hidden">
-                <div className="fixed h-screen w-32 bg-black left-0 top-0 hidden lg:flex items-center justify-center -rotate-6 -translate-x-12 z-50">
-                    <span className="origin-center -rotate-90 font-black text-4xl uppercase tracking-tighter text-orange-600 animate-marquee whitespace-nowrap">BORA PASSAR / BORA PASSAR / BORA PASSAR</span>
-                </div>
-                <main className="pl-0 lg:pl-20">
-                    <section className="min-h-screen grid lg:grid-cols-2">
-                        <div className="flex flex-col justify-center p-12 lg:p-24 space-y-12 bg-white text-black relative">
-                            <img src="/bora_passar_logo.png" className="h-10 w-fit absolute top-10 left-10" alt="Logo" />
-                            <span className="px-6 py-2 bg-orange-600 text-white font-black text-sm skew-x-[-15deg] w-fit">VAGAS LIMITADAS</span>
-                            <h1 className="text-7xl lg:text-[140px] font-black leading-[0.8] tracking-tighter uppercase -ml-4 italic">SEM <br /> <span className="text-orange-600">FOLGA.</span></h1>
-                            <p className="text-2xl font-bold italic opacity-60 leading-tight">O conteúdo mais agressivo para detonar no cuncurso e garantir a aprovação!.</p>
-                            <div className="p-8 bg-orange-50 border-4 border-black shadow-[15px_15px_0_#000] rotate-2 space-y-4">
-                                <div className="space-y-1 relative">
-                                    <PromoBadge className="mb-6 -rotate-2" />
-                                    {course.coupon_name && <p className="text-xs font-black uppercase text-orange-600 tracking-widest animate-pulse">CUMPOM ATIVO: {course.coupon_name}</p>}
-                                    {hasDiscount && <p className="text-2xl text-black/20 line-through font-black italic">R$ {formatPrice(course.price_base)}</p>}
-                                    <span className="text-7xl lg:text-9xl font-black italic block italic leading-none">R$ {formatPrice(course.price_offer)}</span>
-                                </div>
-                                <button onClick={handlePurchase} className="w-full bg-black text-white py-8 font-black text-4xl uppercase hover:translate-x-2 hover:translate-y-2 hover:shadow-none transition-all shadow-[10px_10px_0_#ea580c] active:scale-95">EU QUERO MINHA POSSE! ⚡</button>
-                            </div>
-                        </div>
-                        <div className="relative overflow-hidden group flex items-center justify-center">
-                            <img src={course.banner_url} className="h-full w-full object-cover grayscale scale-125 group-hover:grayscale-0 group-hover:scale-100 transition-all duration-[3000ms]" alt="" />
-                            <div className="absolute inset-x-0 h-24 bg-orange-600/90 -rotate-3 flex items-center justify-center border-y-4 border-black shadow-2xl skew-y-3 z-10">
-                                <span className="text-white font-black text-4xl lg:text-5xl uppercase tracking-tighter drop-shadow-lg">{course.title}</span>
-                            </div>
-                            <div className="absolute inset-0 bg-orange-600/30 mix-blend-multiply transition-opacity group-hover:opacity-0"></div>
-                            <div className="absolute top-10 right-10 flex flex-col gap-4">
-                                {Stats.map((s, i) => (<div key={i} className="bg-white text-black p-4 border-2 border-black font-black text-center -rotate-12"><p className="text-xl">{s.val}</p><p className="text-[8px] uppercase">{s.label}</p></div>))}
-                            </div>
-                        </div>
-                    </section>
-                    <div className="py-40 grid lg:grid-cols-4 gap-8 px-12 lg:px-24">
-                        {FeaturesEnergetic.map((f, i) => (
-                            <div key={i} className="p-12 border-4 border-white bg-transparent text-white space-y-6 hover:bg-white hover:text-black transition-all">
-                                <span className="material-symbols-outlined text-6xl">{f.icon}</span>
-                                <h4 className="text-3xl font-black uppercase italic">{f.title}</h4>
-                                <p className="text-sm font-bold opacity-70 italic leading-relaxed">{f.desc}</p>
-                            </div>
-                        ))}
-                    </div>
-                </main>
-            </div>
-        );
-    };
-
-    const Nature = () => {
-        const FeaturesNature = [
-            { title: 'Atendimento especializado ao Aluno', desc: 'Canal direto para tirar dúvidas com nossos especialistas.', icon: 'support_agent' },
-            { title: 'Apostilas Digitais', desc: 'Material estratégico otimizado para sua leitura rápida.', icon: 'auto_stories' },
-            { title: 'Simulados de Elite', desc: 'Treine com questões inéditas no tempo real da prova.', icon: 'quiz' },
-            { title: 'Banco de Questões', desc: 'Milhares de itens comentados e mapeados por assunto.', icon: 'database' }
-        ];
-
-        return (
-            <div className="min-h-screen bg-[#f7fee7] text-emerald-950 font-sans p-4 lg:p-12 selection:bg-emerald-200">
-                <div className="max-w-7xl mx-auto bg-white rounded-[60px] lg:rounded-[100px] p-8 lg:p-24 space-y-24 shadow-[0_50px_100px_rgba(6,78,59,0.05)] border border-emerald-100 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 size-[600px] bg-emerald-50 rounded-full blur-[120px] translate-x-1/3 -translate-y-1/3 -z-10"></div>
-
-                    <nav className="flex justify-between items-center">
-                        <img src="/bora_passar_logo.png" className="h-10 brightness-0 sepia(1) saturate(100) hue-rotate(100deg)" alt="Logo" />
-                        <span className="hidden lg:block text-[10px] font-black uppercase tracking-widest text-emerald-800/40">Soft Prep Experience • 2026</span>
-                    </nav>
-
-                    <header className="text-center space-y-10">
-                        <div className="inline-flex items-center gap-3 px-6 py-2 bg-emerald-50 text-emerald-700 rounded-full font-black text-[10px] uppercase tracking-widest animate-pulse border border-emerald-100">🌱 Semeie seu futuro agora</div>
-                        <div className="space-y-6">
-                            <h1 className="text-6xl lg:text-[110px] font-black leading-[0.9] tracking-tighter text-emerald-950 uppercase">ESTUDE COM <br /> <span className="text-emerald-500 italic uppercase">EQUILÍBRIO.</span></h1>
-                            <h2 className="text-3xl lg:text-5xl font-black text-emerald-600 uppercase tracking-tighter drop-shadow-sm">{course.title}</h2>
-                        </div>
-                        <p className="text-xl lg:text-2xl font-medium max-w-3xl mx-auto text-emerald-900/60 leading-relaxed italic">Preparatório para mudar sua vida. Um método focado na absorção estratégica para sua aprovação!</p>
-
-                        <div className="flex flex-wrap justify-center gap-4 lg:gap-8 pt-6">
-                            {Stats.map((s, i) => (
-                                <div key={i} className="px-8 py-4 bg-emerald-50/50 backdrop-blur-sm rounded-3xl text-center border border-emerald-100 transition-transform hover:scale-105">
-                                    <p className="text-3xl font-black text-emerald-600">{s.val}</p>
-                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-30">{s.label}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </header>
-
-                    <section className="bg-emerald-600 text-white rounded-[50px] lg:rounded-[80px] p-10 lg:p-20 grid lg:grid-cols-2 gap-16 items-center relative overflow-hidden shadow-2xl shadow-emerald-900/20 group">
-                        <div className="absolute top-0 left-0 size-full opacity-5 pointer-events-none">
-                            <div className="grid grid-cols-10 gap-px size-full">{Array(100).fill(0).map((_, i) => (<div key={i} className="border border-white"></div>))}</div>
-                        </div>
-
-                        <div className="space-y-10 z-10 text-center lg:text-left">
-                            <div className="space-y-4">
-                                <h2 className="text-4xl lg:text-6xl font-black leading-tight">Garantir a sua posse é questão de estratégia.</h2>
-                                <div className="space-y-2">
-                                    <PromoBadge className="mb-6" />
-                                    {course.coupon_name && <p className="text-[10px] font-black uppercase tracking-widest text-emerald-200 animate-pulse">Cupom Ativo: {course.coupon_name}</p>}
-                                    {hasDiscount && <p className="text-2xl text-white/30 line-through font-black italic">R$ {formatPrice(course.price_base)}</p>}
-                                    <div className="text-8xl lg:text-[140px] font-black italic tracking-tighter leading-none">R$ {formatPrice(course.price_offer)}</div>
-                                </div>
-                            </div>
-                            <button onClick={handlePurchase} className="w-full lg:w-auto px-16 py-8 bg-white text-emerald-900 rounded-full font-black text-2xl hover:scale-105 transition-all shadow-xl active:scale-95">{CTA_TEXT}</button>
-                        </div>
-
-                        <div className="relative z-10">
-                            <div className="absolute -inset-4 bg-emerald-400/20 blur-2xl rounded-full scale-0 group-hover:scale-100 transition-transform duration-1000"></div>
-                            <div className="rounded-[40px] overflow-hidden shadow-2xl border-8 border-white/10 group-hover:border-white/20 transition-all">
-                                <img src={course.banner_url} className="w-full aspect-video object-cover transition-transform duration-1000 group-hover:scale-110" alt="Banner" />
-                            </div>
-                        </div>
-                    </section>
-
-                    <footer className="grid lg:grid-cols-4 gap-12 pb-10">
-                        {FeaturesNature.map((f, i) => (
-                            <div key={i} className="space-y-6 group p-8 rounded-3xl hover:bg-emerald-50 transition-colors">
-                                <span className="material-symbols-outlined text-5xl text-emerald-300 group-hover:text-emerald-600 transition-all transform group-hover:rotate-12">{f.icon}</span>
-                                <div className="space-y-2">
-                                    <h4 className="text-xl font-black text-emerald-950">{f.title}</h4>
-                                    <p className="text-sm text-emerald-900/40 font-medium leading-relaxed italic">{f.desc}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </footer>
-                </div>
-            </div>
-        );
-    };
-
-    const Premium = () => {
-        const FeaturesPremium = [
-            { title: 'Atendimento especializado ao Aluno', desc: 'Canal exclusivo de atendimento direto no WhatsApp.', icon: 'support_agent' },
-            { title: 'Material de Elite', desc: 'Apostilas densas, focadas no que realmente cai na prova.', icon: 'auto_stories' },
-            { title: 'Monitoramento', desc: 'Simulados ranqueados com análise de desempenho real.', icon: 'analytics' },
-            { title: 'Questões Reais', desc: 'Milhares de itens comentados pela nossa equipe.', icon: 'database' }
-        ];
-
-        return (
-            <div className="min-h-screen bg-[#050505] text-neutral-100 font-serif selection:bg-[#d4af37] selection:text-black overflow-x-hidden">
-                <nav className="fixed top-0 inset-x-0 h-24 px-6 lg:px-20 flex items-center justify-between z-[100] bg-black/60 backdrop-blur-xl border-b border-[#d4af37]/10">
-                    <img src="/bora_passar_logo.png" className="h-8 brightness-0 invert sepia(1) saturate(5) hue-rotate-[340deg] contrast(1.2) drop-shadow(0 0 5px #d4af37)" alt="Logo" />
-                    <button onClick={handlePurchase} className="px-8 py-2.5 bg-[#d4af37] text-black text-[10px] uppercase font-black tracking-[0.2em] hover:bg-white transition-all transform hover:scale-105 active:scale-95">Solicitar Acesso VIP</button>
-                </nav>
-
-                <main>
-                    {/* Immersive Hero */}
-                    <section className="relative min-h-screen flex flex-col items-center justify-center pt-20 px-6 overflow-hidden">
-                        <div className="absolute inset-0 z-0">
-                            <img src={course.banner_url} className="w-full h-full object-cover opacity-20 scale-110 blur-sm" alt="" />
-                            <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-transparent to-[#050505]"></div>
-                            <div className="absolute inset-0 bg-black/40"></div>
-                        </div>
-
-                        <div className="relative z-10 text-center space-y-12 max-w-7xl mx-auto">
-                            <div className="space-y-6 animate-in fade-in slide-in-from-top duration-1000">
-                                <span className="inline-block px-10 py-2 border border-[#d4af37]/30 text-[#d4af37] text-[10px] font-black uppercase tracking-[0.8em]">Padrão Refinado</span>
-                                <h1 className="text-6xl lg:text-[140px] font-black uppercase tracking-tighter leading-[0.85] text-white">
-                                    {course.title}
-                                </h1>
-                            </div>
-
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-16 max-w-4xl mx-auto py-12 border-y border-white/5 bg-white/[0.02] backdrop-blur-sm rounded-[40px] px-10">
-                                {Stats.map((s, i) => (
-                                    <div key={i} className="text-center group space-y-1">
-                                        <p className="text-3xl lg:text-5xl font-black text-[#d4af37] group-hover:scale-110 transition-transform">{s.val}</p>
-                                        <p className="text-[10px] font-black uppercase tracking-widest opacity-30 group-hover:opacity-100">{s.label}</p>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="flex flex-col items-center gap-10">
-                                <div className="space-y-4 flex flex-col items-center">
-                                    <PromoBadge className="mb-4" />
-                                    {course.coupon_name && <p className="text-[11px] font-black text-[#d4af37] uppercase tracking-[0.4em] animate-pulse"># CUPOM_ATIVADO: {course.coupon_name}</p>}
-                                    <div className="flex items-center justify-center gap-8">
-                                        {hasDiscount && <span className="text-3xl text-white/10 line-through font-bold">R$ {formatPrice(course.price_base)}</span>}
-                                        <span className="text-7xl lg:text-9xl font-black italic tracking-tighter text-white drop-shadow-[0_0_50px_rgba(212,175,55,0.2)]">R$ {formatPrice(course.price_offer)}</span>
-                                    </div>
-                                </div>
-                                <button onClick={handlePurchase} className="group relative px-24 py-10 bg-white text-black font-black text-2xl uppercase tracking-widest hover:bg-[#d4af37] transition-all transform hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(212,175,55,0.3)]">
-                                    BORA SER VIP
-                                    <span className="absolute inset-0 border border-white translate-x-3 translate-y-3 -z-10 group-hover:translate-x-0 group-hover:translate-y-0 transition-transform"></span>
-                                </button>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Features Grid */}
-                    <section className="max-w-7xl mx-auto px-6 py-40">
-                        <div className="grid lg:grid-cols-2 gap-32 items-center">
-                            <div className="space-y-16">
-                                <h2 className="text-6xl lg:text-8xl font-black uppercase leading-none text-white tracking-tighter">O SEGREDO <br /> <span className="text-[#d4af37] italic">DA POSSE.</span></h2>
-                                <div className="space-y-12">
-                                    {FeaturesPremium.map((f, i) => (
-                                        <div key={i} className="flex gap-10 items-start group border-l-2 border-white/5 pl-10 hover:border-[#d4af37] transition-colors">
-                                            <span className="material-symbols-outlined text-4xl text-[#d4af37] opacity-40 group-hover:opacity-100 transition-opacity">{f.icon}</span>
-                                            <div className="space-y-3">
-                                                <h4 className="text-2xl font-black uppercase text-white tracking-widest">{f.title}</h4>
-                                                <p className="text-lg text-neutral-500 font-medium leading-relaxed italic">{f.desc}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="relative group perspective-1000">
-                                <div className="absolute -inset-10 bg-[#d4af37]/5 blur-[120px] rounded-full group-hover:bg-[#d4af37]/10 transition-all duration-1000"></div>
-                                <div className="rounded-[60px] overflow-hidden border border-white/10 shadow-huge rotate-y-[-12deg] group-hover:rotate-y-0 transition-all duration-1000 relative">
-                                    <img src={course.banner_url} className="w-full aspect-[4/5] object-cover grayscale hover:grayscale-0 transition-all duration-1000" alt="" />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-                </main>
-
-                <footer className="py-20 text-center border-t border-white/5 opacity-20 text-[10px] uppercase font-black tracking-[1em]">
-                    Bora Passar Agora • Premium Academic Experience • 2026
-                </footer>
-            </div>
-        );
-    };
-
-    const ModernTech = () => {
-        const FeaturesTech = [
-            { title: 'Atendimento especializado ao Aluno', desc: 'Suporte técnico e pedagógico direto.', icon: 'support_agent' },
-            { title: 'Apostilas Digitais', desc: 'Acesso instantâneo ao material de estudo.', icon: 'auto_stories' },
-            { title: 'Simulados Online', desc: 'Pratique com cronômetro e ranking.', icon: 'quiz' },
-            { title: 'Banco de Dados', desc: 'Milhares de questões mapeadas.', icon: 'database' }
-        ];
-
-        return (
-            <div className="min-h-screen bg-[#050508] text-indigo-400 font-mono p-4 lg:p-12 overflow-hidden selection:bg-indigo-500 selection:text-white">
-                <div className="max-w-[1600px] mx-auto min-h-[90vh] border-2 border-indigo-500/20 rounded-[40px] overflow-hidden bg-[#0a0a14] flex flex-col shadow-[0_50px_100px_rgba(0,0,0,0.8)] relative">
-                    {/* Efeitos de Fundo */}
-                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-5 pointer-events-none"></div>
-                    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
-                        <div className="absolute top-0 left-1/4 w-px h-full bg-gradient-to-b from-transparent via-indigo-500 to-transparent animate-scanline"></div>
-                        <div className="absolute top-0 right-1/4 w-px h-full bg-gradient-to-b from-transparent via-indigo-500 to-transparent animate-scanline delay-1000"></div>
-                    </div>
-
-                    <div className="h-16 bg-[#0f0f1f] flex items-center px-6 lg:px-10 border-b border-indigo-500/10 justify-between z-10">
-                        <div className="flex items-center gap-6">
-                            <div className="flex gap-2">
-                                <div className="size-3 rounded-full bg-red-500/40"></div>
-                                <div className="size-3 rounded-full bg-yellow-500/40"></div>
-                                <div className="size-3 rounded-full bg-green-500/40"></div>
-                            </div>
-                            <img src="/bora_passar_logo.png" className="h-6 brightness-0 invert sepia(1) saturate(5) hue-rotate-[240deg] contrast(1.2)" alt="Logo" />
-                        </div>
-                        <span className="text-[10px] font-black uppercase tracking-[0.4em] opacity-40 hidden md:block">bpa_nucleo_v3.0.estabilidade</span>
-                    </div>
-
-                    <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto">
-                        <div className="flex-1 p-8 lg:p-24 space-y-12">
-                            <div className="space-y-4">
-                                <span className="text-indigo-500 bg-indigo-500/10 px-4 py-1 rounded text-[10px] animate-pulse font-bold tracking-widest">$ comando_executado --posse_imediata</span>
-                                <h1 className="text-5xl lg:text-8xl font-black text-white leading-none uppercase tracking-tighter">
-                                    INICIAR <br /> <span className="text-indigo-500 italic">APROVAÇÃO</span>
-                                </h1>
-                                <p className="text-xl text-indigo-300/60 max-w-xl font-bold uppercase tracking-widest underline decoration-indigo-500/30">{course.title}</p>
-                            </div>
-
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-                                {Stats.map((s, i) => (
-                                    <div key={i} className="p-6 bg-black/40 border border-indigo-500/10 rounded-2xl group hover:border-indigo-500/40 transition-all text-center">
-                                        <p className="text-[9px] font-black uppercase opacity-30 group-hover:opacity-100 transition-opacity tracking-widest">{s.label}</p>
-                                        <p className="text-3xl font-black text-white mt-1 italic group-hover:scale-110 transition-transform">{s.val}</p>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="p-8 bg-indigo-500/5 border border-indigo-500/10 rounded-3xl space-y-6">
-                                <p className="text-indigo-500 font-black text-[10px] uppercase tracking-widest animate-pulse">&gt; módulos_ativos_do_preparatório:</p>
-                                <div className="grid md:grid-cols-2 gap-6">
-                                    {FeaturesTech.map((f, i) => (
-                                        <div key={i} className="flex gap-4 items-center">
-                                            <span className="text-green-500 font-black text-[10px]">[OK]</span>
-                                            <div>
-                                                <p className="text-sm text-white font-black uppercase tracking-wider">{f.title}</p>
-                                                <p className="text-[10px] text-indigo-400/50 uppercase leading-relaxed">{f.desc}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col lg:flex-row items-center gap-12 pt-10 border-t border-white/5">
-                                <div className="space-y-2 text-center lg:text-left flex flex-col items-center lg:items-start">
-                                    <PromoBadge className="mb-4" />
-                                    {course.coupon_name && <p className="text-[10px] font-black uppercase tracking-widest text-[#00ffc3] animate-pulse">CÓDIGO_VITAL: {course.coupon_name}</p>}
-                                    <div className="flex flex-col">
-                                        {hasDiscount && <span className="text-2xl text-white/10 line-through font-black italic italic leading-none">R$ {formatPrice(course.price_base)}</span>}
-                                        <span className="text-7xl lg:text-9xl font-black text-white italic tracking-tighter leading-none drop-shadow-[0_0_30px_rgba(99,102,241,0.3)]">R$ {formatPrice(course.price_offer)}</span>
-                                    </div>
-                                </div>
-                                <button onClick={handlePurchase} className="w-full lg:w-auto px-20 py-8 bg-indigo-600 text-white font-black text-2xl rounded-2xl hover:shadow-[0_0_60px_rgba(79,70,229,0.5)] transition-all active:scale-95 border-b-4 border-indigo-800 uppercase tracking-widest">EXECUTAR_SISTEMA ↗</button>
-                            </div>
-                        </div>
-                        <div className="w-full lg:w-[45%] bg-black relative flex items-center justify-center p-12 lg:border-l border-indigo-500/10 min-h-[400px]">
-                            <div className="absolute inset-0 bg-indigo-500/5 blur-[100px] rounded-full"></div>
-                            <img src={course.banner_url} className="max-w-full rounded-2xl relative z-10 border-2 border-indigo-500/20 shadow-2xl transition-all hover:scale-105 duration-1000" alt="" />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black pointer-events-none z-20"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    const Creative = () => {
-        const FeaturesCreative = [
-            { title: 'Atendimento especializado ao Aluno', desc: 'Canal direto para tirar dúvidas com nossos especialistas.', icon: 'support_agent' },
-            { title: 'Apostilas Digitais', desc: 'Material estratégico otimizado para sua leitura rápida.', icon: 'auto_stories' },
-            { title: 'Simulados de Elite', desc: 'Treine com questões inéditas no tempo real da prova.', icon: 'quiz' },
-            { title: 'Banco de Questões', desc: 'Milhares de itens comentados e mapeados por assunto.', icon: 'database' }
-        ];
-
-        return (
-            <div className="min-h-screen bg-pink-500 text-black font-sans p-6 lg:p-12 overflow-x-hidden selection:bg-yellow-400">
-                <div className="max-w-[1400px] mx-auto space-y-12">
-                    <nav className="h-24 bg-white border-[8px] border-black p-8 flex justify-between items-center shadow-[15px_15px_0_#000] rotate-[-1deg] transition-transform hover:rotate-0">
-                        <img src="/bora_passar_logo.png" className="h-6 invert" alt="" />
-                        <button onClick={handlePurchase} className="px-10 py-3 bg-black text-white font-black text-sm uppercase skew-x-[-10deg]">QUERO AGORA!</button>
-                    </nav>
-                    <div className="grid lg:grid-cols-12 gap-12">
-                        <section className="lg:col-span-8 bg-yellow-400 border-[12px] border-black p-12 lg:p-24 space-y-12 shadow-[20px_20px_0_#000] rotate-[1deg] transition-transform hover:rotate-0">
-                            <span className="inline-block bg-black text-white px-6 py-2 font-black text-lg skew-x-[-20deg]">#PROJETO_POSSE_MÁXIMA</span>
-                            <h1 className="text-7xl lg:text-[160px] font-black leading-[0.7] tracking-tighter uppercase italic -ml-4 underline group cursor-default">
-                                BORA <br /> <span className="text-pink-600">PASSAR</span> <br /> AGORA!
-                            </h1>
-                            <p className="text-2xl font-black uppercase tracking-widest bg-white border-4 border-black px-6 py-4 inline-block -rotate-2">{course.title}</p>
-
-                            <div className="flex flex-col gap-4">
-                                <PromoBadge className="mb-2 rotate-2 scale-110 z-20" />
-                                {course.coupon_name && <p className="text-xs font-black uppercase tracking-widest bg-black text-white px-4 py-1 w-fit rotate-2 mt-4">CUPOM: {course.coupon_name}</p>}
-                                <div className="flex flex-wrap items-end gap-10">
-                                    <div className="flex flex-col">
-                                        {hasDiscount && <span className="text-3xl font-black text-black/20 line-through -mb-4 ml-6 rotate-[-5deg] z-10">R${formatPrice(course.price_base)}</span>}
-                                        <span className="text-[140px] font-black italic tracking-tighter leading-none text-white drop-shadow-[10px_10px_0_#000]">R${formatPrice(course.price_offer)}</span>
-                                    </div>
-                                    <button onClick={handlePurchase} className="mb-6 px-16 py-10 bg-black text-white font-black text-4xl uppercase hover:translate-x-4 hover:translate-y-4 hover:shadow-none shadow-[20px_20px_0_#f472b6] transition-all active:scale-95 leading-none">GO!!! 🎯</button>
-                                </div>
-                            </div>
-                        </section>
-                        <div className="lg:col-span-4 flex flex-col gap-12">
-                            <div className="flex-1 bg-white border-[8px] border-black p-10 flex flex-col justify-center items-center text-center shadow-[15px_15px_0_#000] -rotate-3 transition-transform hover:rotate-0 gap-6">
-                                <img src={course.banner_url} className="w-full border-4 border-black grayscale group-hover:grayscale-0" alt="" />
-                                <div className="space-y-2">{Stats.map((s, i) => (<div key={i} className="flex justify-between items-center gap-10 font-black uppercase text-xl"><span>{s.label}:</span> <span className="text-pink-500">{s.val}</span></div>))}</div>
-                            </div>
-                            <div className="bg-cyan-400 border-[8px] border-black p-10 shadow-[15px_15px_0_#000] rotate-2 transition-transform hover:rotate-0">
-                                <h4 className="font-black uppercase text-3xl mb-8 border-b-8 border-black pb-4">POR QUE NÓS?</h4>
-                                <div className="space-y-6">{FeaturesCreative.map((f, i) => (<div key={i} className="flex items-center gap-6 font-black uppercase text-xs group"><span className="size-8 bg-black text-white flex items-center justify-center shrink-0 group-hover:rotate-45 transition-transform">{i + 1}</span> {f.title}</div>))}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    const Classic = () => {
-        const FeaturesClassic = [
-            { title: 'Atendimento especializado ao Aluno', desc: 'Canal direto para tirar dúvidas com nossos especialistas.', icon: 'support_agent' },
-            { title: 'Apostilas Digitais', desc: 'Material estratégico otimizado para sua leitura rápida.', icon: 'auto_stories' },
-            { title: 'Simulados de Elite', desc: 'Treine com questões inéditas no tempo real da prova.', icon: 'quiz' },
-            { title: 'Banco de Questões', desc: 'Milhares de itens comentados e mapeados por assunto.', icon: 'database' }
-        ];
-
-        return (
-            <div className="min-h-screen bg-white text-slate-800 font-sans selection:bg-blue-900 selection:text-white">
-                <header className="bg-[#0f172a] py-32 text-center text-white space-y-12 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
-                    <img src="/bora_passar_logo.png" className="h-12 brightness-0 invert mx-auto mb-10 transition-transform hover:scale-105" alt="Logo" />
-                    <div className="max-w-5xl mx-auto space-y-6 relative z-10">
-                        <span className="text-red-500 font-black text-xs lg:text-sm uppercase tracking-[0.3em] border-y border-red-500/20 py-4 px-10 inline-block">Mátriculas Abertas – Temporada 2026</span>
-                        <h1 className="text-5xl lg:text-[100px] font-black leading-[0.9] tracking-tight uppercase">CURSO PREPARATÓRIO <br /> <span className="text-transparent border border-white/40 px-6 py-2 mt-4 inline-block -skew-x-6 italic" style={{ WebkitTextFillColor: 'transparent', WebkitTextStroke: '2px white' }}>{course.title}</span></h1>
-                    </div>
-                    <p className="text-xl lg:text-2xl font-bold opacity-40 max-w-2xl mx-auto relative z-10">Método focado na sua aprovação!</p>
-                    <div className="flex flex-wrap justify-center gap-10 lg:gap-20 py-10 relative z-10">
-                        {Stats.map((s, i) => (<div key={i} className="text-center group cursor-default"><p className="text-4xl lg:text-6xl font-black group-hover:text-red-500 transition-colors">{s.val}</p><p className="text-[10px] uppercase font-black tracking-widest opacity-30">{s.label}</p></div>))}
-                    </div>
-
-                    <div className="max-w-4xl mx-auto px-6 relative z-10 mt-10">
-                        <div className="p-4 bg-white/5 border-4 border-white/10 rounded-[40px] shadow-2xl overflow-hidden group">
-                            <img src={course.banner_url} className="w-full rounded-[30px] group-hover:scale-105 transition-transform duration-[3000ms]" alt="Banner" />
-                        </div>
-                    </div>
-                </header>
-
-                <main className="max-w-6xl mx-auto px-6 py-40 grid lg:grid-cols-12 gap-20">
-                    <div className="lg:col-span-7 space-y-20">
-                        <div className="space-y-8">
-                            <h2 className="text-4xl lg:text-5xl font-black text-blue-950 uppercase border-l-[12px] border-red-600 pl-10 tracking-widest">Aqui você tem:</h2>
-                            <div className="grid sm:grid-cols-2 gap-8">
-                                {FeaturesClassic.map((f, i) => (
-                                    <div key={i} className="bg-slate-50 p-10 rounded-2xl border border-slate-100 space-y-6 hover:shadow-xl transition-all group">
-                                        <span className="material-symbols-outlined text-6xl text-blue-900 group-hover:scale-110 transition-transform">{f.icon}</span>
-                                        <div>
-                                            <p className="font-black text-xl text-blue-950">{f.title}</p>
-                                            <p className="text-sm text-slate-500 mt-2 font-medium leading-relaxed uppercase tracking-widest">{f.desc}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="lg:col-span-5">
-                        <div className="sticky top-40 bg-white border border-slate-100 p-10 lg:p-16 text-center space-y-12 shadow-huge transform hover:-translate-y-4 transition-all rounded-[40px]">
-                            <div className="space-y-2 flex flex-col items-center">
-                                <PromoBadge className="mb-6 -mt-6" />
-                                <p className="font-black uppercase tracking-widest text-slate-400 text-[10px]">Investimento na Carreira:</p>
-                                <div className="flex flex-col items-center gap-2">
-                                    {hasDiscount && <span className="text-2xl line-through text-slate-200 font-bold decoration-red-500">R$ {formatPrice(course.price_base)}</span>}
-                                    <span className="text-7xl lg:text-8xl font-black text-blue-950 tracking-tighter leading-none">R$ {formatPrice(course.price_offer)}</span>
-                                </div>
-                            </div>
-                            <div className="bg-red-50 p-6 rounded-2xl border border-red-100">
-                                <p className="text-red-600 font-black text-[10px] uppercase tracking-widest leading-relaxed">⚠️ Atenção: Últimas vagas com este valor!</p>
-                            </div>
-                            <button onClick={handlePurchase} className="w-full py-10 bg-red-600 text-white font-black text-2xl rounded-3xl shadow-[0_20px_60px_rgba(220,38,38,0.3)] hover:bg-red-700 transition-all uppercase active:scale-95 leading-none tracking-widest">MATRICULAR-SE AGORA</button>
-                            <div className="flex items-center justify-center gap-6 opacity-40">
-                                <span className="material-symbols-outlined text-4xl text-blue-950">verified_user</span>
-                                <span className="text-left leading-none font-bold text-[10px] uppercase italic">Acesso 100% Seguro <br /> 7 Dias de Garantia</span>
-                            </div>
-                        </div>
-                    </div>
-                </main>
-            </div>
-        );
-    };
 
     const ModelSwitcher = () => {
-        switch (course.lp_model) {
-            case 'minimalist': return <Minimalist />;
-            case 'futuristic': return <Futuristic />;
-            case 'executive': return <Executive />;
-            case 'energetic': return <Energetic />;
-            case 'nature': return <Nature />;
-            case 'premium': return <Premium />;
-            case 'modern_tech': return <ModernTech />;
-            case 'creative': return <Creative />;
-            case 'classic': return <Classic />;
-            default: return <Standard />;
-        }
+        if (course.lp_model === 'impacto-neon') return <ImpactoNeon />;
+        if (course.lp_model === 'premium') return <ProfessionalClean />;
+        return <EliteGold />;
     };
 
     return (
