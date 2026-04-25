@@ -13,6 +13,7 @@ interface CourseData {
   is_notice_open: boolean;
   test_date: string;
   access_days: number;
+  study_plan_json?: any[];
 }
 
 interface Notice {
@@ -37,9 +38,11 @@ const CourseView: React.FC = () => {
   const [collapsedDisciplines, setCollapsedDisciplines] = useState<string[]>([]);
   const [simuladoAttempts, setSimuladoAttempts] = useState<any[]>([]);
 
-  // New State for Notices
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
   const [isNoticesCollapsed, setIsNoticesCollapsed] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
+  const [expandedSessions, setExpandedSessions] = useState<string[]>([]);
 
   useEffect(() => {
     if (id) fetchData();
@@ -50,7 +53,21 @@ const CourseView: React.FC = () => {
     try {
       // Fetch Course Info
       const { data: courseData } = await supabase.from('courses').select('*').eq('id', id).single();
-      if (courseData) setCourse(courseData);
+      if (courseData) {
+        // Normalize study plan structure (migration from old flat array to new session/group structure)
+        if (Array.isArray(courseData.study_plan_json)) {
+            const firstItem = courseData.study_plan_json[0] as any;
+            if (firstItem && !firstItem.items && firstItem.type) {
+                // It's the old format (flat array of items)
+                courseData.study_plan_json = [{
+                    id: 'migration-default',
+                    title: 'Guia de Estudos',
+                    items: courseData.study_plan_json as any
+                }];
+            }
+        }
+        setCourse(courseData);
+      }
 
       // Fetch Items (Apostilas) linked to this course
       const { data: itemsData } = await supabase
@@ -201,15 +218,52 @@ const CourseView: React.FC = () => {
     }
   };
 
+  const togglePlanItemRead = async (itemId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!enrollment) {
+      alert('Você precisa estar matriculado para salvar o progresso.');
+      return;
+    }
+
+    const currentProgress = enrollment.study_plan_progress || {};
+    const isCurrentlyRead = currentProgress[itemId];
+    
+    const newProgress = { ...currentProgress, [itemId]: !isCurrentlyRead };
+
+    try {
+      const { error } = await supabase
+        .from('enrollments')
+        .update({
+          study_plan_progress: newProgress
+        })
+        .eq('id', enrollment.id);
+
+      if (error) throw error;
+
+      setEnrollment((prev: any) => prev ? ({ ...prev, study_plan_progress: newProgress }) : null);
+    } catch (err) {
+      console.error('Falha técnica ao salvar progresso do organizador:', err);
+      alert('Erro ao salvar progresso.');
+    }
+  };
+
   // ... (aux functions)
 
   // Helper for progress display
-  const getProgressPercentage = () => {
+  const getCourseProgress = () => {
     if (!items.length) return 0;
     const currentApostilaIds = items.map(i => i.apostila_id);
     const validReadCount = readItems.filter(id => currentApostilaIds.includes(id)).length;
     return Math.round((validReadCount / items.length) * 100);
   };
+
+  const studyPlanStats = useMemo(() => {
+    const planItems = course?.study_plan_json?.flatMap((s: any) => s.items || []) || [];
+    const total = planItems.length;
+    const completed = planItems.filter((item: any) => enrollment?.study_plan_progress?.[item.id]).length;
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { total, completed, percent };
+  }, [course?.study_plan_json, enrollment?.study_plan_progress]);
 
   // ... (rest of code)
 
@@ -409,21 +463,37 @@ const CourseView: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex bg-slate-50 p-6 rounded-[32px] border border-slate-100 gap-8">
-          <div className="text-center">
-            <p className="text-2xl font-black text-slate-900 leading-none">{items.length}</p>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Ligas/Apostilas</p>
+        <div className="flex flex-col gap-4 items-center lg:items-end w-full lg:w-auto">
+          <div className="flex bg-slate-50 p-6 rounded-[32px] border border-slate-100 gap-8 w-full justify-between lg:justify-start">
+            <div className="text-center">
+              <p className="text-2xl font-black text-slate-900 leading-none">{items.length}</p>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Ligas/Apostilas</p>
+            </div>
+            <div className="w-px h-10 bg-slate-200"></div>
+            <div className="text-center">
+              <p className="text-2xl font-black text-slate-900 leading-none">{simulados.length}</p>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Simulados</p>
+            </div>
+            <div className="w-px h-10 bg-slate-200"></div>
+            <div className="text-center">
+              <p className="text-2xl font-black text-emerald-500 leading-none">{getCourseProgress()}%</p>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Progresso</p>
+            </div>
           </div>
-          <div className="w-px h-10 bg-slate-200"></div>
-          <div className="text-center">
-            <p className="text-2xl font-black text-slate-900 leading-none">{simulados.length}</p>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Simulados</p>
-          </div>
-          <div className="w-px h-10 bg-slate-200"></div>
-          <div className="text-center">
-            <p className="text-2xl font-black text-emerald-500 leading-none">{getProgressPercentage()}%</p>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Progresso</p>
-          </div>
+
+          <button 
+            onClick={() => setIsGuideModalOpen(true)}
+            className={`w-full py-5 rounded-[32px] flex items-center justify-center gap-4 transition-all duration-500 shadow-2xl relative overflow-hidden group/btn bg-[#ff2d92] text-white shadow-pink-500/40 hover:scale-105 hover:bg-[#e62681]`}
+          >
+            <div className={`size-10 rounded-xl flex items-center justify-center transition-colors`}>
+              <span className="material-symbols-outlined text-3xl font-black">account_tree</span>
+            </div>
+            <div className="text-left">
+              <p className={`text-[7px] font-black uppercase tracking-[0.3em] leading-none mb-1 ${activeTab === 'organizador' ? 'text-white/80' : 'text-pink-300'}`}>Acessar Agora</p>
+              <p className="text-xs font-black uppercase italic tracking-widest leading-none">Guia de Estudo</p>
+            </div>
+            <div className="absolute top-0 -right-4 w-12 h-full bg-white/10 skew-x-12 translate-x-full group-hover/btn:translate-x-[-200%] transition-transform duration-1000"></div>
+          </button>
         </div>
       </div>
 
@@ -452,8 +522,33 @@ const CourseView: React.FC = () => {
           <div className="space-y-6">
             {(activeTab === 'apostilas' || activeTab === 'resolucoes') && (
               <div className="space-y-10">
+                <div className="relative group">
+                  <span className="material-symbols-outlined absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#137fec] transition-colors">search</span>
+                  <input 
+                    type="text" 
+                    placeholder="Filtrar por nome do material..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full h-16 bg-white border border-slate-100 rounded-[24px] pl-16 pr-8 text-sm font-bold text-slate-700 outline-none focus:border-[#137fec] focus:ring-4 focus:ring-blue-500/5 transition-all shadow-sm"
+                  />
+                </div>
                 {(() => {
-                  const currentGroups = activeTab === 'apostilas' ? groupedItems : groupedResolutions;
+                  let currentGroups = activeTab === 'apostilas' ? groupedItems : groupedResolutions;
+                  
+                  // Apply search filter
+                  if (searchTerm) {
+                    const filtered: any = {};
+                    Object.entries(currentGroups).forEach(([discipline, items]: [string, any]) => {
+                      const matchingItems = items.filter((item: any) => 
+                        item.apostila?.title?.toLowerCase().includes(searchTerm.toLowerCase())
+                      );
+                      if (matchingItems.length > 0) {
+                        filtered[discipline] = matchingItems;
+                      }
+                    });
+                    currentGroups = filtered;
+                  }
+
                   return (
                     <>
                       {Object.keys(currentGroups).length === 0 && (
@@ -528,6 +623,91 @@ const CourseView: React.FC = () => {
                     </>
                   );
                 })()}
+              </div>
+            )}
+
+            {activeTab === 'organizador' && (
+              <div className="space-y-12">
+                {(!course?.study_plan_json || course.study_plan_json.length === 0) ? (
+                  <div className="py-20 text-center bg-white rounded-[40px] border border-dashed border-slate-200">
+                    <span className="material-symbols-outlined text-slate-200 text-5xl mb-4">account_tree</span>
+                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">Nenhum guia de estudo configurado para esta trilha.</p>
+                  </div>
+                ) : (
+                  course.study_plan_json.map((session: any, sIndex: number) => (
+                    <div key={session.id} className="space-y-6">
+                      <div className="flex items-center gap-4 px-2">
+                        <div className="size-10 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-sm italic">
+                          {sIndex + 1}
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">{session.title}</h3>
+                          {session.comment && <p className="text-xs font-medium text-slate-500 italic mt-0.5">{session.comment}</p>}
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{session.items?.length || 0} Materiais nesta sessão</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 relative">
+                        <div className="absolute left-[39px] top-4 bottom-4 w-0.5 bg-slate-100 z-0"></div>
+                        {session.items?.map((item: any) => {
+                          const isCompleted = enrollment?.study_plan_progress?.[item.id];
+                          
+                          let icon = 'menu_book';
+                          let typeLabel = item.type;
+                          if (item.type === 'simulado') icon = 'speed';
+                          if (item.type === 'revisao') icon = 'draw';
+                          if (item.type === 'caderno') icon = 'library_books';
+                          if (item.type === 'resolvido') icon = 'fact_check';
+                          if (item.type === 'questao') icon = 'quiz';
+                          if (item.type === 'extra') icon = 'add_circle';
+                          if (item.type === 'outro') icon = 'link';
+
+                          return (
+                            <div key={item.id} className={`relative z-10 flex items-center gap-6 p-6 rounded-[32px] border transition-all ${isCompleted ? 'bg-emerald-50/30 border-emerald-100/50 opacity-80' : 'bg-white border-slate-100 hover:shadow-xl hover:border-[#137fec]/20'}`}>
+                              <div className={`size-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-colors ${isCompleted ? 'bg-emerald-500 text-white' : 'bg-slate-50 text-slate-400'}`}>
+                                <span className="material-symbols-outlined text-2xl">{isCompleted ? 'check_circle' : icon}</span>
+                              </div>
+                              
+                              <div className="flex-1">
+                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1 block">{typeLabel}</span>
+                                <h4 className={`text-base font-black uppercase italic tracking-tight leading-tight ${isCompleted ? 'text-emerald-900' : 'text-slate-900'}`}>{item.title}</h4>
+                              </div>
+
+                              <div className="flex items-center gap-4">
+                                {(item.type === 'apostila' || item.type === 'resolvido') && item.ref_id && (
+                                  <button onClick={() => navigate(`/aluno/apostila/${item.ref_id}`)} className="size-10 bg-slate-50 text-slate-400 hover:text-[#137fec] hover:bg-blue-50 rounded-xl flex items-center justify-center transition-all">
+                                    <span className="material-symbols-outlined">arrow_forward</span>
+                                  </button>
+                                )}
+                                {item.type === 'simulado' && item.ref_id && (
+                                  <button onClick={() => navigate(`/aluno/simulado/${item.ref_id}`)} className="size-10 bg-slate-50 text-slate-400 hover:text-[#137fec] hover:bg-blue-50 rounded-xl flex items-center justify-center transition-all">
+                                    <span className="material-symbols-outlined">arrow_forward</span>
+                                  </button>
+                                )}
+                                {item.type === 'caderno' && item.ref_id && (
+                                  <button onClick={() => navigate(`/aluno/caderno/${item.ref_id}`)} className="size-10 bg-slate-50 text-slate-400 hover:text-[#137fec] hover:bg-blue-50 rounded-xl flex items-center justify-center transition-all">
+                                    <span className="material-symbols-outlined">arrow_forward</span>
+                                  </button>
+                                )}
+                                {(item.type === 'outro' || item.type === 'extra' || item.type === 'revisao') && item.url && (
+                                  <a href={item.url} target="_blank" rel="noreferrer" className="size-10 bg-slate-50 text-slate-400 hover:text-[#137fec] hover:bg-blue-50 rounded-xl flex items-center justify-center transition-all">
+                                    <span className="material-symbols-outlined">open_in_new</span>
+                                  </a>
+                                )}
+                                
+                                <div className="w-px h-8 bg-slate-100"></div>
+                                
+                                <button onClick={(e) => togglePlanItemRead(item.id, e)} className={`px-6 py-2.5 rounded-[16px] text-[9px] font-black uppercase tracking-widest transition-all border ${isCompleted ? 'bg-emerald-100 border-emerald-200 text-emerald-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-[#137fec] hover:text-white hover:border-[#137fec]'}`}>
+                                  {isCompleted ? 'Concluído' : 'Marcar Feito'}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             )}
 
@@ -742,6 +922,199 @@ const CourseView: React.FC = () => {
               <button onClick={() => setSelectedNotice(null)} className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-[#137fec] transition-colors">
                 Entendido
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Premium Study Guide Modal */}
+      {isGuideModalOpen && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={() => setIsGuideModalOpen(false)}></div>
+          
+          <div className="relative w-full max-w-5xl h-full max-h-[90vh] bg-white rounded-[40px] shadow-huge flex flex-col animate-in zoom-in-95 duration-300 overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-8 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-6">
+                <div className="relative size-20 flex items-center justify-center">
+                  <svg className="size-full transform -rotate-90">
+                    <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-slate-100" />
+                    <circle 
+                      cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="6" fill="transparent" 
+                      strokeDasharray={2 * Math.PI * 36} 
+                      strokeDashoffset={2 * Math.PI * 36 * (1 - studyPlanStats.percent / 100)} 
+                      className="text-[#ff2d92] transition-all duration-1000" 
+                    />
+                  </svg>
+                  <span className="absolute text-lg font-black text-slate-900 tracking-tighter">{studyPlanStats.percent}%</span>
+                </div>
+                <div>
+                  <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">Roteiro de Estudo</h2>
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mt-2">Status: {studyPlanStats.completed} / {studyPlanStats.total} concluídos</p>
+                </div>
+              </div>
+              <button onClick={() => setIsGuideModalOpen(false)} className="size-12 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-300 hover:text-red-500 hover:border-red-100 transition-all shadow-sm">
+                <span className="material-symbols-outlined text-2xl">close</span>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar bg-slate-50/20">
+              {course?.study_plan_json?.map((session: any, sIndex: number) => {
+                const isExpanded = expandedSessions.includes(session.id);
+                const sessionProgress = session.items?.filter((item: any) => enrollment?.study_plan_progress?.[item.id]).length || 0;
+                const totalItems = session.items?.length || 0;
+                const percent = totalItems > 0 ? Math.round((sessionProgress / totalItems) * 100) : 0;
+
+                return (
+                  <div key={session.id} className="space-y-6">
+                    {/* Session Card (Collapsed) */}
+                    <button 
+                      onClick={() => setExpandedSessions(prev => prev.includes(session.id) ? prev.filter(id => id !== session.id) : [...prev, session.id])}
+                      className={`w-full p-8 bg-white rounded-[32px] border-2 transition-all flex items-center justify-between text-left group ${isExpanded ? 'border-pink-200 shadow-huge shadow-pink-500/5' : 'border-slate-100 hover:border-pink-100 shadow-sm'}`}
+                    >
+                      <div className="flex items-center gap-6">
+                        <div className={`size-14 rounded-2xl flex items-center justify-center font-black text-xl italic transition-all duration-500 ${isExpanded ? 'bg-[#ff2d92] text-white shadow-lg shadow-pink-500/20' : 'bg-slate-50 text-slate-300 group-hover:bg-pink-50 group-hover:text-pink-400'}`}>
+                          {sIndex + 1}
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter group-hover:text-pink-500 transition-colors">{session.title}</h3>
+                          <div className="flex items-center gap-4 mt-2">
+                            <div className="h-1.5 w-32 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-pink-500 transition-all duration-1000" style={{ width: `${percent}%` }}></div>
+                            </div>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{percent}% Concluído • {totalItems} Materiais</p>
+                          </div>
+                        </div>
+                      </div>
+                      <span className={`material-symbols-outlined text-slate-200 transition-transform duration-500 ${isExpanded ? 'rotate-180 text-pink-500' : ''}`}>expand_more</span>
+                    </button>
+
+                    {/* Timeline Items (Expanded) */}
+                    {isExpanded && (
+                      <div className="pl-10 space-y-8 relative ml-7">
+                        <div className="absolute left-[-1px] top-4 bottom-4 w-0.5 bg-slate-100 z-0"></div>
+                        
+                        {session.items?.map((item: any, iIndex: number) => {
+                          const isDone = enrollment?.study_plan_progress?.[item.id];
+                          const isPreviousDone = iIndex === 0 || enrollment?.study_plan_progress?.[session.items[iIndex-1].id];
+                          const isLocked = !isDone && !isPreviousDone && iIndex > 0;
+                          const isInProgress = !isDone && !isLocked;
+
+                          const typeStyles: any = {
+                            apostila: {
+                              border: "border-pink-100",
+                              accent: "text-pink-500",
+                              tag: "bg-pink-50 text-pink-600",
+                              icon: "auto_stories",
+                              label: "Apostila",
+                              highlight: true
+                            },
+                            simulado: {
+                              border: "border-orange-100",
+                              accent: "text-orange-500",
+                              tag: "bg-orange-50 text-orange-600",
+                              icon: "speed",
+                              label: "Simulado"
+                            },
+                            caderno: {
+                              border: "border-cyan-100",
+                              accent: "text-cyan-500",
+                              tag: "bg-cyan-50 text-cyan-600",
+                              icon: "library_books",
+                              label: "Caderno"
+                            },
+                            resolvido: {
+                              border: "border-emerald-100",
+                              accent: "text-emerald-500",
+                              tag: "bg-emerald-50 text-emerald-600",
+                              icon: "fact_check",
+                              label: "Resolução"
+                            },
+                            questao: {
+                              border: "border-violet-100",
+                              accent: "text-violet-500",
+                              tag: "bg-violet-50 text-violet-600",
+                              icon: "quiz",
+                              label: "Questão"
+                            }
+                          };
+
+                          const style = typeStyles[item.type] || {
+                            border: "border-slate-100",
+                            accent: "text-slate-400",
+                            tag: "bg-slate-50 text-slate-500",
+                            icon: "link",
+                            label: "Extra"
+                          };
+
+                          return (
+                            <div key={item.id} className={`relative z-10 flex items-start gap-8 group ${isLocked ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
+                              {/* Timeline Icon */}
+                              <div className={`size-8 rounded-full flex items-center justify-center shrink-0 mt-6 z-10 shadow-md border-2 border-white transition-all duration-500 ${isDone ? 'bg-emerald-500 text-white' : (isInProgress ? 'bg-pink-500 text-white animate-pulse' : 'bg-slate-50 text-slate-300')}`}>
+                                <span className="material-symbols-outlined text-xs font-black">{isDone ? 'check' : style.icon}</span>
+                              </div>
+
+                              {/* Card */}
+                              <div className={`flex-1 p-6 bg-white rounded-[24px] border transition-all duration-300 ${isDone ? 'border-emerald-100 shadow-sm' : `border-slate-100 ${style.highlight ? 'border-pink-200' : ''}`} hover:shadow-lg`}>
+                                <div className="flex justify-between items-center mb-4">
+                                  <div className="flex items-center gap-3">
+                                    <span className={`text-[8px] font-black px-2 py-1 rounded-md tracking-widest uppercase ${style.tag}`}>
+                                      {style.label}
+                                    </span>
+                                    {isDone && <span className="text-[8px] font-black px-2 py-1 rounded-md tracking-widest uppercase bg-emerald-50 text-emerald-600">Concluído</span>}
+                                  </div>
+                                  
+                                  <button 
+                                    onClick={(e) => togglePlanItemRead(item.id, e)}
+                                    className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${
+                                      isDone 
+                                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                                      : 'bg-slate-50 text-slate-400 hover:bg-[#ff2d92] hover:text-white border border-slate-100 hover:border-[#ff2d92]'
+                                    }`}
+                                  >
+                                    <span className="material-symbols-outlined text-xs">{isDone ? 'check_circle' : 'circle'}</span>
+                                    {isDone ? 'Concluir' : 'Marcar Feito'}
+                                  </button>
+                                </div>
+
+                                <h4 className={`text-lg font-black uppercase italic tracking-tighter mb-2 ${style.highlight ? 'text-pink-600' : 'text-slate-800'}`}>
+                                  {item.title}
+                                </h4>
+                                <p className="text-xs text-slate-400 font-medium leading-relaxed mb-6 line-clamp-2">{item.type === 'apostila' ? 'Leitura teórica completa com questões interativas.' : 'Prática focada no assunto para fixação.'}</p>
+
+                                <div className="flex items-center gap-3">
+                                  <button 
+                                    onClick={() => {
+                                      if (item.type === 'apostila' || item.type === 'resolvido') navigate(`/aluno/apostila/${item.ref_id}`);
+                                      else if (item.type === 'simulado') navigate(`/aluno/simulado/${item.ref_id}`);
+                                      else if (item.type === 'caderno') navigate(`/aluno/caderno/${item.ref_id}`);
+                                      else if (item.type === 'questao') navigate(`/aluno/questoes`);
+                                      else if (item.url) window.open(item.url, '_blank');
+                                    }}
+                                    className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md ${
+                                      isInProgress 
+                                      ? 'bg-[#ff2d92] text-white hover:bg-[#e62681]' 
+                                      : 'bg-white border border-slate-200 text-slate-600 hover:border-pink-200 hover:text-pink-500'
+                                    }`}
+                                  >
+                                    {isInProgress ? 'Acessar Agora' : 'Revisar'}
+                                  </button>
+                                  
+                                  {item.type === 'simulado' && isDone && (
+                                    <button onClick={() => navigate(`/aluno/simulado/${item.ref_id}`)} className="px-4 py-3 bg-amber-50 border border-amber-100 text-amber-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all">
+                                      Erros
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

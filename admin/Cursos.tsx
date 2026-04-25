@@ -39,6 +39,22 @@ interface CourseDb {
     investor_percentage?: number;
     coupons_json?: { name: string, discount_type: 'valor' | 'porcentagem', discount_value: number }[];
     lp_images?: string[];
+    study_plan_json?: StudyPlanSession[];
+}
+
+export interface StudyPlanItem {
+    id: string;
+    title: string;
+    type: 'apostila' | 'simulado' | 'caderno' | 'resolvido' | 'revisao' | 'outro' | 'questao' | 'extra';
+    ref_id?: string;
+    url?: string;
+}
+
+export interface StudyPlanSession {
+    id: string;
+    title: string;
+    comment?: string;
+    items: StudyPlanItem[];
 }
 
 interface MaterialItem {
@@ -58,7 +74,7 @@ interface CourseNotice {
 
 const Cursos: React.FC = () => {
     const [view, setView] = useState<'list' | 'form' | 'notice'>('list');
-    const [activeTab, setActiveTab] = useState<'geral' | 'apostilas' | 'simulados' | 'materiais' | 'financeiro' | 'landing'>('geral');
+    const [activeTab, setActiveTab] = useState<'geral' | 'apostilas' | 'simulados' | 'materiais' | 'organizador' | 'financeiro' | 'landing'>('geral');
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [courses, setCourses] = useState<CourseDb[]>([]);
@@ -78,7 +94,8 @@ const Cursos: React.FC = () => {
         pix_discount: 0,
         commission_percentage: 50,
         coupons_json: [],
-        lp_images: []
+        lp_images: [],
+        study_plan_json: []
     });
 
     // Content States
@@ -89,6 +106,7 @@ const Cursos: React.FC = () => {
     // Aux Lists
     const [allApostilas, setAllApostilas] = useState<Apostila[]>([]);
     const [allSimulados, setAllSimulados] = useState<Simulado[]>([]);
+    const [allNotebooks, setAllNotebooks] = useState<any[]>([]);
     const [bancas, setBancas] = useState<Banca[]>([]);
     const [disciplinas, setDisciplinas] = useState<Disciplina[]>([]);
     const [assuntos, setAssuntos] = useState<Assunto[]>([]);
@@ -109,6 +127,11 @@ const Cursos: React.FC = () => {
 
     const [lpSelectionModalOpen, setLpSelectionModalOpen] = useState(false);
     const [selectedCourseForLP, setSelectedCourseForLP] = useState<CourseDb | null>(null);
+
+    // Study Plan Modal State
+    const [planMaterialModal, setPlanMaterialModal] = useState<{ open: boolean, sIndex: number, iIndex: number, type: string }>({ open: false, sIndex: 0, iIndex: 0, type: '' });
+    const [planModalSearch, setPlanModalSearch] = useState('');
+    const [planModalDisc, setPlanModalDisc] = useState('');
 
     const [totalActiveQuotas, setTotalActiveQuotas] = useState(0);
     const [totalGeneralCommissionReceivers, setTotalGeneralCommissionReceivers] = useState(0);
@@ -186,6 +209,13 @@ const Cursos: React.FC = () => {
             }
         } catch (e) { console.error(e); }
 
+        // Fetch Notebooks
+        try {
+            const { data, error } = await supabase.from('notebooks').select('*, disciplinas(name)').order('title');
+            if (error) console.error('Error fetching notebooks:', error);
+            else setAllNotebooks(data || []);
+        } catch (e) { console.error(e); }
+
         // Fetch Total Active Quotas for Preview
         try {
             const { data } = await supabase.from('investor_quotas').select('quantity').eq('status', 'active');
@@ -208,7 +238,29 @@ const Cursos: React.FC = () => {
             const filteredCoupons = (course.coupons_json || []).filter(c => !c.name.startsWith('__PROMO__'));
             
             setEditingCourse(course);
-            setFormData({ ...course, coupons_json: filteredCoupons });
+            
+            // Normalize study plan structure (migration from old flat array to new session/group structure)
+            let normalizedPlan: StudyPlanSession[] = [];
+            if (Array.isArray(course.study_plan_json)) {
+                const firstItem = course.study_plan_json[0] as any;
+                if (firstItem && !firstItem.items && firstItem.type) {
+                    // It's the old format (flat array of items)
+                    normalizedPlan = [{
+                        id: crypto.randomUUID(),
+                        title: 'Guia Geral',
+                        items: course.study_plan_json as any
+                    }];
+                } else {
+                    // It's already the new format or empty
+                    normalizedPlan = course.study_plan_json as StudyPlanSession[];
+                }
+            }
+            
+            setFormData({ 
+                ...course, 
+                coupons_json: filteredCoupons,
+                study_plan_json: normalizedPlan 
+            });
 
             const [aps, sims, mats] = await Promise.all([
                 supabase.from('course_items').select('apostila_id, position').eq('course_id', course.id).order('position'),
@@ -686,7 +738,7 @@ const Cursos: React.FC = () => {
 
                 <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm flex flex-col md:flex-row overflow-hidden min-h-[750px]">
                     <div className="w-full md:w-64 bg-slate-50 border-r border-slate-200 p-6 space-y-2">
-                        {[{ id: 'geral', label: 'Inf. Gerais', icon: 'info' }, { id: 'apostilas', label: 'Apostilas', icon: 'auto_stories' }, { id: 'simulados', label: 'Simulados', icon: 'quiz' }, { id: 'materiais', label: 'Materiais Extra', icon: 'attachment' }, { id: 'financeiro', label: 'Financeiro', icon: 'payments' }, { id: 'landing', label: 'Página de Vendas', icon: 'auto_awesome' }].map(tab => (
+                        {[{ id: 'geral', label: 'Inf. Gerais', icon: 'info' }, { id: 'apostilas', label: 'Apostilas', icon: 'auto_stories' }, { id: 'simulados', label: 'Simulados', icon: 'quiz' }, { id: 'materiais', label: 'Materiais Extra', icon: 'attachment' }, { id: 'organizador', label: 'Organizador', icon: 'account_tree' }, { id: 'financeiro', label: 'Financeiro', icon: 'payments' }, { id: 'landing', label: 'Página de Vendas', icon: 'auto_awesome' }].map(tab => (
                             <button type="button" key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === tab.id ? 'bg-[#137fec] text-white' : 'text-slate-500 hover:bg-slate-200'}`}>
                                 <span className="material-symbols-outlined text-[20px]">{tab.icon}</span>{tab.label}
                             </button>
@@ -1024,6 +1076,186 @@ const Cursos: React.FC = () => {
                         </div>
                     )}
 
+                    {activeTab === 'organizador' && (
+                        <div className="space-y-8">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Organizador de Estudos</h3>
+                                    <p className="text-xs font-medium text-slate-500">Organize o curso por sessões ou grupos de materiais.</p>
+                                </div>
+                                <button type="button" onClick={() => setFormData({ ...formData, study_plan_json: [...(formData.study_plan_json || []), { id: crypto.randomUUID(), title: 'Nova Sessão', items: [] }] })} className="px-6 py-3 bg-blue-600 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-blue-700 transition-all flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[16px]">add</span> Adicionar Sessão
+                                </button>
+                            </div>
+                            
+                            <div className="space-y-10">
+                                {(formData.study_plan_json || []).map((session, sIndex) => (
+                                    <div key={session.id} className="bg-slate-50 border border-slate-200 p-8 rounded-[40px] space-y-6">
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="flex-1">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Título da Sessão / Grupo</label>
+                                                <input type="text" value={session.title} onChange={e => {
+                                                    const newPlan = [...(formData.study_plan_json || [])];
+                                                    newPlan[sIndex].title = e.target.value;
+                                                    setFormData({ ...formData, study_plan_json: newPlan });
+                                                }} className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-black text-slate-900 outline-none focus:border-blue-500 transition-all mt-1" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Comentário / Descrição (Opcional)</label>
+                                                <input type="text" value={session.comment || ''} onChange={e => {
+                                                    const newPlan = [...(formData.study_plan_json || [])];
+                                                    newPlan[sIndex].comment = e.target.value;
+                                                    setFormData({ ...formData, study_plan_json: newPlan });
+                                                }} className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-medium text-slate-600 outline-none focus:border-blue-500 transition-all mt-1" placeholder="Ex: Assista aos vídeos e faça os exercícios." />
+                                            </div>
+                                            <div className="flex items-center gap-2 pt-5">
+                                                <button type="button" onClick={() => {
+                                                    const newPlan = [...(formData.study_plan_json || [])];
+                                                    if (sIndex > 0) {
+                                                        [newPlan[sIndex - 1], newPlan[sIndex]] = [newPlan[sIndex], newPlan[sIndex - 1]];
+                                                        setFormData({ ...formData, study_plan_json: newPlan });
+                                                    }
+                                                }} className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 text-slate-400"><span className="material-symbols-outlined text-[18px]">keyboard_arrow_up</span></button>
+                                                <button type="button" onClick={() => {
+                                                    const newPlan = [...(formData.study_plan_json || [])];
+                                                    if (sIndex < newPlan.length - 1) {
+                                                        [newPlan[sIndex + 1], newPlan[sIndex]] = [newPlan[sIndex], newPlan[sIndex + 1]];
+                                                        setFormData({ ...formData, study_plan_json: newPlan });
+                                                    }
+                                                }} className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 text-slate-400"><span className="material-symbols-outlined text-[18px]">keyboard_arrow_down</span></button>
+                                                <button type="button" onClick={() => {
+                                                    const newPlan = [...(formData.study_plan_json || [])];
+                                                    newPlan.splice(sIndex, 1);
+                                                    setFormData({ ...formData, study_plan_json: newPlan });
+                                                }} className="p-2 bg-rose-50 border border-rose-100 rounded-lg hover:bg-rose-100 text-rose-500"><span className="material-symbols-outlined text-[18px]">delete</span></button>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {session.items?.map((item: any, iIndex: number) => (
+                                                <div key={item.id} className="bg-white border border-slate-100 p-6 rounded-3xl flex items-start gap-4 shadow-sm group">
+                                                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div className="md:col-span-1">
+                                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Título do Material</label>
+                                                            <input type="text" value={item.title} onChange={e => {
+                                                                const newPlan = [...(formData.study_plan_json || [])];
+                                                                newPlan[sIndex].items[iIndex].title = e.target.value;
+                                                                setFormData({ ...formData, study_plan_json: newPlan });
+                                                            }} className="w-full h-11 bg-slate-50 border border-slate-100 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 transition-all mt-1" />
+                                                        </div>
+                                                        <div className="md:col-span-1">
+                                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo de Conteúdo</label>
+                                                            <select value={item.type} onChange={e => {
+                                                                const newPlan = [...(formData.study_plan_json || [])];
+                                                                newPlan[sIndex].items[iIndex].type = e.target.value as any;
+                                                                newPlan[sIndex].items[iIndex].ref_id = '';
+                                                                setFormData({ ...formData, study_plan_json: newPlan });
+                                                            }} className="w-full h-11 bg-slate-50 border border-slate-100 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 transition-all mt-1">
+                                                                <option value="apostila">Apostila / PDF</option>
+                                                                <option value="resolvido">Questões Resolvidas</option>
+                                                                <option value="simulado">Simulado</option>
+                                                                <option value="caderno">Caderno de Questões</option>
+                                                                <option value="questao">Questão Única / Específica</option>
+                                                                <option value="revisao">Revisão / Texto / Vídeo</option>
+                                                                <option value="extra">Material Extra</option>
+                                                                <option value="outro">Link Externo / Outro</option>
+                                                            </select>
+                                                        </div>
+
+                                                        {(['apostila', 'resolvido', 'simulado', 'caderno'].includes(item.type)) && (
+                                                            <div className="md:col-span-2">
+                                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Vincular Conteúdo</label>
+                                                                <button 
+                                                                    type="button" 
+                                                                    onClick={() => setPlanMaterialModal({ open: true, sIndex, iIndex, type: item.type })}
+                                                                    className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 flex items-center justify-between text-sm font-black text-slate-700 hover:border-blue-500 transition-all mt-1"
+                                                                >
+                                                                    <span className="truncate">
+                                                                        {(() => {
+                                                                            if (!item.ref_id) return 'Selecione o material...';
+                                                                            if (item.type === 'apostila' || item.type === 'resolvido') {
+                                                                                const ap = allApostilas.find(a => a.id === item.ref_id);
+                                                                                return ap ? `${ap.title} (${ap.disciplinas?.name})` : 'Material não encontrado';
+                                                                            }
+                                                                            if (item.type === 'simulado') {
+                                                                                const sim = allSimulados.find(s => s.id === item.ref_id);
+                                                                                return sim ? sim.title : 'Simulado não encontrado';
+                                                                            }
+                                                                            if (item.type === 'caderno') {
+                                                                                const nb = allNotebooks.find(n => n.id === item.ref_id);
+                                                                                return nb ? `${nb.title} (${nb.disciplinas?.name})` : 'Caderno não encontrado';
+                                                                            }
+                                                                            return 'Vínculo indefinido';
+                                                                        })()}
+                                                                    </span>
+                                                                    <span className="material-symbols-outlined text-[18px] text-slate-400">search</span>
+                                                                </button>
+                                                            </div>
+                                                        )}
+
+                                                        {(item.type === 'outro' || item.type === 'extra' || item.type === 'revisao') && (
+                                                            <div className="md:col-span-2">
+                                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Link / URL do Recurso</label>
+                                                                <input type="text" value={item.url || ''} onChange={e => {
+                                                                    const newPlan = [...(formData.study_plan_json || [])];
+                                                                    newPlan[sIndex].items[iIndex].url = e.target.value;
+                                                                    setFormData({ ...formData, study_plan_json: newPlan });
+                                                                }} className="w-full h-11 bg-slate-50 border border-slate-100 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 transition-all mt-1" placeholder="https://..." />
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button type="button" onClick={() => {
+                                                            const newPlan = [...(formData.study_plan_json || [])];
+                                                            if (iIndex > 0) {
+                                                                [newPlan[sIndex].items[iIndex - 1], newPlan[sIndex].items[iIndex]] = [newPlan[sIndex].items[iIndex], newPlan[sIndex].items[iIndex - 1]];
+                                                                setFormData({ ...formData, study_plan_json: newPlan });
+                                                            }
+                                                        }} className="size-8 bg-slate-50 text-slate-400 hover:text-slate-600 rounded-lg flex items-center justify-center transition-colors"><span className="material-symbols-outlined text-sm">expand_less</span></button>
+                                                        <button type="button" onClick={() => {
+                                                            const newPlan = [...(formData.study_plan_json || [])];
+                                                            if (iIndex < newPlan.items.length - 1) {
+                                                                [newPlan[sIndex].items[iIndex + 1], newPlan[sIndex].items[iIndex]] = [newPlan[sIndex].items[iIndex], newPlan[sIndex].items[iIndex + 1]];
+                                                                setFormData({ ...formData, study_plan_json: newPlan });
+                                                            }
+                                                        }} className="size-8 bg-slate-50 text-slate-400 hover:text-slate-600 rounded-lg flex items-center justify-center transition-colors"><span className="material-symbols-outlined text-sm">expand_more</span></button>
+                                                        <button type="button" onClick={() => {
+                                                            const newPlan = [...(formData.study_plan_json || [])];
+                                                            newPlan[sIndex].items.splice(iIndex, 1);
+                                                            setFormData({ ...formData, study_plan_json: newPlan });
+                                                        }} className="size-8 bg-rose-50 text-rose-500 hover:bg-rose-100 rounded-lg flex items-center justify-center transition-colors mt-2"><span className="material-symbols-outlined text-sm">delete</span></button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            
+                                            <button 
+                                                type="button" 
+                                                onClick={() => {
+                                                    const newPlan = [...(formData.study_plan_json || [])];
+                                                    newPlan[sIndex].items.push({ id: crypto.randomUUID(), title: 'Novo Material', type: 'apostila' });
+                                                    setFormData({ ...formData, study_plan_json: newPlan });
+                                                }}
+                                                className="w-full py-4 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/30 transition-all flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest"
+                                            >
+                                                <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                                                Adicionar Material a esta Sessão
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                                
+                                {(!formData.study_plan_json || formData.study_plan_json.length === 0) && (
+                                    <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-[40px] bg-slate-50/50">
+                                        <span className="material-symbols-outlined text-5xl block mb-4 text-slate-300">account_tree</span>
+                                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Nenhuma sessão configurada.</p>
+                                        <p className="text-[10px] text-slate-300 font-bold uppercase mt-2">Clique em "Adicionar Sessão" para começar.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'financeiro' && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             {/* Coluna Esquerda: Escura (Configuração de Preço e Ganhos) */}
@@ -1330,6 +1562,91 @@ const Cursos: React.FC = () => {
                 </div>
             </div>
                 {isMediaModalOpen && <MediaLibraryModalContent />}
+                {planMaterialModal.open && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/50 backdrop-blur-sm">
+                        <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[85vh]">
+                            <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">Vincular {planMaterialModal.type.charAt(0).toUpperCase() + planMaterialModal.type.slice(1)}</h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Selecione o conteúdo desejado</p>
+                                </div>
+                                <button onClick={() => setPlanMaterialModal({ ...planMaterialModal, open: false })} className="size-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors">
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+
+                            <div className="p-8 bg-slate-50 border-b border-slate-100 flex flex-col md:flex-row gap-4">
+                                <div className="flex-1 relative">
+                                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">search</span>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Buscar por título..." 
+                                        value={planModalSearch}
+                                        onChange={e => setPlanModalSearch(e.target.value)}
+                                        className="w-full h-12 bg-white border border-slate-200 rounded-xl pl-12 pr-4 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
+                                    />
+                                </div>
+                                {(planMaterialModal.type === 'apostila' || planMaterialModal.type === 'resolvido' || planMaterialModal.type === 'caderno') && (
+                                    <select 
+                                        value={planModalDisc} 
+                                        onChange={e => setPlanModalDisc(e.target.value)}
+                                        className="h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
+                                    >
+                                        <option value="">Todas as Disciplinas</option>
+                                        {disciplinas.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                    </select>
+                                )}
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-8 space-y-4 custom-scrollbar">
+                                {(() => {
+                                    let list: any[] = [];
+                                    if (planMaterialModal.type === 'apostila') {
+                                        list = allApostilas.filter(a => !a.is_resolution_notebook);
+                                    } else if (planMaterialModal.type === 'resolvido') {
+                                        list = allApostilas.filter(a => !!a.is_resolution_notebook);
+                                    } else if (planMaterialModal.type === 'simulado') {
+                                        list = allSimulados;
+                                    } else if (planMaterialModal.type === 'caderno') {
+                                        list = allNotebooks;
+                                    }
+
+                                    const filtered = list.filter(item => {
+                                        const matchSearch = item.title.toLowerCase().includes(planModalSearch.toLowerCase());
+                                        const matchDisc = !planModalDisc || (item.disciplina_id === planModalDisc);
+                                        return matchSearch && matchDisc;
+                                    });
+
+                                    if (filtered.length === 0) return <p className="text-center py-20 text-slate-300 font-bold uppercase tracking-widest text-xs">Nenhum item encontrado.</p>;
+
+                                    return filtered.map(item => (
+                                        <button 
+                                            key={item.id} 
+                                            onClick={() => {
+                                                const newPlan = [...(formData.study_plan_json || [])];
+                                                newPlan[planMaterialModal.sIndex].items[planMaterialModal.iIndex].ref_id = item.id;
+                                                newPlan[planMaterialModal.sIndex].items[planMaterialModal.iIndex].title = item.title;
+                                                setFormData({ ...formData, study_plan_json: newPlan });
+                                                setPlanMaterialModal({ ...planMaterialModal, open: false });
+                                                setPlanModalSearch('');
+                                                setPlanModalDisc('');
+                                            }}
+                                            className="w-full flex items-center justify-between p-6 bg-white border border-slate-100 rounded-[24px] hover:border-blue-500 hover:shadow-lg transition-all group text-left"
+                                        >
+                                            <div>
+                                                <h4 className="text-sm font-black text-slate-900 uppercase italic tracking-tight group-hover:text-blue-600">{item.title}</h4>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                                    {item.disciplinas?.name || 'Geral'}
+                                                </p>
+                                            </div>
+                                            <span className="material-symbols-outlined text-slate-200 group-hover:text-blue-500">add_circle</span>
+                                        </button>
+                                    ));
+                                })()}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </>
         );
 
