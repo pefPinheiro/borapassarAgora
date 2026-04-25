@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import RichTextEditor from './RichTextEditor';
 import { supabase } from '../lib/supabase';
 
@@ -22,6 +22,70 @@ const FaqAdmin: React.FC = () => {
         categoria: 'Geral',
         status: 'Ativo'
     });
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const promptTemplate = `Gere um arquivo JSON contendo uma lista de perguntas e respostas frequentes para uma plataforma de estudos. O formato deve ser exatamente um array de objetos, onde cada objeto tem as seguintes chaves:
+- "pergunta": (string) A pergunta do aluno.
+- "resposta": (string) A resposta detalhada (pode conter HTML básico como <p>, <b>, <ul>, <li>).
+- "categoria": (string) Deve ser uma destas: "Geral", "Financeiro", "Plataforma" ou "Conteúdo".
+- "status": (string) Deve ser "Ativo" ou "Rascunho".
+
+Exemplo:
+[
+  {
+    "pergunta": "Como acesso meu curso?",
+    "resposta": "<p>Basta fazer login e clicar em <b>Meus Cursos</b> no menu lateral.</p>",
+    "categoria": "Plataforma",
+    "status": "Ativo"
+  }
+]`;
+
+    const handleJsonUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const json = JSON.parse(e.target?.result as string);
+                
+                if (!Array.isArray(json)) {
+                    throw new Error('O arquivo JSON deve conter um array de objetos.');
+                }
+
+                // Validação básica
+                const isValid = json.every(item => 
+                    item.pergunta && 
+                    item.resposta && 
+                    ['Geral', 'Financeiro', 'Plataforma', 'Conteúdo'].includes(item.categoria)
+                );
+
+                if (!isValid) {
+                    throw new Error('Alguns itens do JSON não estão no formato correto ou possuem categorias inválidas.');
+                }
+
+                const { error } = await supabase
+                    .from('faq')
+                    .insert(json.map(item => ({
+                        pergunta: item.pergunta,
+                        resposta: item.resposta,
+                        categoria: item.categoria,
+                        status: item.status || 'Ativo'
+                    })));
+
+                if (error) throw error;
+
+                alert(`${json.length} FAQs importadas com sucesso!`);
+                fetchFaqs();
+            } catch (error: any) {
+                console.error('Error importing JSON:', error);
+                alert('Erro ao importar JSON: ' + error.message);
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+    };
 
     const categories = ['Geral', 'Financeiro', 'Plataforma', 'Conteúdo'];
 
@@ -101,13 +165,40 @@ const FaqAdmin: React.FC = () => {
                     <h2 className="text-[#111418] text-3xl font-black tracking-tight uppercase">Base de Conhecimento (FAQ)</h2>
                     <p className="text-[#617589] font-medium">Gerencie as dúvidas frequentes para reduzir chamados de suporte.</p>
                 </div>
-                <button
-                    onClick={() => handleOpenForm()}
-                    className="flex items-center gap-2 px-6 py-3 bg-[#137fec] text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-600 transition-all active:scale-95"
-                >
-                    <span className="material-symbols-outlined">add_circle</span>
-                    Nova Pergunta
-                </button>
+                <div className="flex flex-wrap gap-4">
+                    <button
+                        onClick={() => {
+                            navigator.clipboard.writeText(promptTemplate);
+                            alert('Modelo de prompt copiado para a área de transferência!');
+                        }}
+                        className="flex items-center gap-2 px-6 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all active:scale-95 border border-slate-200"
+                        title="Copiar modelo de prompt para IA"
+                    >
+                        <span className="material-symbols-outlined">content_copy</span>
+                        Prompt IA
+                    </button>
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-2 px-6 py-3 bg-white text-slate-600 border border-slate-200 rounded-xl font-bold shadow-sm hover:bg-slate-50 transition-all active:scale-95"
+                    >
+                        <span className="material-symbols-outlined">upload_file</span>
+                        Importar JSON
+                    </button>
+                    <button
+                        onClick={() => handleOpenForm()}
+                        className="flex items-center gap-2 px-6 py-3 bg-[#137fec] text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-600 transition-all active:scale-95"
+                    >
+                        <span className="material-symbols-outlined">add_circle</span>
+                        Nova Pergunta
+                    </button>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleJsonUpload}
+                        accept=".json"
+                        className="hidden"
+                    />
+                </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4">
