@@ -33,6 +33,7 @@ const CourseCheckout: React.FC = () => {
     const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix');
     const [mpLoaded, setMpLoaded] = useState(false);
     const [cardBrickLoaded, setCardBrickLoaded] = useState(false);
+    const [savedCardData, setSavedCardData] = useState<any>(null);
     const bricksBuilder = useRef<any>(null);
 
     useEffect(() => {
@@ -95,7 +96,9 @@ const CourseCheckout: React.FC = () => {
                         setCardBrickLoaded(true);
                     },
                     onSubmit: ({ selectedPaymentMethod, formData }: any) => {
-                        return handleCardPayment(formData);
+                        setSavedCardData(formData);
+                        setShowTerms(true);
+                        return new Promise(() => {}); // Manter o brick em "loading" até o modal fechar ou processar
                     },
                     onError: (error: any) => {
                         console.error(error);
@@ -285,6 +288,13 @@ const CourseCheckout: React.FC = () => {
 
     const handlePlaceOrder = async () => {
         if (!agreed) return;
+        setShowTerms(false);
+
+        if (paymentMethod === 'card') {
+            if (savedCardData) handleCardPayment(savedCardData);
+            return;
+        }
+
         setSubmitting(true);
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -425,32 +435,14 @@ const CourseCheckout: React.FC = () => {
                                 <div className="bg-white p-6 rounded-3xl border border-slate-100 space-y-4">
                                     <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest flex items-center gap-2"><span className="material-symbols-outlined text-blue-500">credit_card</span> 2. Cartão de Crédito</h3>
                                     
-                                    <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
-                                        <label className="flex items-center gap-3 cursor-pointer">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={agreed} 
-                                                onChange={e => setAgreed(e.target.checked)}
-                                                className="size-5 rounded border-slate-300 text-blue-600"
-                                            />
-                                            <span className="text-[10px] font-bold text-slate-600 uppercase">Aceito os termos de adesão</span>
-                                        </label>
+                                    <div id="paymentBrick_container" className={paymentMethod === 'card' ? 'block' : 'hidden'}>
+                                        {!cardBrickLoaded && (
+                                            <div className="flex flex-col items-center justify-center py-12 gap-3">
+                                                <div className="size-8 border-2 border-slate-100 border-t-blue-500 rounded-full animate-spin"></div>
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Carregando formulário seguro...</p>
+                                            </div>
+                                        )}
                                     </div>
-
-                                    {agreed ? (
-                                        <div id="paymentBrick_container">
-                                            {!cardBrickLoaded && (
-                                                <div className="flex flex-col items-center justify-center py-12 gap-3">
-                                                    <div className="size-8 border-2 border-slate-100 border-t-blue-500 rounded-full animate-spin"></div>
-                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Carregando formulário seguro...</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Marque os termos para habilitar o pagamento</p>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         ) : (
@@ -543,7 +535,7 @@ const CourseCheckout: React.FC = () => {
                                     </div>
                                     <div className="p-5 bg-slate-50 border border-slate-100 rounded-3xl text-center">
                                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Investimento</p>
-                                        <p className="text-xl font-black text-slate-900 leading-none">R$ {currentPrice.toFixed(2).replace('.', ',')}</p>
+                                        <p className="text-xl font-black text-slate-900 leading-none">R$ {finalPrice.toFixed(2).replace('.', ',')}</p>
                                     </div>
                                     <div className="p-5 bg-slate-50 border border-slate-100 rounded-3xl text-center">
                                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Duração do Acesso</p>
