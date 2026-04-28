@@ -27,6 +27,8 @@ const QuestionsStudent: React.FC = () => {
     const [subassuntos, setSubassuntos] = useState<any[]>([]);
     const [subsubassuntos, setSubsubassuntos] = useState<any[]>([]);
     const [bancas, setBancas] = useState<Banca[]>([]);
+    const [bancasOriginal, setBancasOriginal] = useState<Banca[]>([]);
+    const [excludedBancaIds, setExcludedBancaIds] = useState<string[]>([]);
     const [years] = useState(Array.from({ length: 15 }, (_, i) => (new Date().getFullYear() - i).toString()));
 
     // Selected Filters (Multi-select)
@@ -40,6 +42,7 @@ const QuestionsStudent: React.FC = () => {
     const [filterStatus, setFilterStatus] = useState(searchParams.get('status') || 'all');
 
     const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
+    const [historyLoaded, setHistoryLoaded] = useState(false);
 
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
@@ -51,7 +54,6 @@ const QuestionsStudent: React.FC = () => {
 
     useEffect(() => {
         fetchAuxiliaryData();
-        fetchQuestions(1);
         checkDailyLimit();
     }, []);
 
@@ -64,31 +66,46 @@ const QuestionsStudent: React.FC = () => {
 
     // Filter effect: When filters change, reset to page 1
     useEffect(() => {
-        setPage(1);
-        fetchQuestions(1);
-    }, [filterDisciplinas, filterAssuntos, filterSubassuntos, filterSubsubassuntos, filterBancas, filterAnos, filterStatus, filterModalidades]);
+        // Only fetch if we have the basic banca data to apply exclusion filters
+        if (bancasOriginal.length > 0) {
+            setPage(1);
+            fetchQuestions(1);
+        }
+    }, [filterDisciplinas, filterAssuntos, filterSubassuntos, filterSubsubassuntos, filterBancas, filterAnos, filterStatus, filterModalidades, bancasOriginal]);
 
     const fetchAuxiliaryData = async () => {
         try {
-            const [dRes, aRes, saRes, ssaRes, bRes] = await Promise.all([
-                supabase.from('disciplinas').select('*').order('name'),
-                supabase.from('assuntos').select('*').order('name'),
-                supabase.from('subassuntos').select('*').order('name'),
-                supabase.from('subsubassuntos').select('*').order('name'),
-                supabase.from('bancas').select('*').order('name')
+            // Load only essential metadata for the first view
+            const [dRes, bRes] = await Promise.all([
+                supabase.from('disciplinas').select('id, name').order('name'),
+                supabase.from('bancas').select('id, name, sigla').order('name')
             ]);
             
-            if (dRes.data) setDisciplinas(dRes.data);
-            if (aRes.data) setAssuntos(aRes.data);
-            if (saRes.data) setSubassuntos(saRes.data);
-            if (ssaRes.data) setSubsubassuntos(ssaRes.data);
+            if (dRes.data) setDisciplinas(dRes.data as Disciplina[]);
             
             if (bRes.data) {
-                const excludedBancas = ['Bora Passar Agora - Relax', 'Bora Passar Agora - Simulado'];
-                setBancas(bRes.data.filter(b =>
-                    !excludedBancas.includes(b.name) &&
+                setBancasOriginal(bRes.data);
+                const excludedNames = ['Bora Passar Agora - Relax', 'Bora Passar Agora - Simulado'];
+                const filtered = bRes.data.filter(b =>
+                    !excludedNames.includes(b.name) &&
                     !b.name.toUpperCase().includes('SIMULADOS - BPA')
-                ));
+                );
+                setBancas(filtered);
+                
+                const excludedIds = bRes.data
+                    .filter(b => !filtered.find(f => f.id === b.id))
+                    .map(b => b.id);
+                setExcludedBancaIds(excludedIds);
+            }
+
+            // Load subjects lazily or in background
+            const { data: aData } = await supabase.from('assuntos').select('id, name, disciplina_id').order('name');
+            if (aData) setAssuntos(aData as Assunto[]);
+
+            // Load sub-subjects even more lazily (only if we have subjects)
+            if (aData && aData.length > 0) {
+                const { data: saData } = await supabase.from('subassuntos').select('id, name, assunto_id').order('name').limit(1000);
+                if (saData) setSubassuntos(saData);
             }
         } catch (error) {
             console.error('Error fetching filter data:', error);
@@ -108,18 +125,30 @@ const QuestionsStudent: React.FC = () => {
                 return;
             }
 
-            const { data: historyData } = await supabase
-                .from('student_question_history')
-                .select('question_id')
-                .eq('student_id', user.id);
+            let currentResolved = resolvedIds;
+            if (!historyLoaded) {
+                const { data: historyData } = await supabase
+                    .from('student_question_history')
+                    .select('question_id')
+                    .eq('student_id', user.id);
 
-            const rIds = new Set(historyData?.map(h => h.question_id) || []);
-            setResolvedIds(rIds);
+                currentResolved = new Set(historyData?.map(h => h.question_id) || []);
+                setResolvedIds(currentResolved);
+                setHistoryLoaded(true);
+            }
 
             // 2. Build Query
+            // Select only necessary columns to reduce payload size
             let query = supabase
                 .from('questions')
-                .select('*, disciplinas(name), bancas!inner(name, sigla), text_bases(content, title), assuntos(name), subassuntos(name), subsubassuntos(name)', { count: 'exact' });
+                .select(`
+                    id, enunciado, ano, alternativas, resposta_professor, 
+                    disciplina_id, banca_id, assunto_id, 
+                    disciplinas(name), 
+                    bancas!inner(name, sigla), 
+                    assuntos(name),
+                    text_bases(content, title)
+                `);
  
             // Apply Multi-select Filters
             if (filterDisciplinas.length > 0) query = query.in('disciplina_id', filterDisciplinas);
@@ -145,12 +174,12 @@ const QuestionsStudent: React.FC = () => {
                 query = query.or(modConditions.join(','));
             }
  
-            // Exclude Simulados and Relax
-            query = query.not('bancas.name', 'ilike', '%SIMULADOS%BPA%')
-                .neq('bancas.name', 'Bora Passar Agora - Relax')
-                .neq('bancas.name', 'Bora Passar Agora - Simulado');
+            // Exclude Simulados and Relax using IDs (much faster than ILIKE on join)
+            if (excludedBancaIds.length > 0) {
+                query = query.not('banca_id', 'in', `(${excludedBancaIds.join(',')})`);
+            }
 
-            const idsArray = Array.from(rIds);
+            const idsArray = Array.from(currentResolved);
             if (filterStatus === 'resolved') {
                 if (idsArray.length === 0) {
                     setQuestions([]);
@@ -159,6 +188,7 @@ const QuestionsStudent: React.FC = () => {
                 }
                 query = query.in('id', idsArray);
             } else if (filterStatus === 'unresolved' && idsArray.length > 0) {
+                // Warning: This can fail if idsArray is too large due to URL length limits
                 query = query.not('id', 'in', `(${idsArray.join(',')})`);
             }
 

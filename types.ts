@@ -180,6 +180,7 @@ export interface Apostila {
     professional_validation?: boolean;
   };
   is_resolution_notebook?: boolean;
+  is_resumo_8020?: boolean;
 }
 
 export interface Teacher {

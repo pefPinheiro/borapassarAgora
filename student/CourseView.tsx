@@ -78,6 +78,7 @@ const CourseView: React.FC = () => {
                 id,
                 title,
                 is_resolution_notebook,
+                is_resumo_8020,
                 disciplina:disciplinas (name)
             )
         `)
@@ -599,6 +600,9 @@ const CourseView: React.FC = () => {
                                   <p className={`font-bold text-xs uppercase tracking-tight ${isRead ? 'text-emerald-700' : 'text-slate-900'}`}>
                                     {item.apostila?.title}
                                   </p>
+                                  {item.apostila?.is_resumo_8020 && (
+                                    <span className="mt-1 px-2 py-0.5 bg-emerald-500 text-white text-[7px] font-black rounded uppercase tracking-widest w-fit block animate-pulse">80/20 Summary</span>
+                                  )}
                                 </div>
 
                                 <div className="flex items-center gap-6">

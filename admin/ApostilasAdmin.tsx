@@ -95,7 +95,8 @@ const ApostilasAdmin: React.FC = () => {
         } as any,
         commission_valid_until: '',
         professor_id: null,
-        is_resolution_notebook: false
+        is_resolution_notebook: false,
+        is_resumo_8020: false
     });
 
     // Cadernos State
@@ -305,7 +306,8 @@ const ApostilasAdmin: React.FC = () => {
                 },
                 commission_valid_until: apostila.commission_valid_until || '',
                 professor_id: apostila.professor_id || null,
-                is_resolution_notebook: apostila.is_resolution_notebook || false
+                is_resolution_notebook: apostila.is_resolution_notebook || false,
+                is_resumo_8020: apostila.is_resumo_8020 || false
             });
 
             fetchLinkedNotebooks(apostila.id);
@@ -331,7 +333,8 @@ const ApostilasAdmin: React.FC = () => {
                 },
                 commission_valid_until: '',
                 professor_id: (currentUser?.role === 'teacher' && currentTeacher) ? currentTeacher.id : null,
-                is_resolution_notebook: false
+                is_resolution_notebook: false,
+                is_resumo_8020: false
             });
             setNotebooks([]);
         }
@@ -596,7 +599,38 @@ const ApostilasAdmin: React.FC = () => {
         }
     };
 
-    const insertTag = (tagType: 'question' | 'quest_json' | 'video' | 'image' | 'math' | 'exemplo' | 'lei' | 'correcao' | 'resolve') => {
+    const insertTag = (tagType: 'question' | 'quest_json' | 'video' | 'image' | 'math' | 'exemplo' | 'lei' | 'correcao' | 'resolve' | 'template_8020') => {
+        if (tagType === 'template_8020') {
+            editorRef.current?.insertContent(`
+                <h1>[TÍTULO DO RESUMO 80/20]</h1>
+                <p>Este resumo foca nos 20% do conteúdo que garantem 80% do seu resultado.</p>
+                
+                <h2>[1] O Coração do Assunto (O que mais cai)</h2>
+                <p>Descreva aqui a base teórica essencial que é cobrada em quase todas as provas.</p>
+                <p>[--IMPORTANTE--] Foque nestes termos-chave: [Termo 1], [Termo 2], [Termo 3]. [/--IMPORTANTE--]</p>
+
+                <h2>[2] Jurisprudência e Lei Seca</h2>
+                <p>[--LEI--] Texto da lei ou julgado fundamental aqui... [/--LEI--]</p>
+
+                <h2>[3] Resumo Esquematizado</h2>
+                <table>
+                    <thead>
+                        <tr><th>Conceito</th><th>Aplicação Prática</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>A</td><td>B</td></tr>
+                        <tr><td>C</td><td>D</td></tr>
+                    </tbody>
+                </table>
+
+                <h2>[4] Bora Praticar</h2>
+                <p>[--BORA-PRATICAR--] Agora que revisamos a teoria, vamos fixar com questões. [/--BORA-PRATICAR--]</p>
+                <div class="ap-placeholder ap-q">[quest_id:"ESCOLHA_UMA_QUESTÃO"]</div>
+            `);
+            setFormData(prev => ({ ...prev, is_resumo_8020: true }));
+            return;
+        }
+
         if (tagType === 'resolve') {
             const num = window.prompt("Número da Questão:", "01");
             if (num === null) return;
@@ -1148,6 +1182,10 @@ const ApostilasAdmin: React.FC = () => {
                                                     <span className="material-symbols-outlined text-[18px]">check_circle</span>
                                                     <span className="hidden md:inline">Resolvida</span>
                                                 </button>
+                                                <button onClick={() => insertTag('template_8020')} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 animate-bounce-subtle">
+                                                    <span className="material-symbols-outlined text-[18px]">bolt</span>
+                                                    <span className="hidden md:inline">Template 80/20</span>
+                                                </button>
                                             </div>
 
                                             <div className="h-8 w-px bg-slate-200 mx-2"></div>
@@ -1375,6 +1413,22 @@ const ApostilasAdmin: React.FC = () => {
                                             <div>
                                                 <span className="block text-xs font-black text-white group-hover:text-purple-400 transition-colors uppercase tracking-widest">Caderno de Resolução</span>
                                                 <span className="text-[9px] text-slate-500">Agrupa em uma aba separada de resolvidas pelo professor</span>
+                                            </div>
+                                        </label>
+
+                                        <label className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-2xl cursor-pointer group hover:border-emerald-500/50 transition-all">
+                                            <div className="relative">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="peer appearance-none w-10 h-6 bg-slate-700 rounded-full checked:bg-emerald-600 transition-all cursor-pointer"
+                                                    checked={formData.is_resumo_8020 || false}
+                                                    onChange={(e) => setFormData({ ...formData, is_resumo_8020: e.target.checked })}
+                                                />
+                                                <div className="absolute top-1 left-1 size-4 bg-white rounded-full peer-checked:translate-x-4 transition-transform pointer-events-none shadow-sm"></div>
+                                            </div>
+                                            <div>
+                                                <span className="block text-xs font-black text-white group-hover:text-emerald-400 transition-colors uppercase tracking-widest">Módulo de Resumo (80/20)</span>
+                                                <span className="text-[9px] text-slate-500">Aplica um estilo focado e minimalista para revisões rápidas</span>
                                             </div>
                                         </label>
                                     </div>
@@ -1705,6 +1759,12 @@ const ApostilasAdmin: React.FC = () => {
                                                     <div className="flex flex-col gap-1">
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-base font-black text-[#111418] group-hover:text-[#137fec] transition-colors">{a.title}</span>
+                                                            {a.is_resumo_8020 && (
+                                                                <span className="px-2 py-0.5 bg-emerald-500 text-white text-[8px] font-black rounded-lg uppercase tracking-widest animate-pulse">80/20</span>
+                                                            )}
+                                                            {a.is_resolution_notebook && (
+                                                                <span className="px-2 py-0.5 bg-purple-500 text-white text-[8px] font-black rounded-lg uppercase tracking-widest">Resolvida</span>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </td>

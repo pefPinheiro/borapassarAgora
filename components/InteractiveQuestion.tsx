@@ -27,72 +27,57 @@ export interface InteractiveQuestionProps {
     onBeforeAnswer?: () => boolean;
 }
 
-const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question: propQuestion, onAnswer, onBeforeAnswer, disabled }) => {
-    const [localQuestion, setLocalQuestion] = useState<any>(null);
-    const [loading, setLoading] = useState(false);
-    const [selectedAlt, setSelectedAlt] = useState<string | null>(null);
-    const [showResult, setShowResult] = useState(false);
-    const [showBaseText, setShowBaseText] = useState(false);
+// Move processing functions outside to avoid recreation and allow potential caching
+const cleanLatex = (tex: string) => {
+    return tex
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/<br\s*\/?>/gi, ' ')
+        .replace(/<\/?(?:p|div|br|span|strong|b|em|i|u|s|h[1-6]|ol|ul|li|pre|code|font)\b[^>]*?>/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+};
 
-    const activeQuestion = propQuestion || localQuestion;
-
-    const processMath = (text: string) => {
-        const cleanLatex = (tex: string) => {
-            return tex
-                .replace(/&amp;/gi, '&')      // Unescape & primeiro
-                .replace(/&lt;/gi, '<')
-                .replace(/&gt;/gi, '>')
-                .replace(/<br\s*\/?>/gi, ' ') // Substituir breaks por espaço
-                .replace(/<\/?(?:p|div|br|span|strong|b|em|i|u|s|h[1-6]|ol|ul|li|pre|code|font)\b[^>]*?>/gi, ' ') // Remover apenas tags HTML conhecidas
-                .replace(/\s+/g, ' ')           // Colapsar múltiplos espaços
-                .trim();
-        };
-
-        return text
-            // 1. Converte <code> com conteúdo LaTeX para texto puro para processamento
-            .replace(/<code>([\s\S]*?\\(?:frac|sqrt|cdot|times|sum|int|align|begin|quad|implies|iff|neg|lor|land)[\s\S]*?)<\/code>/gi, '$1')
-            
-            // 2. Display Mode: $$...$$ ou \[...\]
-            .replace(/\$\$([\s\S]*?)\$\$/g, (_, tex) => {
-                try {
-                    return katex.renderToString(cleanLatex(tex).replace(/\\\\/g, '\\'), { displayMode: true, throwOnError: false });
-                } catch { return _; }
-            })
-            .replace(/\\\[([\s\S]*?)\\\]/g, (_, tex) => {
-                try {
-                    return katex.renderToString(cleanLatex(tex).replace(/\\\\/g, '\\'), { displayMode: true, throwOnError: false });
-                } catch { return _; }
-            })
-            
-            // 3. Inline Mode: \(...\) ou $...$ (apenas se tiver caracteres matemáticos para evitar falsos positivos com $)
-            .replace(/\\\(([\s\S]*?)\\\)/g, (_, tex) => {
+const processMath = (text: string) => {
+    return text
+        .replace(/<code>([\s\S]*?\\(?:frac|sqrt|cdot|times|sum|int|align|begin|quad|implies|iff|neg|lor|land)[\s\S]*?)<\/code>/gi, '$1')
+        .replace(/\$\$([\s\S]*?)\$\$/g, (_, tex) => {
+            try {
+                return katex.renderToString(cleanLatex(tex).replace(/\\\\/g, '\\'), { displayMode: true, throwOnError: false });
+            } catch { return _; }
+        })
+        .replace(/\\\[([\s\S]*?)\\\]/g, (_, tex) => {
+            try {
+                return katex.renderToString(cleanLatex(tex).replace(/\\\\/g, '\\'), { displayMode: true, throwOnError: false });
+            } catch { return _; }
+        })
+        .replace(/\\\(([\s\S]*?)\\\)/g, (_, tex) => {
+            try {
+                return katex.renderToString(cleanLatex(tex).replace(/\\\\/g, '\\'), { displayMode: false, throwOnError: false });
+            } catch { return _; }
+        })
+        .replace(/\$([^\n\$]+?)\$/g, (_, tex) => {
+            if (/[\\^_\{\}\+\=\-\/\(\)]/.test(tex)) {
                 try {
                     return katex.renderToString(cleanLatex(tex).replace(/\\\\/g, '\\'), { displayMode: false, throwOnError: false });
                 } catch { return _; }
-            })
-            .replace(/\$([^\n\$]+?)\$/g, (_, tex) => {
-                // Detectar se parece math (presença de \, ^, _, {, } ou operadores comuns)
-                if (/[\\^_\{\}\+\=\-\/\(\)]/.test(tex)) {
-                    try {
-                        return katex.renderToString(cleanLatex(tex).replace(/\\\\/g, '\\'), { displayMode: false, throwOnError: false });
-                    } catch { return _; }
-                }
-                return _;
-            })
-            
-            // 4. Ambientes diretos \begin{array} ... \end{array} que podem não estar em \[ \]
-            .replace(/\\begin\{array\}([\s\S]*?)\\end\{array\}/gi, (match) => {
-                try {
-                    return katex.renderToString(cleanLatex(match).replace(/\\\\/g, '\\'), { displayMode: true, throwOnError: false });
-                } catch { return match; }
-            });
-    };
+            }
+            return _;
+        })
+        .replace(/\\begin\{array\}([\s\S]*?)\\end\{array\}/gi, (match) => {
+            try {
+                return katex.renderToString(cleanLatex(match).replace(/\\\\/g, '\\'), { displayMode: true, throwOnError: false });
+            } catch { return match; }
+        });
+};
 
-    const processMarkdown = (text: string) => {
-        let processed = text;
-        
-        // 0. Process Advanced Markdown Tables (GFM Standard)
-        const potentialTableBlockRegex = /((?:(?:<p>|<div>)?\s*(?:(?!<\/?(?:p|div)).)*?\|.*?(?:\s*|<\/p>|<\/div>|<br\s*\/?>)*){2,})/gi;
+const processMarkdown = (text: string) => {
+    let processed = text;
+    
+    // Optimized table detection logic - avoiding complex backtracking regex
+    if (processed.includes('|')) {
+        const potentialTableBlockRegex = /((?:(?:<p>|<div>)?\s*[^|]*\|.*?(?:\s*|<\/p>|<\/div>|<br\s*\/?>)*){2,})/gi;
         
         processed = processed.replace(potentialTableBlockRegex, (block) => {
             if (block.includes('\\begin') || block.includes('\\end')) return block;
@@ -140,7 +125,7 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
 
             const bodyRows = lines.slice(2).map(parseMarkdownRow);
 
-            let html = '<div class="table-container my-12 animate-in fade-in zoom-in-95 duration-1000"><table>';
+            let html = '<div class="table-container my-12"><table>';
             html += '<thead><tr>';
             headerRow.forEach((h, i) => {
                 const align = alignments[i] || 'left';
@@ -161,45 +146,99 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
             html += '</tbody></table></div>';
             return html;
         });
+    }
 
-        processed = processed.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
-        processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        
-        const headerRegex = /(#{2,4})\s+((?:(?!(?:<br|<\/p>|<div>|\n)).)*)/gi;
-        
-        processed = processed.replace(headerRegex, (match, hashes, content) => {
-            const level = hashes.length;
-            return `<h${level}>${content.trim()}</h${level}>`;
-        });
+    processed = processed.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // Safer header regex
+    processed = processed.replace(/(#{2,4})\s+([^\n<]+)/gi, (match, hashes, content) => {
+        const level = hashes.length;
+        return `<h${level}>${content.trim()}</h${level}>`;
+    });
 
-        processed = processed.replace(/<p>\s*<\/p>/g, '');
-        
-        return processed;
-    };
+    processed = processed.replace(/<p>\s*<\/p>/g, '');
+    
+    return processed;
+};
 
-    // Process custom BPA tags (specifically [--OBSERVE--] as requested)
-    const processContent = (text: string | null | undefined) => {
-        if (!text) return '';
-        
-        // Handle newlines before processing math/markdown to ensure they don't break regex
-        // Also handle literal \n strings that often appear in JSON content
-        let processed = text
-            .replace(/\\n/g, '<br/>')
-            .replace(/\n/g, '<br/>');
+const processContent = (text: string | null | undefined) => {
+    if (!text) return '';
+    
+    let processed = text
+        .replace(/\\n/g, '<br/>')
+        .replace(/\n/g, '<br/>');
 
-        processed = processMath(processed);
-        processed = processMarkdown(processed);
-        
-        processed = processed.replace(/\[--OBSERVE--\]([\s\S]*?)\[\/--OBSERVE--\]/gi, (match, content) => {
-            return `<div class="custom-tag tag-observe"><div class="tag-icon-box"><span class="material-symbols-outlined">visibility</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Observe</strong></div><div class="tag-text">${content}</div></div></div>`;
-        });
+    // 1. EXTRAIR IMAGENS (Para evitar que regex processem Base64 gigante e travem o navegador)
+    const images: string[] = [];
+    processed = processed.replace(/<img[^>]+>/gi, (match) => {
+        images.push(match);
+        return `__IMG_PLACEHOLDER_${images.length - 1}__`;
+    });
 
-        // Add SOLUCAO tags support
-        processed = processed.replace(/\[--SOLUCAO--\]([\s\S]*?)\[\/--SOLUCAO--\]/gi, '<div class="resolve-solution">$1</div>');
-        processed = processed.replace(/\[--SOLUÇÃO--\]([\s\S]*?)\[\/--SOLUÇÃO--\]/gi, '<div class="resolve-solution">$1</div>');
+    // 2. EXTRAIR SVGs (Tiptap pode gerar SVGs que também são grandes)
+    const svgs: string[] = [];
+    processed = processed.replace(/<svg[\s\S]*?<\/svg>/gi, (match) => {
+        svgs.push(match);
+        return `__SVG_PLACEHOLDER_${svgs.length - 1}__`;
+    });
 
-        return processed;
-    };
+    processed = processMath(processed);
+    processed = processMarkdown(processed);
+    
+    processed = processed.replace(/\[--OBSERVE--\]([\s\S]*?)\[\/--OBSERVE--\]/gi, (match, content) => {
+        return `<div class="custom-tag tag-observe"><div class="tag-icon-box"><span class="material-symbols-outlined">visibility</span></div><div class="tag-content-wrapper"><div class="tag-body"><strong>Observe</strong></div><div class="tag-text">${content}</div></div></div>`;
+    });
+
+    processed = processed.replace(/\[--SOLUCAO--\]([\s\S]*?)\[\/--SOLUCAO--\]/gi, '<div class="resolve-solution">$1</div>');
+    processed = processed.replace(/\[--SOLUÇÃO--\]([\s\S]*?)\[\/--SOLUÇÃO--\]/gi, '<div class="resolve-solution">$1</div>');
+
+    // 3. RESTAURAR IMAGENS E SVGs
+    processed = processed.replace(/__SVG_PLACEHOLDER_(\d+)__/g, (_, index) => {
+        return svgs[parseInt(index, 10)] || '';
+    });
+    
+    processed = processed.replace(/__IMG_PLACEHOLDER_(\d+)__/g, (_, index) => {
+        return images[parseInt(index, 10)] || '';
+    });
+
+    return processed;
+};
+
+const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question: propQuestion, onAnswer, onBeforeAnswer, disabled }) => {
+    const [localQuestion, setLocalQuestion] = React.useState<any>(null);
+    const [loading, setLoading] = useState(false);
+    const [selectedAlt, setSelectedAlt] = useState<string | null>(null);
+    const [showResult, setShowResult] = useState(false);
+    const [showBaseText, setShowBaseText] = useState(false);
+
+    const activeQuestion = propQuestion || localQuestion;
+
+    // Memoize processed content to avoid freezing during re-renders
+    const processedEnunciado = React.useMemo(() => processContent(activeQuestion?.enunciado), [activeQuestion?.enunciado]);
+    
+    const processedAlternativas = React.useMemo(() => {
+        if (!activeQuestion?.alternativas) return [];
+        return activeQuestion.alternativas.map((alt: any) => ({
+            ...alt,
+            processedTexto: processContent(alt.texto)
+        }));
+    }, [activeQuestion?.alternativas]);
+
+    const processedRespostaProfessor = React.useMemo(() => 
+        processContent(activeQuestion?.resposta_professor), 
+    [activeQuestion?.resposta_professor]);
+
+    const processedTextoBase = React.useMemo(() => {
+        const tb = activeQuestion?.text_bases as any;
+        let content = '';
+        if (Array.isArray(tb) && tb.length > 0) {
+            content = tb[0].content;
+        } else if (tb && !Array.isArray(tb)) {
+            content = tb.content;
+        }
+        return processContent(content || activeQuestion?.texto_base || '');
+    }, [activeQuestion?.text_bases, activeQuestion?.texto_base]);
 
     useEffect(() => {
         if (id && !propQuestion) {
@@ -322,16 +361,16 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                             <span className="material-symbols-outlined text-lg">description</span>
                             TEXTO DE APOIO
                         </h4>
-                        <div className="prose prose-slate max-w-none break-words overflow-hidden" dangerouslySetInnerHTML={{ __html: baseTextData.content }} />
+                        <div className="prose prose-slate max-w-none break-words overflow-hidden" dangerouslySetInnerHTML={{ __html: processedTextoBase }} />
                     </div>
                 )}
 
                 {/* Enunciado */}
-                <div className="text-base md:text-lg font-bold text-slate-800 leading-relaxed mb-8 md:mb-10 premium-question-text break-words" dangerouslySetInnerHTML={{ __html: processContent(activeQuestion.enunciado) }} />
+                <div className="text-base md:text-lg font-bold text-slate-800 leading-relaxed mb-8 md:mb-10 premium-question-text break-words" dangerouslySetInnerHTML={{ __html: processedEnunciado }} />
 
                 {/* Alternativas */}
                 <div className="space-y-3 md:space-y-4">
-                    {activeQuestion.alternativas.map((alt: any, idx: number) => {
+                    {processedAlternativas.map((alt: any, idx: number) => {
                         const isSelected = selectedAlt === alt.id;
                         const isThisCorrect = alt.isCorreta;
                         const showAsCorrect = showResult && isThisCorrect;
@@ -360,7 +399,7 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                                 <div className={`size-8 md:size-9 flex items-center justify-center text-xs md:text-sm font-black transition-all shrink-0 rounded-full border-2 mt-0.5 ${circleClass}`}>
                                     {showAsCorrect ? <span className="material-symbols-outlined text-[18px] md:text-[20px]">check</span> : String.fromCharCode(65 + idx)}
                                 </div>
-                                <span className="text-sm md:text-[15px] font-semibold text-slate-700 flex-1 premium-question-text break-words whitespace-normal min-w-0" dangerouslySetInnerHTML={{ __html: processContent(alt.texto) }} />
+                                <span className="text-sm md:text-[15px] font-semibold text-slate-700 flex-1 premium-question-text break-words whitespace-normal min-w-0" dangerouslySetInnerHTML={{ __html: alt.processedTexto }} />
                                 {showResult && isThisCorrect && <span className="material-symbols-outlined text-emerald-500 animate-in zoom-in text-xl md:text-2xl shrink-0">check_circle</span>}
                                 {showResult && isSelected && !isThisCorrect && <span className="material-symbols-outlined text-red-500 animate-in zoom-in text-xl md:text-2xl shrink-0">cancel</span>}
                             </button>
@@ -380,7 +419,7 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                                 <p className="text-[10px] text-slate-400 font-bold m-0 uppercase mt-0.5">Análise do Especialista</p>
                             </div>
                         </div>
-                        <div className="text-[15px] text-slate-600 leading-relaxed bg-emerald-50/30 p-8 border-l-4 border-emerald-500 premium-question-text" dangerouslySetInnerHTML={{ __html: processContent(activeQuestion.resposta_professor) }} />
+                        <div className="text-[15px] text-slate-600 leading-relaxed bg-emerald-50/30 p-8 border-l-4 border-emerald-500 premium-question-text" dangerouslySetInnerHTML={{ __html: processedRespostaProfessor }} />
                     </div>
                 )}
 
@@ -411,4 +450,4 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
     );
 };
 
-export default InteractiveQuestion;
+export default React.memo(InteractiveQuestion);

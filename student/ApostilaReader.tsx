@@ -18,6 +18,7 @@ interface Apostila {
     author?: { full_name: string };
     teacher?: { name: string; avatar_url: string };
     created_at?: string;
+    is_resumo_8020?: boolean;
 }
 
 interface Question {
@@ -1334,6 +1335,79 @@ const ApostilaReader: React.FC = () => {
                         break-after: avoid; 
                     }
                 }
+
+                /* RESUMO 80/20 MODE UNIQUE STYLE - PREMIUM LIGHT */
+                .resumo-mode {
+                    background: #ffffff !important;
+                    border: 1px solid #f1f5f9 !important;
+                    box-shadow: 0 40px 100px -20px rgba(0,0,0,0.05) !important;
+                    color: #1e293b !important;
+                }
+                .resumo-mode .apostila-content h1 {
+                    color: #0f172a !important;
+                    text-align: center;
+                    font-size: 2.5rem !important;
+                    letter-spacing: -0.05em;
+                    background: linear-gradient(to bottom, #1e293b 0%, #64748b 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    margin-bottom: 4rem !important;
+                    font-weight: 900 !important;
+                }
+                .resumo-mode .apostila-content h2 {
+                    background: #f8fafc !important;
+                    border-left: 6px solid #10b981 !important;
+                    color: #1e293b !important;
+                    padding: 1.5rem 2rem !important;
+                    border-radius: 0 20px 20px 0 !important;
+                    font-size: 1.5rem !important;
+                    margin-top: 4rem !important;
+                    box-shadow: 5px 5px 15px rgba(0,0,0,0.02) !important;
+                }
+                .resumo-mode .apostila-content p {
+                    color: #475569 !important;
+                    font-size: 1.15rem !important;
+                    line-height: 1.8 !important;
+                }
+                .resumo-mode .apostila-content strong {
+                    color: #059669 !important;
+                    background: rgba(16, 185, 129, 0.05);
+                    padding: 2px 6px;
+                    border-radius: 6px;
+                    font-weight: 900 !important;
+                }
+                .resumo-mode .custom-tag {
+                    background: #fdfdfd !important;
+                    border: 1px solid #f1f5f9 !important;
+                    box-shadow: 0 10px 20px rgba(0,0,0,0.02) !important;
+                }
+                .resumo-mode .tag-content-wrapper {
+                    color: #334155 !important;
+                }
+                .resumo-mode .table-container {
+                    background: #ffffff !important;
+                    border: 2px solid #f1f5f9 !important;
+                }
+                .resumo-mode table {
+                    background: #ffffff !important;
+                }
+                .resumo-mode td {
+                    color: #475569 !important;
+                    border-bottom: 1px solid #f1f5f9 !important;
+                }
+                .resumo-mode th {
+                    background: #f8fafc !important;
+                    color: #1e293b !important;
+                    border-bottom: 2px solid #e2e8f0 !important;
+                }
+                .resumo-mode .katex-display {
+                    background: #fcfcfc !important;
+                    border: 1px dashed #e2e8f0 !important;
+                }
+
+                @media (max-width: 1400px) {
+                    .resumo-sidebar { display: none !important; }
+                }
             `}</style>
 
             {/* Toolbar */}
@@ -1369,7 +1443,9 @@ const ApostilaReader: React.FC = () => {
             </div>
 
             {/* Main Sheet */}
-            <article className={`apostila-sheet transition-all duration-700 ${isFocusMode ? 'rounded-none border-0 shadow-none py-20 px-10' : 'p-8 md:p-20'}`}>
+            <article className={`apostila-sheet transition-all duration-700 ${isFocusMode ? 'rounded-none border-0 shadow-none py-20 px-10' : 'p-8 md:p-20'} ${apostila.is_resumo_8020 ? 'resumo-mode' : ''}`}>
+                
+                {/* Header Professional with Breadcrumbs & Banner */}
 
                 {/* Header Professional with Breadcrumbs & Banner */}
                 <header className="mb-16 animate-in fade-in slide-in-from-bottom-10 duration-700 relative">
@@ -1380,41 +1456,51 @@ const ApostilaReader: React.FC = () => {
                         <img src="/bora_passar_logo.png" alt="Bora Passar" />
                     </div>
 
-                    {/* Vibrant Banner */}
-                    <div className="banner-container w-full h-64 md:h-80 rounded-none overflow-hidden mb-12 shadow-2xl relative group bg-slate-900 border-4 border-white">
-                        {courseBanner ? (
-                            <img src={courseBanner} className="size-full object-cover transition-transform duration-1000 group-hover:scale-105" alt="Banner" />
-                        ) : (
-                            <div className="size-full bg-[linear-gradient(45deg,#0f172a,#1e293b,#334155)] relative overflow-hidden">
-                                <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-                                <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] via-transparent to-transparent"></div>
-                                <div className="absolute top-10 right-10 opacity-10">
-                                    <span className="material-symbols-outlined text-9xl text-white">school</span>
+                    {!apostila.is_resumo_8020 && (
+                        <div className="banner-container w-full h-64 md:h-80 rounded-none overflow-hidden mb-12 shadow-2xl relative group bg-slate-900 border-4 border-white">
+                            {courseBanner ? (
+                                <img src={courseBanner} className="size-full object-cover transition-transform duration-1000 group-hover:scale-105" alt="Banner" />
+                            ) : (
+                                <div className="size-full bg-[linear-gradient(45deg,#0f172a,#1e293b,#334155)] relative overflow-hidden">
+                                    <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+                                    <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] via-transparent to-transparent"></div>
+                                    <div className="absolute top-10 right-10 opacity-10">
+                                        <span className="material-symbols-outlined text-9xl text-white">school</span>
+                                    </div>
                                 </div>
+                            )}
+                            <div className="banner-overlay absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent"></div>
+                            <div className="banner-text-container absolute bottom-0 left-0 right-0 p-8 md:p-12 flex flex-col justify-end items-start">
+                                <span className="px-5 py-2 bg-[#137fec] text-white text-[10px] font-black uppercase tracking-[0.3em] rounded-none shadow-lg shadow-blue-900/50 mb-4 animate-in slide-in-from-left-4 duration-700">
+                                    {apostila.disciplina?.name || 'Material Didático'}
+                                </span>
+                                <h1 className="text-3xl md:text-5xl font-black text-white leading-tight tracking-tight shadow-black drop-shadow-lg">
+                                    {apostila.title}
+                                </h1>
                             </div>
-                        )}
-                        <div className="banner-overlay absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent"></div>
-                        <div className="banner-text-container absolute bottom-0 left-0 right-0 p-8 md:p-12 flex flex-col justify-end items-start">
-                            <span className="px-5 py-2 bg-[#137fec] text-white text-[10px] font-black uppercase tracking-[0.3em] rounded-none shadow-lg shadow-blue-900/50 mb-4 animate-in slide-in-from-left-4 duration-700">
-                                {apostila.disciplina?.name || 'Material Didático'}
+                            <div className="absolute top-8 right-8 z-20 opacity-90 banner-logo-container flex items-center gap-3">
+                                <span className="hidden print:block banner-logo-text text-white font-bold uppercase tracking-wider text-xs shadow-black drop-shadow-md">
+                                    {apostila.disciplina?.name}
+                                </span>
+                                <img
+                                    src="/bora_passar_logo.png"
+                                    className="w-16 md:w-20 object-contain drop-shadow-2xl brightness-0 invert banner-logo-img"
+                                    alt="Bora Passar Agora"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {apostila.is_resumo_8020 && (
+                        <div className="py-12 border-b border-slate-100 mb-12 flex flex-col items-center text-center">
+                            <span className="px-5 py-2 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-[0.3em] rounded-full mb-6 animate-pulse">
+                                Módulo de Revisão 80/20
                             </span>
-                            <h1 className="text-3xl md:text-5xl font-black text-white leading-tight tracking-tight shadow-black drop-shadow-lg">
-                                {apostila.title}
+                            <h1 className="text-2xl md:text-4xl font-black text-slate-900 leading-tight tracking-tighter uppercase italic">
+                                RESUMO: {apostila.title}
                             </h1>
                         </div>
-                        {/* Logo Transparente no Canto Inferior Direito */}
-                        {/* Logo Transparente no Canto Inferior Direito */}
-                        <div className="absolute top-8 right-8 z-20 opacity-90 banner-logo-container flex items-center gap-3">
-                            <span className="hidden print:block banner-logo-text text-white font-bold uppercase tracking-wider text-xs shadow-black drop-shadow-md">
-                                {apostila.disciplina?.name}
-                            </span>
-                            <img
-                                src="/bora_passar_logo.png"
-                                className="w-16 md:w-20 object-contain drop-shadow-2xl brightness-0 invert banner-logo-img"
-                                alt="Bora Passar Agora"
-                            />
-                        </div>
-                    </div>
+                    )}
 
                     <div className="flex flex-wrap items-center gap-4 text-sm font-bold text-slate-500 mb-8 px-4">
                         <button 
@@ -1443,9 +1529,11 @@ const ApostilaReader: React.FC = () => {
                         )}
                     </div>
 
-                    <p className="text-xl text-slate-600 font-medium leading-relaxed px-4 border-l-4 border-[#137fec] pl-6 ml-4 md:ml-0">
-                        {apostila.description || 'Uma abordagem prática e direto ao ponto para dominar este conteúdo.'}
-                    </p>
+                    {!apostila.is_resumo_8020 && (
+                        <p className="text-xl text-slate-600 font-medium leading-relaxed px-4 border-l-4 border-[#137fec] pl-6 ml-4 md:ml-0">
+                            {apostila.description || 'Uma abordagem prática e direto ao ponto para dominar este conteúdo.'}
+                        </p>
+                    )}
                 </header>
 
                 {/* Content body */}
