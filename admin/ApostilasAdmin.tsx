@@ -70,6 +70,7 @@ const ApostilasAdmin: React.FC = () => {
     const [filterAuthor, setFilterAuthor] = useState('');
     const [filterProfessor, setFilterProfessor] = useState('');
     const [currentTeacher, setCurrentTeacher] = useState<Teacher | null>(null);
+    const [filterSortOrder, setFilterSortOrder] = useState<'asc' | 'desc'>('asc');
 
     // Observation State
     const [isObservationModalOpen, setIsObservationModalOpen] = useState(false);
@@ -166,12 +167,12 @@ const ApostilasAdmin: React.FC = () => {
 
     useEffect(() => {
         fetchApostilas();
-    }, [currentPage, filterSearch, filterDisciplina, filterAuthor, filterProfessor]);
+    }, [currentPage, filterSearch, filterDisciplina, filterAuthor, filterProfessor, filterSortOrder]);
 
     // Reset to page 1 when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [filterSearch, filterDisciplina, filterAuthor, filterProfessor]);
+    }, [filterSearch, filterDisciplina, filterAuthor, filterProfessor, filterSortOrder]);
 
     const fetchApostilas = async () => {
         setLoading(true);
@@ -203,7 +204,7 @@ const ApostilasAdmin: React.FC = () => {
             const to = from + ITEMS_PER_PAGE - 1;
 
             const { data, error, count } = await query
-                .order('created_at', { ascending: false })
+                .order('created_at', { ascending: filterSortOrder === 'asc' })
                 .range(from, to);
 
             if (error) throw error;
@@ -2186,7 +2187,7 @@ const ApostilasAdmin: React.FC = () => {
             </div>
 
             <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-[20px] px-6 py-3 transition-all">
                         <span className="material-symbols-outlined text-slate-300">search</span>
                         <input
@@ -2228,6 +2229,14 @@ const ApostilasAdmin: React.FC = () => {
                             {currentTeacher && <option value={`prof_${currentTeacher.id}`}>Minhas Apostilas (Professor)</option>}
                             {teachers.filter(t => t.id !== currentTeacher?.id).map(t => <option key={t.id} value={`prof_${t.id}`}>{t.name}</option>)}
                         </optgroup>
+                    </select>
+                    <select
+                        value={filterSortOrder}
+                        onChange={e => setFilterSortOrder(e.target.value as 'asc' | 'desc')}
+                        className="h-14 px-6 bg-slate-50 border border-slate-100 rounded-[20px] text-sm font-bold text-slate-500 outline-none appearance-none"
+                    >
+                        <option value="asc">Mais Antigas Primeiro (Padrão)</option>
+                        <option value="desc">Mais Recentes Primeiro</option>
                     </select>
                 </div>
             </div>

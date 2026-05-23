@@ -177,7 +177,7 @@ const Cursos: React.FC = () => {
     const fetchAuxData = async () => {
         // Fetch Apostilas
         try {
-            const { data, error } = await supabase.from('apostilas').select('*, disciplinas(name), assuntos(name)').order('title');
+            const { data, error } = await supabase.from('apostilas').select('*, disciplinas(name), assuntos(name)').order('created_at', { ascending: true });
             if (error) console.error('Error fetching apostilas:', error);
             else setAllApostilas(data || []);
         } catch (e) { console.error(e); }
