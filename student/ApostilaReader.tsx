@@ -1371,9 +1371,6 @@ const ApostilaReader: React.FC = () => {
                 }
                 .resumo-mode .apostila-content strong {
                     color: #059669 !important;
-                    background: rgba(16, 185, 129, 0.05);
-                    padding: 2px 6px;
-                    border-radius: 6px;
                     font-weight: 900 !important;
                 }
                 .resumo-mode .custom-tag {
