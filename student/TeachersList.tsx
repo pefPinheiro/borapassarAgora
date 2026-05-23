@@ -68,10 +68,10 @@ const TeachersList: React.FC = () => {
                         <div 
                             key={teacher.id}
                             onClick={() => handleOpenProfile(teacher.id)}
-                            className="group bg-white rounded-[40px] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-[#137fec]/10 transition-all duration-500 overflow-hidden cursor-pointer flex flex-col hover:-translate-y-2"
+                            className="group bg-white rounded-[40px] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-[#137fec]/10 transition-all duration-500 overflow-hidden cursor-pointer flex flex-col hover:-translate-y-2 relative pt-32"
                         >
                             {/* Banner Section */}
-                            <div className="h-40 absolute inset-0 w-full overflow-hidden bg-slate-900 z-0">
+                            <div className="h-48 absolute top-0 inset-x-0 w-full overflow-hidden bg-slate-900 z-0">
                                 {teacherBanner ? (
                                     <img src={teacherBanner} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" alt="Banner" />
                                 ) : (
@@ -83,11 +83,11 @@ const TeachersList: React.FC = () => {
                             </div>
 
                         {/* Profile Info Overlay Positioned */}
-                        <div className="px-8 pb-8 -mt-12 relative z-10 flex flex-col items-center text-center space-y-4 flex-1">
-                            <div className="size-24 rounded-[30px] bg-white p-2 shadow-xl group-hover:rotate-3 transition-transform duration-500">
+                        <div className="px-8 pb-8 -mt-20 relative z-10 flex flex-col items-center text-center space-y-4 flex-1">
+                            <div className="size-32 rounded-[30px] bg-white p-2 shadow-xl group-hover:rotate-3 transition-transform duration-500">
                                 <div className="size-full rounded-[22px] bg-slate-100 overflow-hidden">
                                      {teacher.avatar_url ? (
-                                        <img src={teacher.avatar_url} className="size-full object-cover" alt={teacher.name} />
+                                        <img src={teacher.avatar_url} className="size-full object-cover object-top p-1" alt={teacher.name} />
                                      ) : (
                                         <div className="size-full flex items-center justify-center text-slate-300">
                                             <span className="material-symbols-outlined text-4xl">person</span>
@@ -208,10 +208,10 @@ const TeacherProfileModal: React.FC<{
                             <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent pointer-events-none" />
                             
                             <div className="absolute -bottom-10 left-10 flex items-end gap-6">
-                                <div className="size-24 md:size-32 rounded-[32px] bg-white p-2 shadow-2xl relative z-10">
+                                <div className="size-32 md:size-40 rounded-[32px] bg-white p-2 shadow-2xl relative z-10">
                                     <div className="size-full rounded-[24px] bg-slate-100 overflow-hidden">
                                         {teacher.avatar_url ? (
-                                            <img src={teacher.avatar_url} className="size-full object-cover" alt={teacher.name} />
+                                            <img src={teacher.avatar_url} className="size-full object-cover object-top p-1" alt={teacher.name} />
                                         ) : (
                                             <div className="size-full flex items-center justify-center text-slate-300">
                                                 <span className="material-symbols-outlined text-4xl">person</span>

@@ -23,7 +23,14 @@ interface Banca {
 }
 
 const ApostilasAdmin: React.FC = () => {
-    const [view, setView] = useState<'list' | 'form'>('list');
+    const [view, setView] = useState<'list' | 'form' | 'validator'>('list');
+    const [auditingApostila, setAuditingApostila] = useState<Apostila | null>(null);
+    const [isExtractingChapters, setIsExtractingChapters] = useState(false);
+    const [isAnalyzingChapter, setIsAnalyzingChapter] = useState(false);
+    const [analysisResults, setAnalysisResults] = useState<any[]>([]);
+    const [analysisProgress, setAnalysisProgress] = useState(0);
+    const [analysisError, setAnalysisError] = useState<string | null>(null);
+    const [selectedChapter, setSelectedChapter] = useState<string | null>(null);
     const [apostilas, setApostilas] = useState<Apostila[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentUser, setCurrentUser] = useState<Profile | null>(null);
@@ -96,7 +103,8 @@ const ApostilasAdmin: React.FC = () => {
         commission_valid_until: '',
         professor_id: null,
         is_resolution_notebook: false,
-        is_resumo_8020: false
+        is_resumo_8020: false,
+        is_audited: false
     });
 
     // Cadernos State
@@ -307,7 +315,8 @@ const ApostilasAdmin: React.FC = () => {
                 commission_valid_until: apostila.commission_valid_until || '',
                 professor_id: apostila.professor_id || null,
                 is_resolution_notebook: apostila.is_resolution_notebook || false,
-                is_resumo_8020: apostila.is_resumo_8020 || false
+                is_resumo_8020: apostila.is_resumo_8020 || false,
+                is_audited: apostila.is_audited || false
             });
 
             fetchLinkedNotebooks(apostila.id);
@@ -334,7 +343,8 @@ const ApostilasAdmin: React.FC = () => {
                 commission_valid_until: '',
                 professor_id: (currentUser?.role === 'teacher' && currentTeacher) ? currentTeacher.id : null,
                 is_resolution_notebook: false,
-                is_resumo_8020: false
+                is_resumo_8020: false,
+                is_audited: false
             });
             setNotebooks([]);
         }
@@ -794,6 +804,137 @@ const ApostilasAdmin: React.FC = () => {
         }
     };
 
+    const [isChapterModalOpen, setIsChapterModalOpen] = useState(false);
+
+    const handleExtractChapters = async () => {
+        if (!auditingApostila) return;
+        
+        setIsExtractingChapters(true);
+        setAnalysisResults([]);
+        setSelectedChapter(null);
+        setAnalysisProgress(5);
+        setAnalysisError(null);
+
+        const timer = setInterval(() => {
+            setAnalysisProgress(prev => {
+                if (prev >= 90) return prev;
+                return prev + Math.floor(Math.random() * 5);
+            });
+        }, 1500);
+
+        try {
+            const cleanContent = (auditingApostila.content?.replace(/<[^>]*>?/gm, ' ') || '').substring(0, 40000);
+
+            const { data, error } = await supabase.functions.invoke('audit-content', {
+                body: { 
+                    action: 'list_chapters',
+                    content: cleanContent, 
+                    title: auditingApostila.title 
+                }
+            });
+
+            if (error) throw error;
+            if (data && data.error) throw new Error(data.message || 'Erro na API do Google.');
+            
+            if (data && Array.isArray(data)) {
+                setAnalysisProgress(100);
+                const mapped = data.map(cap => ({
+                    capitulo: cap,
+                    status: 'pending',
+                    alertas: []
+                }));
+                setAnalysisResults(mapped);
+                setTimeout(() => {
+                    setIsChapterModalOpen(true); // Abre o popup com os capítulos gerados pela IA
+                    setAnalysisProgress(0);
+                }, 500);
+            } else {
+                throw new Error('A IA retornou um formato inesperado.');
+            }
+
+        } catch (e: any) {
+            console.error('Erro na extração de capítulos pela IA:', e);
+            let detailedMessage = e.message;
+            if (e.name === 'FunctionsHttpError' && e.context) {
+                try {
+                    const errData = await e.context.json();
+                    if (errData && errData.message) detailedMessage = errData.message;
+                } catch (_) {}
+            }
+            setAnalysisError(detailedMessage || 'Erro ao mapear apostila.');
+        } finally {
+            setIsExtractingChapters(false);
+            // @ts-ignore
+            clearInterval(timer);
+        }
+    };
+
+    const handleAnalyzeChapter = async (chapterName: string) => {
+        if (!auditingApostila) return;
+
+        setIsAnalyzingChapter(true);
+        setIsChapterModalOpen(false); // Fecha o popup para ver o relatório
+        setSelectedChapter(chapterName);
+        setAnalysisProgress(5);
+        setAnalysisError(null);
+        
+        setAnalysisResults(prev => prev.map(c => c.capitulo === chapterName ? { ...c, status: 'analyzing' } : c));
+
+        const timer = setInterval(() => {
+            setAnalysisProgress(prev => {
+                if (prev >= 95) return prev;
+                return prev + Math.floor(Math.random() * 3);
+            });
+        }, 1000);
+
+        try {
+            const cleanContent = (auditingApostila.content?.replace(/<[^>]*>?/gm, ' ') || '').substring(0, 40000);
+
+            const { data, error } = await supabase.functions.invoke('audit-content', {
+                body: { 
+                    action: 'analyze_chapter',
+                    chapter: chapterName,
+                    content: cleanContent, 
+                    title: auditingApostila.title 
+                }
+            });
+
+            if (error) throw error;
+            if (data && data.error) throw new Error(data.message || 'Erro na API do Google.');
+            
+            if (data && Array.isArray(data)) {
+                setAnalysisProgress(100);
+                // Se o array for vazio, significa que não há erros (validado com sucesso)
+                setAnalysisResults(prev => prev.map(c => 
+                    c.capitulo === chapterName ? { 
+                        ...c, 
+                        status: 'validated', 
+                        alertas: data 
+                    } : c
+                ));
+                setTimeout(() => setAnalysisProgress(0), 1000);
+            } else {
+                throw new Error('Formato inesperado retornado.');
+            }
+
+        } catch (e: any) {
+            console.error('Erro na análise de capítulo:', e);
+            let detailedMessage = e.message;
+            if (e.name === 'FunctionsHttpError' && e.context) {
+                try {
+                    const errData = await e.context.json();
+                    if (errData && errData.message) detailedMessage = errData.message;
+                } catch (_) {}
+            }
+            setAnalysisResults(prev => prev.map(c => c.capitulo === chapterName ? { ...c, status: 'error' } : c));
+            setAnalysisError(detailedMessage || 'Erro na análise de fatos.');
+        } finally {
+            setIsAnalyzingChapter(false);
+            // @ts-ignore
+            clearInterval(timer);
+        }
+    };
+
     const handleSetProfessor = async (professorId: string | null) => {
         if (!validatingApostila) return;
         await updateApostilaProfessor(validatingApostila.id, professorId);
@@ -827,6 +968,27 @@ const ApostilasAdmin: React.FC = () => {
         } catch (error: any) {
             console.error('Error saving professor:', error);
             alert('Erro ao salvar professor: ' + error.message);
+        }
+    };
+
+    const handleToggleAudit = async (apostila: Apostila) => {
+        const newValue = !apostila.is_audited;
+        try {
+            const { error } = await supabase
+                .from('apostilas')
+                .update({ is_audited: newValue })
+                .eq('id', apostila.id);
+
+            if (error) throw error;
+
+            setApostilas(prev => prev.map(a => 
+                a.id === apostila.id 
+                ? { ...a, is_audited: newValue } 
+                : a
+            ));
+        } catch (error: any) {
+            console.error('Error toggling audit:', error);
+            alert('Erro ao atualizar auditoria: ' + error.message);
         }
     };
 
@@ -869,6 +1031,61 @@ const ApostilasAdmin: React.FC = () => {
             alert('Erro ao salvar observação: ' + e.message);
         } finally {
             setIsSavingObservation(false);
+        }
+    };
+
+    const handleExportTxt = (apostila: Apostila) => {
+        try {
+            let content = apostila.content || '';
+
+            // 1. Remover blocos de questões e códigos (PRE e CODE)
+            content = content.replace(/<pre[^>]*>[\s\S]*?<\/pre>/gi, '');
+            content = content.replace(/<code[^>]*>[\s\S]*?<\/code>/gi, '');
+            content = content.replace(/\[--QUESTAO-JSON--\][\s\S]*?\[\/--QUESTAO-JSON--\]/gi, '');
+            content = content.replace(/\[--RESOLVE:[\s\S]*?\[\/--RESOLVE--\]/gi, '');
+            content = content.replace(/\[quest_id:[\s\S]*?\]/gi, '');
+
+            // 2. Estruturar Capítulos e Seções (Linguagem Natural)
+            content = content.replace(/<h1>(.*?)<\/h1>/gi, '\nCapítulo: $1\n');
+            content = content.replace(/<h2>(.*?)<\/h2>/gi, '\nSeção: $1\n');
+            content = content.replace(/<h3>(.*?)<\/h3>/gi, '\n$1\n');
+
+            // 3. Remover TODAS as TAGS de marcação ([--NOME_TAG--])
+            content = content.replace(/\[\/?--[\s\S]*?--\]/g, '');
+
+            // 4. Converter HTML restante para texto limpo
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            let cleanText = tempDiv.innerText || tempDiv.textContent || '';
+            
+            // 5. Limpeza final de espaçamentos
+            cleanText = cleanText.replace(/\n\s*\n\s*\n/g, '\n\n'); 
+
+            const fileContent = `==================================================\n` +
+                               `VALIDAÇÃO DE CONTEÚDO: ${apostila.title.toUpperCase()}\n` +
+                               `DISCIPLINA: ${apostila.disciplinas?.name || 'GERAL'}\n` +
+                               `==================================================\n\n` +
+                               `${cleanText.trim()}`;
+            
+            const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            
+            const safeTitle = apostila.title
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-zA-Z0-9]/g, '_')
+                .toLowerCase();
+            
+            link.href = url;
+            link.download = `validacao_${safeTitle}.txt`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Error exporting TXT:', error);
+            alert('Erro ao gerar o arquivo de validação.');
         }
     };
 
@@ -1061,6 +1278,15 @@ const ApostilasAdmin: React.FC = () => {
                         </div>
                     </div>
                     <div className="flex gap-4">
+                        {editingApostila && (
+                            <button 
+                                onClick={() => handleExportTxt(editingApostila)} 
+                                className="px-6 py-3 bg-slate-100 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-500 hover:text-slate-700 transition-all flex items-center gap-2"
+                            >
+                                <span className="material-symbols-outlined text-sm">download</span>
+                                Gerar TXT
+                            </button>
+                        )}
                         <button onClick={() => setView('list')} className="px-8 py-3 bg-white border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all">Cancelar</button>
                         <button onClick={handleSubmit} className="px-10 py-3 bg-[#137fec] text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-2xl shadow-blue-500/20 hover:bg-blue-600 transition-all active:scale-95">
                             Salvar Alterações
@@ -1431,6 +1657,22 @@ const ApostilasAdmin: React.FC = () => {
                                                 <span className="text-[9px] text-slate-500">Aplica um estilo focado e minimalista para revisões rápidas</span>
                                             </div>
                                         </label>
+
+                                        <label className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-2xl cursor-pointer group hover:border-blue-500/50 transition-all">
+                                            <div className="relative">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="peer appearance-none w-10 h-6 bg-slate-700 rounded-full checked:bg-blue-600 transition-all cursor-pointer"
+                                                    checked={formData.is_audited || false}
+                                                    onChange={(e) => setFormData({ ...formData, is_audited: e.target.checked })}
+                                                />
+                                                <div className="absolute top-1 left-1 size-4 bg-white rounded-full peer-checked:translate-x-4 transition-transform pointer-events-none shadow-sm"></div>
+                                            </div>
+                                            <div>
+                                                <span className="block text-xs font-black text-white group-hover:text-blue-400 transition-colors uppercase tracking-widest">Auditoria Concluída</span>
+                                                <span className="text-[9px] text-slate-500">Marca que a obra passou pelo processo de auditoria</span>
+                                            </div>
+                                        </label>
                                     </div>
 
                                     <div className="space-y-4 pt-6 border-t border-white/5 mt-6">
@@ -1655,6 +1897,269 @@ const ApostilasAdmin: React.FC = () => {
         );
     }
 
+    if (view === 'validator' && auditingApostila) {
+        return (
+            <div className="flex flex-col gap-8 pb-10 animate-in fade-in duration-500">
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-4">
+                        <button 
+                            onClick={() => { setView('list'); setAuditingApostila(null); setAnalysisResults([]); setSelectedChapter(null); }}
+                            className="size-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-blue-600 transition-all active:scale-95 shadow-sm"
+                        >
+                            <span className="material-symbols-outlined">arrow_back</span>
+                        </button>
+                        <div>
+                            <h2 className="text-[#111418] text-3xl font-black tracking-tighter">Validador de Conteúdo IA</h2>
+                            <p className="text-slate-500 font-medium italic">Analisando: {auditingApostila.title}</p>
+                        </div>
+                    </div>
+                    {analysisResults.length > 0 && (
+                        <button
+                            onClick={() => setIsChapterModalOpen(true)}
+                            className={`flex items-center gap-3 px-8 py-4 bg-slate-100 text-slate-700 rounded-[20px] font-black text-xs uppercase tracking-widest border border-slate-200 hover:bg-slate-200 transition-all active:scale-95`}
+                        >
+                            <span className="material-symbols-outlined font-black">format_list_bulleted</span>
+                            Ver Capítulos ({analysisResults.length})
+                        </button>
+                    )}
+                    <button
+                        onClick={() => handleExtractChapters()}
+                        disabled={isExtractingChapters || isAnalyzingChapter}
+                        className={`flex items-center gap-3 px-8 py-4 bg-purple-600 text-white rounded-[20px] font-black text-xs uppercase tracking-widest shadow-2xl shadow-purple-500/20 hover:bg-purple-700 transition-all active:scale-95 disabled:opacity-50`}
+                    >
+                        <span className={`material-symbols-outlined font-black ${isExtractingChapters ? 'animate-spin' : ''}`}>{isExtractingChapters ? 'sync' : 'psychology'}</span>
+                        {isExtractingChapters ? 'Processando IA (Pode demorar um pouco)...' : 'Mapear Capítulos (IA)'}
+                    </button>
+                </div>
+                
+                {/* Analysis Progress Bar */}
+                {(isExtractingChapters || isAnalyzingChapter || analysisProgress > 0) && (
+                    <div className="w-full bg-white rounded-[24px] p-6 border border-slate-200 shadow-sm animate-in slide-in-from-top-4">
+                        <div className="flex justify-between items-center mb-3">
+                            <div className="flex items-center gap-3">
+                                <div className="size-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-[18px] animate-spin">sync</span>
+                                </div>
+                                <span className="text-[11px] font-black uppercase tracking-widest text-slate-600">
+                                    {isExtractingChapters ? 'Mapeando Estrutura da Apostila...' : `Analisando: ${selectedChapter}`}
+                                </span>
+                            </div>
+                            <span className="text-sm font-black text-purple-600">{analysisProgress || 25}%</span>
+                        </div>
+                        <div className="h-3 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200">
+                            <div 
+                                className="h-full bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full transition-all duration-1000 ease-out shadow-lg shadow-purple-500/20"
+                                style={{ width: `${analysisProgress || 25}%` }}
+                            ></div>
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 mt-3 text-center italic">
+                            O Gemini 3 Flash está processando milhares de tokens para garantir a veracidade do seu material...
+                        </p>
+                    </div>
+                )}
+
+                {/* Analysis Error Message */}
+                {analysisError && (
+                    <div className="w-full bg-red-50 border border-red-200 rounded-[24px] p-6 flex items-start gap-4 animate-in shake duration-500">
+                        <div className="size-12 rounded-2xl bg-red-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-red-500/20">
+                            <span className="material-symbols-outlined text-2xl">error</span>
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="text-sm font-black text-red-900 uppercase tracking-tight">Falha na Comunicação com a IA</h4>
+                            <p className="text-xs font-bold text-red-700/70 mt-1">{analysisError}</p>
+                            <button 
+                                onClick={() => setAnalysisError(null)}
+                                className="mt-4 px-6 py-2 bg-red-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 transition-all active:scale-95 shadow-md shadow-red-500/20"
+                            >
+                                Entendi
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-8">
+                    {/* Área de Relatório (Full Width) */}
+                    <div className="space-y-6">
+                        {!selectedChapter ? (
+                            <div className="bg-white rounded-[40px] border border-slate-200 p-20 text-center flex flex-col items-center gap-6 shadow-sm border-dashed">
+                                <div className="size-24 rounded-[32px] bg-purple-50 text-purple-500 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-5xl">auto_awesome</span>
+                                </div>
+                                <div className="max-w-md">
+                                    <h4 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Aguardando Inteligência</h4>
+                                    <p className="text-slate-500 mt-2 font-medium">
+                                        Mapeie a apostila para gerar a estrutura de tópicos via Inteligência Artificial. O <b>Gemini 3 Flash</b> analisará a estrutura semântica conforme as TAGs de geração (ex: [--EXEMPLO--], [Questões]). 
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                                {(() => {
+                                    const currChapter = analysisResults.find(r => r.capitulo === selectedChapter);
+                                    if (!currChapter) return null;
+
+                                    if (currChapter.status === 'pending') {
+                                        return (
+                                            <div className="bg-white rounded-[40px] border border-slate-200 p-20 text-center flex flex-col items-center gap-6 shadow-sm">
+                                                <span className="material-symbols-outlined text-5xl text-slate-300">target</span>
+                                                <div className="max-w-md">
+                                                    <h4 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Pronto para Análise</h4>
+                                                    <p className="text-slate-500 mt-2 font-medium">Vamos concentrar o poder computacional exclusivamente neste bloco de texto para garantir precisão máxima.</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleAnalyzeChapter(selectedChapter)}
+                                                    disabled={isAnalyzingChapter}
+                                                    className={`mt-4 flex items-center gap-3 px-8 py-4 bg-slate-900 text-white rounded-[20px] font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-900/20 hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50`}
+                                                >
+                                                    <span className="material-symbols-outlined font-black">{isAnalyzingChapter ? 'sync' : 'search'}</span>
+                                                    {isAnalyzingChapter ? 'Auditando...' : 'Analisar Este Capítulo'}
+                                                </button>
+                                            </div>
+                                        );
+                                    }
+
+                                    if (currChapter.status === 'analyzing') {
+                                        return (
+                                            <div className="bg-white rounded-[40px] border border-slate-200 p-20 text-center flex flex-col items-center gap-6 shadow-sm">
+                                                <span className="material-symbols-outlined text-5xl text-purple-500 animate-spin">refresh</span>
+                                                <h4 className="text-xl font-black text-slate-900 uppercase tracking-tighter animate-pulse">Auditando Fatos...</h4>
+                                                <p className="text-slate-500">O Gemini está cruzando os dados deste capítulo...</p>
+                                            </div>
+                                        );
+                                    }
+
+                                    if (currChapter.status === 'validated' && currChapter.alertas.length === 0) {
+                                        return (
+                                            <div className="bg-green-50 rounded-[40px] border border-green-200 p-20 text-center flex flex-col items-center gap-6 shadow-sm">
+                                                <span className="material-symbols-outlined text-6xl text-green-500">verified</span>
+                                                <div>
+                                                    <h4 className="text-xl font-black text-green-900 uppercase tracking-tighter">100% Correto</h4>
+                                                    <p className="text-green-700 mt-2 font-medium">Nenhum erro factual ou informação desatualizada foi encontrada neste capítulo.</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+
+                                    if (currChapter.status === 'error') {
+                                        return (
+                                            <div className="bg-red-50 rounded-[40px] border border-red-200 p-20 text-center flex flex-col items-center gap-6 shadow-sm">
+                                                <span className="material-symbols-outlined text-5xl text-red-500">warning</span>
+                                                <h4 className="text-xl font-black text-red-900 uppercase tracking-tighter">Erro na Análise</h4>
+                                                <p className="text-red-700">Houve um problema ao processar este capítulo. Tente novamente.</p>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <>
+                                            <div className="flex items-center gap-3 px-2">
+                                                <div className="size-2 bg-red-500 rounded-full animate-pulse"></div>
+                                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Erros Factuais Encontrados: {currChapter.alertas.length}</h3>
+                                            </div>
+                                            
+                                            {currChapter.alertas.map((alerta: any, idx: number) => (
+                                                <div key={idx} className={`bg-white rounded-[32px] border border-red-100 p-8 flex flex-col gap-6 shadow-sm transition-all hover:shadow-xl`}>
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="size-12 rounded-xl bg-red-50 text-red-500 flex items-center justify-center shrink-0">
+                                                            <span className="material-symbols-outlined text-3xl font-black">report</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-red-500 text-white inline-block mb-1">
+                                                                {alerta.tipo_correcao === 'exclusao' ? 'Apagar Trecho' : alerta.tipo_correcao === 'acrescimo' ? 'Falta de Informação' : 'Substituir Trecho'}
+                                                            </span>
+                                                            <h4 className="font-black text-slate-800 uppercase tracking-tight text-sm">Problema Factual Detectado</h4>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="pl-16 space-y-4">
+                                                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1"><span className="material-symbols-outlined text-sm">format_quote</span> Trecho Original da Apostila</div>
+                                                            <p className="text-slate-600 font-medium italic">"{alerta.original}"</p>
+                                                        </div>
+
+                                                        <div className="bg-red-50 p-4 rounded-2xl border border-red-100">
+                                                            <div className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-2 flex items-center gap-1"><span className="material-symbols-outlined text-sm">manage_search</span> Análise do Erro</div>
+                                                            <p className="text-red-900 font-medium">{alerta.analise}</p>
+                                                        </div>
+
+                                                        {alerta.tipo_correcao !== 'exclusao' && (
+                                                            <div className="bg-green-50 p-4 rounded-2xl border border-green-100">
+                                                                <div className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-2 flex items-center gap-1"><span className="material-symbols-outlined text-sm">edit_note</span> Sugestão de Correção</div>
+                                                                <p className="text-green-800 font-bold">{alerta.sugestao}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* POPUP DE CAPÍTULOS */}
+                {isChapterModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
+                        <div className="bg-white rounded-[40px] w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-300">
+                        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-[40px]">
+                            <div>
+                                <h3 className="text-2xl font-black text-slate-900 tracking-tight">Capítulos Encontrados</h3>
+                                <p className="text-slate-500 font-medium text-sm mt-1">Selecione um bloco para a IA auditar rigorosamente.</p>
+                            </div>
+                            <button onClick={() => setIsChapterModalOpen(false)} className="size-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-500 hover:border-red-200 transition-all">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                        
+                        <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-3">
+                            {analysisResults.length === 0 ? (
+                                <p className="text-center text-slate-400 font-bold p-10">Nenhum capítulo processado.</p>
+                            ) : (
+                                analysisResults.map((res, idx) => (
+                                    <div key={idx} className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-5 rounded-3xl border border-slate-100 bg-white hover:border-purple-200 hover:shadow-md transition-all group">
+                                        <div className="flex items-center gap-4 flex-1">
+                                            <div className={`size-12 rounded-2xl flex items-center justify-center shrink-0 ${res.status === 'pending' ? 'bg-slate-100 text-slate-400' : res.status === 'analyzing' ? 'bg-purple-100 text-purple-600' : res.status === 'validated' && res.alertas.length === 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                                                <span className={`material-symbols-outlined ${res.status === 'analyzing' ? 'animate-spin' : ''}`}>
+                                                    {res.status === 'pending' ? 'description' : res.status === 'analyzing' ? 'refresh' : res.status === 'validated' && res.alertas.length === 0 ? 'verified' : 'report'}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-black text-slate-800 text-lg uppercase tracking-tighter line-clamp-1">{res.capitulo}</h4>
+                                                <div className="flex items-center gap-3 mt-1">
+                                                    {res.status === 'validated' && res.alertas.length > 0 && (
+                                                        <span className="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-black rounded-lg">{res.alertas.length} Erros</span>
+                                                    )}
+                                                    {res.status === 'validated' && res.alertas.length === 0 && (
+                                                        <span className="px-2 py-0.5 bg-green-100 text-green-600 text-[10px] font-black rounded-lg">Validado Factualmente</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <button
+                                            onClick={() => handleAnalyzeChapter(res.capitulo)}
+                                            disabled={isAnalyzingChapter || res.status === 'analyzing'}
+                                            className={`shrink-0 px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${
+                                                res.status === 'validated' 
+                                                    ? 'bg-white border-2 border-slate-200 text-slate-400 hover:border-slate-400' 
+                                                    : 'bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-500/20'
+                                            }`}
+                                        >
+                                            {res.status === 'analyzing' ? 'Auditando...' : res.status === 'validated' ? 'Analisar Novamente' : 'Auditar Agora'}
+                                        </button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+        );
+    }
+
     return (
         <div className="flex flex-col gap-8 pb-10 animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -1735,6 +2240,7 @@ const ApostilasAdmin: React.FC = () => {
                                 <th className="px-10 py-6">Conteúdo / Metadata</th>
                                 <th className="px-10 py-6">Curadoria</th>
                                 <th className="px-10 py-6 text-center">Qualidade</th>
+                                <th className="px-10 py-6 text-center">Auditoria</th>
                                 <th className="px-10 py-6 text-center">Exibição</th>
                                 <th className="px-10 py-6 text-right">Controle Ações</th>
                             </tr>
@@ -1825,6 +2331,20 @@ const ApostilasAdmin: React.FC = () => {
                                                     )}
                                                 </td>
                                                 <td className="px-10 py-8 text-center">
+                                                    <button
+                                                        onClick={() => handleToggleAudit(a)}
+                                                        className={`group/audit relative px-4 py-2 rounded-2xl transition-all border-2 flex items-center gap-2 mx-auto cursor-pointer ${a.is_audited ? 'bg-blue-600 border-blue-400 text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-300'}`}
+                                                        title={a.is_audited ? 'Auditado - Clique para desmarcar' : 'Não Auditado - Clique para marcar como auditado'}
+                                                    >
+                                                        <span className="material-symbols-outlined text-[18px]">
+                                                            {a.is_audited ? 'task_alt' : 'inventory_2'}
+                                                        </span>
+                                                        <span className="text-[10px] font-black uppercase tracking-widest">
+                                                            {a.is_audited ? 'Auditado' : 'Auditar'}
+                                                        </span>
+                                                    </button>
+                                                </td>
+                                                <td className="px-10 py-8 text-center">
                                                     <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${a.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
                                                         {a.status === 'Ativo' ? 'Publicado' : 'Rascunho'}
                                                     </span>
@@ -1848,6 +2368,13 @@ const ApostilasAdmin: React.FC = () => {
                                                         >
                                                             <span className="material-symbols-outlined text-[20px]">visibility</span>
                                                         </button>
+                                                        <button
+                                                            onClick={() => handleExportTxt(a)}
+                                                            className="size-10 flex items-center justify-center text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
+                                                            title="Gerar TXT da Apostila"
+                                                        >
+                                                            <span className="material-symbols-outlined text-[20px]">description</span>
+                                                        </button>
                                                         {perms.canDuplicate && (
                                                             <button
                                                                 onClick={() => handleDuplicate(a)}
@@ -1866,6 +2393,16 @@ const ApostilasAdmin: React.FC = () => {
                                                                 <span className="material-symbols-outlined text-[20px]">edit_note</span>
                                                             </button>
                                                         )}
+                                                        <button
+                                                            onClick={() => {
+                                                                setAuditingApostila(a);
+                                                                setView('validator');
+                                                            }}
+                                                            className="size-10 flex items-center justify-center text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all"
+                                                            title="Auditoria com IA (Gemini)"
+                                                        >
+                                                            <span className="material-symbols-outlined text-[20px]">psychology</span>
+                                                        </button>
                                                         {perms.canDelete && (
                                                             <button
                                                                 onClick={() => handleDelete(a.id)}

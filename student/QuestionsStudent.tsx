@@ -29,6 +29,8 @@ const QuestionsStudent: React.FC = () => {
     const [bancas, setBancas] = useState<Banca[]>([]);
     const [bancasOriginal, setBancasOriginal] = useState<Banca[]>([]);
     const [excludedBancaIds, setExcludedBancaIds] = useState<string[]>([]);
+    const [excludedDisciplinaIds, setExcludedDisciplinaIds] = useState<string[]>([]);
+    const [userRole, setUserRole] = useState<string | null>(null);
     const [years] = useState(Array.from({ length: 15 }, (_, i) => (new Date().getFullYear() - i).toString()));
 
     // Selected Filters (Multi-select)
@@ -53,9 +55,32 @@ const QuestionsStudent: React.FC = () => {
     const [showLimitPopup, setShowLimitPopup] = useState(false);
 
     useEffect(() => {
-        fetchAuxiliaryData();
         checkDailyLimit();
+        fetchUserRole();
     }, []);
+
+    const fetchUserRole = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single();
+                setUserRole(data?.role || 'student');
+            }
+        } catch (error) {
+            console.error('Error fetching role:', error);
+            setUserRole('student');
+        }
+    };
+
+    useEffect(() => {
+        if (userRole !== null) {
+            fetchAuxiliaryData();
+        }
+    }, [userRole]);
 
     const checkDailyLimit = async () => {
         const { data } = await supabase.rpc('get_student_daily_status');
@@ -66,22 +91,43 @@ const QuestionsStudent: React.FC = () => {
 
     // Filter effect: When filters change, reset to page 1
     useEffect(() => {
-        // Only fetch if we have the basic banca data to apply exclusion filters
-        if (bancasOriginal.length > 0) {
+        // Only fetch if we have the basic banca data and user role to apply filters
+        if (bancasOriginal.length > 0 && userRole !== null) {
             setPage(1);
             fetchQuestions(1);
         }
-    }, [filterDisciplinas, filterAssuntos, filterSubassuntos, filterSubsubassuntos, filterBancas, filterAnos, filterStatus, filterModalidades, bancasOriginal]);
+    }, [filterDisciplinas, filterAssuntos, filterSubassuntos, filterSubsubassuntos, filterBancas, filterAnos, filterStatus, filterModalidades, bancasOriginal, userRole]);
 
     const fetchAuxiliaryData = async () => {
         try {
+            const isAdmin = userRole === 'admin' || userRole === 'super';
+            const isStudent = userRole === 'student';
+
             // Load only essential metadata for the first view
             const [dRes, bRes] = await Promise.all([
-                supabase.from('disciplinas').select('id, name').order('name'),
+                supabase.from('disciplinas').select('id, name, cat').order('name'),
                 supabase.from('bancas').select('id, name, sigla').order('name')
             ]);
             
-            if (dRes.data) setDisciplinas(dRes.data as Disciplina[]);
+            let medicIds: string[] = [];
+            if (dRes.data) {
+                if (isAdmin) {
+                    setDisciplinas(dRes.data as Disciplina[]);
+                    setExcludedDisciplinaIds([]);
+                } else if (isStudent) {
+                    medicIds = dRes.data
+                        .filter(d => d.cat?.toUpperCase().includes('MEDICINA'))
+                        .map(d => d.id);
+                    setExcludedDisciplinaIds(medicIds);
+                    
+                    const filtered = dRes.data.filter(d => !medicIds.includes(d.id));
+                    setDisciplinas(filtered as Disciplina[]);
+                } else {
+                    // Other roles - show all for now
+                    setDisciplinas(dRes.data as Disciplina[]);
+                    setExcludedDisciplinaIds([]);
+                }
+            }
             
             if (bRes.data) {
                 setBancasOriginal(bRes.data);
@@ -98,14 +144,28 @@ const QuestionsStudent: React.FC = () => {
                 setExcludedBancaIds(excludedIds);
             }
 
-            // Load subjects lazily or in background
+            // Load subjects
             const { data: aData } = await supabase.from('assuntos').select('id, name, disciplina_id').order('name');
-            if (aData) setAssuntos(aData as Assunto[]);
+            if (aData) {
+                if (isAdmin) {
+                    setAssuntos(aData as Assunto[]);
+                } else {
+                    const filteredAssuntos = aData.filter(a => !medicIds.includes(a.disciplina_id));
+                    setAssuntos(filteredAssuntos as Assunto[]);
+                }
+            }
 
-            // Load sub-subjects even more lazily (only if we have subjects)
+            // Load sub-subjects
             if (aData && aData.length > 0) {
                 const { data: saData } = await supabase.from('subassuntos').select('id, name, assunto_id').order('name').limit(1000);
-                if (saData) setSubassuntos(saData);
+                if (saData) {
+                    if (isAdmin) {
+                        setSubassuntos(saData);
+                    } else {
+                        const allowedAssuntoIds = aData.filter(a => !medicIds.includes(a.disciplina_id)).map(a => a.id);
+                        setSubassuntos(saData.filter(sa => allowedAssuntoIds.includes(sa.assunto_id)));
+                    }
+                }
             }
         } catch (error) {
             console.error('Error fetching filter data:', error);
@@ -114,6 +174,7 @@ const QuestionsStudent: React.FC = () => {
 
 
     const fetchQuestions = async (pageNumber: number) => {
+        if (userRole === null) return;
         if (pageNumber === 1) setLoading(true);
         const start = (pageNumber - 1) * pageSize;
         const end = start + pageSize - 1;
@@ -144,11 +205,16 @@ const QuestionsStudent: React.FC = () => {
                 .select(`
                     id, enunciado, ano, alternativas, resposta_professor, 
                     disciplina_id, banca_id, assunto_id, 
-                    disciplinas(name), 
+                    disciplinas!inner(name, cat), 
                     bancas!inner(name, sigla), 
                     assuntos(name),
                     text_bases(content, title)
                 `);
+
+            // Apply MEDICINA filter for students directly in query
+            if (userRole === 'student') {
+                query = query.not('disciplinas.cat', 'ilike', '%MEDICINA%');
+            }
  
             // Apply Multi-select Filters
             if (filterDisciplinas.length > 0) query = query.in('disciplina_id', filterDisciplinas);
@@ -174,9 +240,13 @@ const QuestionsStudent: React.FC = () => {
                 query = query.or(modConditions.join(','));
             }
  
-            // Exclude Simulados and Relax using IDs (much faster than ILIKE on join)
+            // Exclude Simulados and Relax using IDs
             if (excludedBancaIds.length > 0) {
                 query = query.not('banca_id', 'in', `(${excludedBancaIds.join(',')})`);
+            }
+            // Additional check for medicine IDs if state is already populated (optional but good for consistency)
+            if (userRole === 'student' && excludedDisciplinaIds.length > 0) {
+                query = query.not('disciplina_id', 'in', `(${excludedDisciplinaIds.join(',')})`);
             }
 
             const idsArray = Array.from(currentResolved);

@@ -181,6 +181,7 @@ export interface Apostila {
   };
   is_resolution_notebook?: boolean;
   is_resumo_8020?: boolean;
+  is_audited?: boolean;
 }
 
 export interface Teacher {

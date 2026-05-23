@@ -135,6 +135,13 @@ const Cursos: React.FC = () => {
     const [planModalSearch, setPlanModalSearch] = useState('');
     const [planModalDisc, setPlanModalDisc] = useState('');
 
+    // IA Study Planner States
+    const [exportModalOpen, setExportModalOpen] = useState(false);
+    const [importModalOpen, setImportModalOpen] = useState(false);
+    const [exportPromptText, setExportPromptText] = useState('');
+    const [importJsonText, setImportJsonText] = useState('');
+    const [copiedPrompt, setCopiedPrompt] = useState(false);
+
     const [totalActiveQuotas, setTotalActiveQuotas] = useState(0);
     const [totalGeneralCommissionReceivers, setTotalGeneralCommissionReceivers] = useState(0);
 
@@ -547,6 +554,187 @@ const Cursos: React.FC = () => {
         const newArr = [...selectedSimulados];
         [newArr[idx], newArr[next]] = [newArr[next], newArr[idx]];
         setSelectedSimulados(newArr);
+    };
+
+    const handleExportAiPrompt = () => {
+        if (selectedApostilas.length === 0 && selectedSimulados.length === 0) {
+            alert('Por favor, selecione pelo menos uma apostila ou simulado nas abas anteriores antes de gerar o prompt para a IA.');
+            return;
+        }
+
+        const itemsList: any[] = [];
+
+        // Gather Apostilas, Resumos, and Cadernos Resolvidos
+        selectedApostilas.forEach(sel => {
+            const a = allApostilas.find(ap => ap.id === sel.id);
+            if (a) {
+                let categoryName = "Apostila Interativa";
+                let typeKey: 'apostila' | 'resolvido' | 'simulado' = 'apostila';
+
+                if (a.is_resumo_8020) {
+                    categoryName = "Resumo 80/20";
+                } else if (a.is_resolution_notebook) {
+                    categoryName = "Caderno Resolvido";
+                    typeKey = 'resolvido';
+                }
+
+                itemsList.push({
+                    id: a.id,
+                    title: a.title,
+                    type: typeKey,
+                    disciplina: a.disciplinas?.name || 'Geral',
+                    categoria: categoryName
+                });
+            }
+        });
+
+        // Gather Simulados
+        selectedSimulados.forEach(sel => {
+            const s = allSimulados.find(sim => sim.id === sel.id);
+            if (s) {
+                itemsList.push({
+                    id: s.id,
+                    title: s.title,
+                    type: 'simulado',
+                    disciplina: 'Simulado',
+                    categoria: 'Simulado'
+                });
+            }
+        });
+
+        const promptText = `--- PROMPT PARA IA - CRIADOR DE CRONOGRAMA PEDAGÓGICO DE ESTUDOS ---
+
+Copie todo este conteúdo (incluindo as instruções e a lista de materiais abaixo) e envie para o chat de uma IA (como Gemini ou ChatGPT) para estruturar o seu Guia de Estudos de forma automática.
+
+============================================================
+INSTRUÇÕES PARA A IA (SYSTEM INSTRUCTIONS)
+============================================================
+Você é um especialista em preparação para concursos públicos e organização pedagógica de estudos.
+Sua tarefa é organizar os materiais de estudo listados abaixo em um cronograma didático altamente estruturado, sequencial e progressivo para garantir a máxima fixação do conteúdo.
+
+O cronograma de estudos deve ser organizado por "Sessões" ou "Blocos de Estudos" progressivos (ex: "Bloco 1 - Fundamentos Iniciais", "Bloco 2 - Teoria Intermediária", etc.). 
+
+DIRETRIZES PEDAGÓGICAS IMPORTANTES:
+1. Sequenciamento Lógico: Organize os materiais de forma progressiva. Assuntos fundamentais e fáceis de cada disciplina devem vir primeiro, avançando gradualmente para assuntos complexos.
+2. Mix de Disciplinas: Cada bloco/sessão deve conter materiais de diferentes disciplinas (estudo intercalado) para manter o cérebro engajado, mas de forma equilibrada (ex: intercalar Português com uma matéria de Direito).
+3. Ciclo de Estudo (Teoria -> Revisão -> Prática): Para um mesmo assunto de uma disciplina, garanta que o aluno siga o ciclo natural:
+   - Primeiro: Estude a Apostila Interativa (Teoria).
+   - Segundo: Revise com o Resumo 80/20 (Revisão).
+   - Terceiro: Pratique com o Caderno Resolvido (Prática de Questões).
+   Note que nem todo assunto terá todos os três materiais disponíveis, então utilize o que estiver disponível na lista de materiais fornecida.
+4. Coesão: Cada bloco/sessão deve fazer sentido didaticamente e não ser longo demais. Cada bloco deve ter um título claro e um comentário motivador/orientador para o aluno (ex: "Foque nos conceitos de crase e no artigo 5º neste bloco").
+
+FORMATO DE SAÍDA OBRIGATÓRIO:
+Você deve responder APENAS com um bloco de código JSON válido, sem qualquer outro texto de introdução ou conclusão. O JSON deve seguir exatamente a seguinte estrutura de dados:
+
+[
+  {
+    "title": "Bloco 1: [Nome do Bloco]",
+    "comment": "[Orientação de estudo para o aluno sobre este bloco]",
+    "items": [
+      {
+        "title": "[Título amigável para o aluno, ex: Teoria - Português: Ortografia]",
+        "type": "apostila" | "resolvido" | "simulado",
+        "ref_id": "[O UUID exato do material fornecido na lista]"
+      }
+    ]
+  }
+]
+
+REGRAS CRUCIAIS PARA O JSON:
+- Você deve incluir TODOS os materiais listados abaixo. Nenhum material pode ser deixado de fora.
+- O campo "ref_id" deve conter exatamente o UUID correspondente ao material fornecido na lista. NÃO mude nenhuma letra ou caractere do UUID.
+- O campo "type" deve ser estritamente:
+  - "apostila" para Apostilas Interativas e Resumos 80/20.
+  - "resolvido" para Cadernos Resolvidos.
+  - "simulado" para Simulados.
+- Não invente UUIDs que não estejam na lista abaixo.
+- A resposta deve conter unicamente o JSON válido.
+
+============================================================
+LISTA DE MATERIAIS DISPONÍVEIS NO CURSO
+============================================================
+${JSON.stringify(itemsList, null, 2)}`;
+
+        setExportPromptText(promptText);
+        setExportModalOpen(true);
+        setCopiedPrompt(false);
+    };
+
+    const handleDownloadPromptTxt = () => {
+        const element = document.createElement("a");
+        const file = new Blob([exportPromptText], {type: 'text/plain'});
+        element.href = URL.createObjectURL(file);
+        element.download = "prompt_guia_estudos.txt";
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+    };
+
+    const handleImportPlan = (jsonText: string) => {
+        try {
+            // Basic cleanup of formatting if they pasted code blocks or conversational text
+            let cleaned = jsonText.trim();
+            const firstBracket = cleaned.indexOf('[');
+            const lastBracket = cleaned.lastIndexOf(']');
+            if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+                cleaned = cleaned.substring(firstBracket, lastBracket + 1);
+            } else if (cleaned.startsWith('```')) {
+                cleaned = cleaned.replace(/^```[a-zA-Z]*\n/, '').replace(/\n```$/, '');
+            }
+            cleaned = cleaned.trim();
+
+            const parsed = JSON.parse(cleaned);
+
+            if (!Array.isArray(parsed)) {
+                alert('O formato importado deve ser uma lista (array) de blocos/sessões.');
+                return;
+            }
+
+            const validatedPlan: StudyPlanSession[] = parsed.map((session: any) => {
+                if (!session.title) {
+                    throw new Error('Cada bloco de estudos precisa ter um "title".');
+                }
+
+                const items = Array.isArray(session.items) ? session.items.map((item: any) => {
+                    if (!item.title || !item.type || !item.ref_id) {
+                        throw new Error('Cada item de estudo deve ter "title", "type" e "ref_id".');
+                    }
+
+                    const allowedTypes = ['apostila', 'resolvido', 'simulado', 'caderno', 'questao', 'revisao', 'extra', 'outro'];
+                    if (!allowedTypes.includes(item.type)) {
+                        throw new Error(`Tipo inválido "${item.type}". Os tipos válidos são: ${allowedTypes.join(', ')}`);
+                    }
+
+                    return {
+                        id: crypto.randomUUID(),
+                        title: item.title,
+                        type: item.type as any,
+                        ref_id: item.ref_id,
+                        url: item.url || ''
+                    };
+                }) : [];
+
+                return {
+                    id: crypto.randomUUID(),
+                    title: session.title,
+                    comment: session.comment || '',
+                    items
+                };
+            });
+
+            setFormData({
+                ...formData,
+                study_plan_json: validatedPlan
+            });
+
+            setImportModalOpen(false);
+            setImportJsonText('');
+            alert('Guia de estudos importado e estruturado com sucesso!');
+        } catch (err: any) {
+            console.error('Import error:', err);
+            alert(`Falha ao importar o JSON: ${err.message || 'Verifique se o texto está no formato JSON correto.'}`);
+        }
     };
 
     const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
@@ -1092,14 +1280,34 @@ const Cursos: React.FC = () => {
 
                     {activeTab === 'organizador' && (
                         <div className="space-y-8">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 <div>
                                     <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Organizador de Estudos</h3>
                                     <p className="text-xs font-medium text-slate-500">Organize o curso por sessões ou grupos de materiais.</p>
                                 </div>
-                                <button type="button" onClick={() => setFormData({ ...formData, study_plan_json: [...(formData.study_plan_json || []), { id: crypto.randomUUID(), title: 'Nova Sessão', items: [] }] })} className="px-6 py-3 bg-blue-600 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-blue-700 transition-all flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-[16px]">add</span> Adicionar Sessão
-                                </button>
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <button 
+                                        type="button" 
+                                        onClick={handleExportAiPrompt}
+                                        className="px-5 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all flex items-center gap-2 border border-indigo-150"
+                                    >
+                                        <span className="material-symbols-outlined text-[16px]">psychology</span> Gerar com IA
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => { setImportJsonText(''); setImportModalOpen(true); }}
+                                        className="px-5 py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all flex items-center gap-2 border border-emerald-150"
+                                    >
+                                        <span className="material-symbols-outlined text-[16px]">upload_file</span> Importar JSON
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setFormData({ ...formData, study_plan_json: [...(formData.study_plan_json || []), { id: crypto.randomUUID(), title: 'Nova Sessão', items: [] }] })} 
+                                        className="px-5 py-3 bg-blue-600 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-blue-700 transition-all flex items-center gap-2"
+                                    >
+                                        <span className="material-symbols-outlined text-[16px]">add</span> Adicionar Sessão
+                                    </button>
+                                </div>
                             </div>
                             
                             <div className="space-y-10">
@@ -1771,6 +1979,143 @@ const Cursos: React.FC = () => {
                                         </button>
                                     ));
                                 })()}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {exportModalOpen && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/50 backdrop-blur-sm">
+                        <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[85vh]">
+                            <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="size-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+                                        <span className="material-symbols-outlined">psychology</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">Assistente IA - Prompt do Guia de Estudos</h3>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Gere o cronograma de estudos didático via Inteligência Artificial</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setExportModalOpen(false)} className="size-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors">
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+
+                            <div className="p-8 bg-indigo-50/50 border-b border-indigo-100 text-xs font-semibold text-indigo-900 leading-relaxed">
+                                <span className="font-bold text-indigo-700">Como usar:</span> Copie o prompt estruturado abaixo e cole-o em uma IA de sua preferência (como Gemini, ChatGPT ou Claude). Ela fará a organização didática por blocos de estudo e fornecerá o arquivo JSON ideal. Depois, basta clicar em <strong>"Importar JSON"</strong> no organizador para carregar tudo de forma 100% automatizada!
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-8 bg-slate-950 font-mono text-slate-300 text-xs rounded-[40px] m-4 mt-8 border border-slate-800 shadow-inner relative max-h-[50vh] custom-scrollbar select-all">
+                                <pre className="whitespace-pre-wrap select-text selection:bg-indigo-500 selection:text-white">{exportPromptText}</pre>
+                            </div>
+
+                            <div className="p-8 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                                <button 
+                                    type="button" 
+                                    onClick={handleDownloadPromptTxt}
+                                    className="px-6 py-3 bg-white border border-slate-200 text-slate-700 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-slate-100 transition-all flex items-center gap-2"
+                                >
+                                    <span className="material-symbols-outlined text-[16px]">download</span> Baixar Prompt .TXT
+                                </button>
+
+                                <div className="flex items-center gap-3">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(exportPromptText);
+                                            setCopiedPrompt(true);
+                                            setTimeout(() => setCopiedPrompt(false), 2000);
+                                        }}
+                                        className={`px-6 py-3 font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all flex items-center gap-2 text-white ${copiedPrompt ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                                    >
+                                        <span className="material-symbols-outlined text-[16px]">{copiedPrompt ? 'check_circle' : 'content_copy'}</span>
+                                        {copiedPrompt ? 'Prompt Copiado!' : 'Copiar Prompt'}
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setExportModalOpen(false)}
+                                        className="px-6 py-3 bg-slate-200 text-slate-700 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-slate-300 transition-all"
+                                    >
+                                        Fechar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {importModalOpen && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/50 backdrop-blur-sm">
+                        <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[85vh]">
+                            <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="size-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+                                        <span className="material-symbols-outlined">upload_file</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">Importar Guia de Estudos</h3>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cole o JSON pedagógico retornado pela IA</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setImportModalOpen(false)} className="size-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors">
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Carregar arquivo JSON (.json ou .txt)</label>
+                                    <div className="border-2 border-dashed border-slate-200 hover:border-emerald-500 rounded-3xl p-8 flex flex-col items-center justify-center bg-slate-50 transition-colors cursor-pointer relative group">
+                                        <input 
+                                            type="file" 
+                                            accept=".json,.txt"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    const reader = new FileReader();
+                                                    reader.onload = (evt) => {
+                                                        const txt = evt.target?.result as string;
+                                                        setImportJsonText(txt);
+                                                    };
+                                                    reader.readAsText(file);
+                                                }
+                                            }}
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                        />
+                                        <span className="material-symbols-outlined text-[40px] text-slate-300 group-hover:text-emerald-500 transition-colors mb-2">cloud_upload</span>
+                                        <p className="text-xs font-bold text-slate-500">Arraste um arquivo JSON aqui ou clique para selecionar</p>
+                                        <p className="text-[10px] font-semibold text-slate-400 uppercase mt-1">Formatos suportados: .json, .txt</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Ou cole o código JSON diretamente abaixo</label>
+                                    <textarea
+                                        value={importJsonText}
+                                        onChange={(e) => setImportJsonText(e.target.value)}
+                                        placeholder={`[\n  {\n    "title": "Bloco 1: Introdução à Matéria",\n    "comment": "Orientações gerais para o bloco...",\n    "items": [\n      {\n        "title": "Português - Introdução",\n        "type": "apostila",\n        "ref_id": "c1f72a6e-..."\n      }\n    ]\n  }\n]`}
+                                        className="w-full h-64 bg-slate-50 border border-slate-200 rounded-3xl p-4 font-mono text-xs text-slate-700 outline-none focus:border-emerald-500 focus:bg-white transition-all shadow-inner custom-scrollbar"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="p-8 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setImportModalOpen(false)}
+                                    className="px-6 py-3 bg-white border border-slate-200 text-slate-700 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-slate-100 transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    type="button" 
+                                    disabled={!importJsonText.trim()}
+                                    onClick={() => handleImportPlan(importJsonText)}
+                                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <span className="material-symbols-outlined text-[16px]">verified</span> Importar e Processar
+                                </button>
                             </div>
                         </div>
                     </div>
