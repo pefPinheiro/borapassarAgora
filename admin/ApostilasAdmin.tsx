@@ -34,6 +34,7 @@ const ApostilasAdmin: React.FC = () => {
     const [apostilas, setApostilas] = useState<Apostila[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentUser, setCurrentUser] = useState<Profile | null>(null);
+    const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
 
     // Modal de Questões
     const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false);
@@ -2358,70 +2359,17 @@ const ApostilasAdmin: React.FC = () => {
                                                         {a.status === 'Ativo' ? 'Publicado' : 'Rascunho'}
                                                     </span>
                                                 </td>
-                                                <td className="px-10 py-8">
-                                                    <div className="flex items-center justify-end gap-2 translate-x-2 group-hover:translate-x-0 transition-transform">
-                                                        {perms.canValidate && (
-                                                            <button
-                                                                onClick={() => handleOpenObservationModal(a)}
-                                                                className={`size-10 flex items-center justify-center rounded-xl transition-all ${a.observations ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
-                                                                title="Adicionar Observação / Melhoria"
-                                                            >
-                                                                <span className="material-symbols-outlined text-[20px]">assignment_add</span>
-                                                            </button>
-                                                        )}
-                                                        
-                                                        <button
-                                                            onClick={() => handlePreview(a.id)}
-                                                            className="size-10 flex items-center justify-center text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
-                                                            title="Ver como Aluno"
-                                                        >
-                                                            <span className="material-symbols-outlined text-[20px]">visibility</span>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleExportTxt(a)}
-                                                            className="size-10 flex items-center justify-center text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
-                                                            title="Gerar TXT da Apostila"
-                                                        >
-                                                            <span className="material-symbols-outlined text-[20px]">description</span>
-                                                        </button>
-                                                        {perms.canDuplicate && (
-                                                            <button
-                                                                onClick={() => handleDuplicate(a)}
-                                                                className="size-10 flex items-center justify-center text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
-                                                                title="Duplicar"
-                                                            >
-                                                                <span className="material-symbols-outlined text-[20px]">content_copy</span>
-                                                            </button>
-                                                        )}
-                                                        {perms.canEdit && (
-                                                            <button
-                                                                onClick={() => handleOpenForm(a)}
-                                                                className="size-10 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all font-black"
-                                                                title="Editar"
-                                                            >
-                                                                <span className="material-symbols-outlined text-[20px]">edit_note</span>
-                                                            </button>
-                                                        )}
-                                                        <button
-                                                            onClick={() => {
-                                                                setAuditingApostila(a);
-                                                                setView('validator');
-                                                            }}
-                                                            className="size-10 flex items-center justify-center text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all"
-                                                            title="Auditoria com IA (Gemini)"
-                                                        >
-                                                            <span className="material-symbols-outlined text-[20px]">psychology</span>
-                                                        </button>
-                                                        {perms.canDelete && (
-                                                            <button
-                                                                onClick={() => handleDelete(a.id)}
-                                                                className="size-10 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                                                title="Excluir Permanentemente"
-                                                            >
-                                                                <span className="material-symbols-outlined text-[20px]">delete_sweep</span>
-                                                            </button>
-                                                        )}
-                                                    </div>
+                                                <td className="px-10 py-8 text-right">
+                                                     <button
+                                                         onClick={(e) => {
+                                                             e.stopPropagation();
+                                                             setActiveActionMenuId(a.id);
+                                                         }}
+                                                         className="size-10 bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 flex items-center justify-center rounded-xl transition-all shadow-sm active:scale-95"
+                                                         title="Opções de Ação"
+                                                     >
+                                                         <span className="material-symbols-outlined text-[22px] font-black">more_horiz</span>
+                                                     </button>
                                                 </td>
                                             </tr>
                                         );
@@ -2430,7 +2378,7 @@ const ApostilasAdmin: React.FC = () => {
                             ))}
                             {Object.keys(grouped).length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="px-10 py-32 text-center">
+                                    <td colSpan={6} className="px-10 py-32 text-center">
                                         <div className="flex flex-col items-center gap-4 text-slate-300">
                                             <span className="material-symbols-outlined text-6xl">library_books</span>
                                             <p className="font-bold text-sm italic">Nenhuma obra literária no acervo atual.</p>
@@ -2441,7 +2389,212 @@ const ApostilasAdmin: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
-                {/* Pagination Controls */}
+
+                {/* Modal de Ações Centralizado Premium */}
+                {activeActionMenuId && (() => {
+                    const a = apostilas.find(item => item.id === activeActionMenuId);
+                    if (!a) return null;
+                    const perms = getPermissions(a);
+                    return (
+                        <div 
+                            className="fixed inset-0 z-[1050] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300"
+                            onClick={() => setActiveActionMenuId(null)}
+                        >
+                            <div 
+                                className="bg-white rounded-[32px] w-full max-w-md shadow-2xl border border-slate-100 p-6 animate-in zoom-in-95 duration-200 flex flex-col gap-6 text-left max-h-[90vh]"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {/* Header */}
+                                <div className="flex justify-between items-start pb-4 border-b border-slate-100">
+                                    <div className="flex items-center gap-3">
+                                        <div className="size-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                                            <span className="material-symbols-outlined text-xl">layers</span>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-none">Painel de Ações</h3>
+                                            <p className="text-[11px] font-bold text-slate-400 mt-1.5 line-clamp-1">{a.title}</p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => setActiveActionMenuId(null)} 
+                                        className="size-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">close</span>
+                                    </button>
+                                </div>
+
+                                {/* Organized Action Options */}
+                                <div className="overflow-y-auto max-h-[60vh] pr-1 space-y-4 no-scrollbar">
+                                    
+                                    {/* Grupo 1: Edição e Visualização */}
+                                    <div className="space-y-1.5">
+                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Curadoria & Produção</span>
+                                        
+                                        {perms.canEdit && (
+                                            <button
+                                                onClick={() => {
+                                                    setActiveActionMenuId(null);
+                                                    handleOpenForm(a);
+                                                }}
+                                                className="w-full p-3 rounded-2xl border border-slate-100 hover:bg-blue-50/50 hover:border-blue-200 text-slate-700 flex items-center gap-4 transition-all text-xs font-bold group text-left"
+                                            >
+                                                <div className="size-9 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors shrink-0">
+                                                    <span className="material-symbols-outlined text-base">edit_note</span>
+                                                </div>
+                                                <div>
+                                                    <p className="font-black text-slate-800 group-hover:text-blue-600">Editar Conteúdo</p>
+                                                    <p className="text-[10px] text-slate-400 font-medium">Modificar textos, mídias e tags</p>
+                                                </div>
+                                            </button>
+                                        )}
+
+                                        <button
+                                            onClick={() => {
+                                                setActiveActionMenuId(null);
+                                                handlePreview(a.id);
+                                            }}
+                                            className="w-full p-3 rounded-2xl border border-slate-100 hover:bg-emerald-50/50 hover:border-emerald-200 text-slate-700 flex items-center gap-4 transition-all text-xs font-bold group text-left"
+                                        >
+                                            <div className="size-9 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors shrink-0">
+                                                <span className="material-symbols-outlined text-base">visibility</span>
+                                            </div>
+                                            <div>
+                                                <p className="font-black text-slate-800 group-hover:text-emerald-600">Ver como Aluno</p>
+                                                <p className="text-[10px] text-slate-400 font-medium">Visualizar a obra na trilha do aluno</p>
+                                            </div>
+                                        </button>
+
+                                        {perms.canDuplicate && (
+                                            <button
+                                                onClick={() => {
+                                                    setActiveActionMenuId(null);
+                                                    handleDuplicate(a);
+                                                }}
+                                                className="w-full p-3 rounded-2xl border border-slate-100 hover:bg-blue-50/50 hover:border-blue-200 text-slate-700 flex items-center gap-4 transition-all text-xs font-bold group text-left"
+                                            >
+                                                <div className="size-9 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors shrink-0">
+                                                    <span className="material-symbols-outlined text-base">content_copy</span>
+                                                </div>
+                                                <div>
+                                                    <p className="font-black text-slate-800 group-hover:text-blue-600">Duplicar Material</p>
+                                                    <p className="text-[10px] text-slate-400 font-medium">Clonar estrutura completa</p>
+                                                </div>
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Grupo 2: Qualidade e Auditoria */}
+                                    <div className="space-y-1.5">
+                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Qualidade & IA</span>
+                                        
+                                        <button
+                                            onClick={async () => {
+                                                setActiveActionMenuId(null);
+                                                handleToggleAudit(a);
+                                            }}
+                                            className={`w-full p-3 rounded-2xl border flex items-center gap-4 transition-all text-xs font-bold group text-left ${
+                                                a.is_audited 
+                                                    ? 'bg-blue-50/50 border-blue-200 text-blue-700 hover:bg-blue-100/50' 
+                                                    : 'border-slate-100 hover:bg-slate-50 text-slate-700'
+                                            }`}
+                                        >
+                                            <div className={`size-9 rounded-xl flex items-center justify-center transition-colors shrink-0 ${
+                                                a.is_audited 
+                                                    ? 'bg-blue-100 text-blue-600' 
+                                                    : 'bg-slate-50 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600'
+                                            }`}>
+                                                <span className="material-symbols-outlined text-base">
+                                                    {a.is_audited ? 'task_alt' : 'inventory_2'}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <p className="font-black text-slate-800">
+                                                    {a.is_audited ? 'Obra Auditada' : 'Marcar como Auditada'}
+                                                </p>
+                                                <p className="text-[10px] text-slate-400 font-medium">
+                                                    {a.is_audited ? 'Apostila já revisada pela coordenação' : 'Sinalizar que a curadoria está concluída'}
+                                                </p>
+                                            </div>
+                                        </button>
+
+                                        <button
+                                            onClick={() => {
+                                                setActiveActionMenuId(null);
+                                                setAuditingApostila(a);
+                                                setView('validator');
+                                            }}
+                                            className="w-full p-3 rounded-2xl border border-slate-100 hover:bg-purple-50/50 hover:border-purple-200 text-slate-700 flex items-center gap-4 transition-all text-xs font-bold group text-left"
+                                        >
+                                            <div className="size-9 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-purple-100 group-hover:text-purple-600 transition-colors shrink-0">
+                                                <span className="material-symbols-outlined text-base animate-pulse">psychology</span>
+                                            </div>
+                                            <div>
+                                                <p className="font-black text-slate-800 group-hover:text-purple-600">Auditoria IA (Gemini)</p>
+                                                <p className="text-[10px] text-slate-400 font-medium">Validação de erros com inteligência artificial</p>
+                                            </div>
+                                        </button>
+
+                                        {perms.canValidate && (
+                                            <button
+                                                onClick={() => {
+                                                    setActiveActionMenuId(null);
+                                                    handleOpenObservationModal(a);
+                                                }}
+                                                className="w-full p-3 rounded-2xl border border-slate-100 hover:bg-indigo-50/50 hover:border-indigo-200 text-slate-700 flex items-center gap-4 transition-all text-xs font-bold group text-left"
+                                            >
+                                                <div className="size-9 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors shrink-0">
+                                                    <span className="material-symbols-outlined text-base">assignment_add</span>
+                                                </div>
+                                                <div>
+                                                    <p className="font-black text-slate-800 group-hover:text-indigo-600">Anotar Melhorias</p>
+                                                    <p className="text-[10px] text-slate-400 font-medium">Cadastrar apontamentos e revisões</p>
+                                                </div>
+                                            </button>
+                                        )}
+
+                                        <button
+                                            onClick={() => {
+                                                setActiveActionMenuId(null);
+                                                handleExportTxt(a);
+                                            }}
+                                            className="w-full p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 hover:border-slate-300 text-slate-700 flex items-center gap-4 transition-all text-xs font-bold group text-left"
+                                        >
+                                            <div className="size-9 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-slate-100 group-hover:text-slate-800 transition-colors shrink-0">
+                                                <span className="material-symbols-outlined text-base">description</span>
+                                            </div>
+                                            <div>
+                                                <p className="font-black text-slate-800 group-hover:text-slate-800">Exportar para TXT</p>
+                                                <p className="text-[10px] text-slate-400 font-medium">Gerar arquivo em texto puro</p>
+                                            </div>
+                                        </button>
+                                    </div>
+
+                                    {perms.canDelete && (
+                                        <div className="space-y-1.5">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Zona Crítica</span>
+                                            <button
+                                                onClick={() => {
+                                                    setActiveActionMenuId(null);
+                                                    handleDelete(a.id);
+                                                }}
+                                                className="w-full p-3 rounded-2xl border border-red-50 hover:bg-red-50 hover:border-red-200 text-slate-700 flex items-center gap-4 transition-all text-xs font-bold group text-left"
+                                            >
+                                                <div className="size-9 rounded-xl bg-red-50 text-red-400 flex items-center justify-center group-hover:bg-red-500 group-hover:text-white transition-colors shrink-0">
+                                                    <span className="material-symbols-outlined text-base">delete_sweep</span>
+                                                </div>
+                                                <div>
+                                                    <p className="font-black text-slate-800 group-hover:text-red-600">Excluir Obra</p>
+                                                    <p className="text-[10px] text-red-400 font-medium">Deletar permanentemente do acervo</p>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
+
                 {/* Pagination Controls */}
                 {apostilas.length < totalCount && (
                     <div className="flex justify-center px-10 py-6 bg-slate-50 border-t border-slate-100">
