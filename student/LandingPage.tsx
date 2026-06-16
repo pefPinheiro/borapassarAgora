@@ -8,10 +8,23 @@ const LandingPage: React.FC = () => {
   const [recentCourses, setRecentCourses] = useState<any[]>([]);
   const [freeCourses, setFreeCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasSession, setHasSession] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchCourses();
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setHasSession(!!session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setHasSession(!!session);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchCourses = async () => {
@@ -130,7 +143,11 @@ const LandingPage: React.FC = () => {
           </Link>
 
           <div className="flex items-center gap-8">
-            <Link to="/login" className="bg-gradient-to-r from-[#137fec] to-[#3b82f6] text-white px-8 py-4 rounded-[20px] text-[10px] font-black uppercase tracking-[0.2em] shadow-[0_20px_40px_-10px_rgba(19,127,236,0.3)] hover:shadow-[0_25px_50px_-12px_rgba(19,127,236,0.4)] hover:-translate-y-1 active:scale-95 transition-all">Começar Agora</Link>
+            {hasSession ? (
+              <Link to="/aluno/meus-cursos" className="bg-gradient-to-r from-[#137fec] to-[#3b82f6] text-white px-8 py-4 rounded-[20px] text-[10px] font-black uppercase tracking-[0.2em] shadow-[0_20px_40px_-10px_rgba(19,127,236,0.3)] hover:shadow-[0_25px_50px_-12px_rgba(19,127,236,0.4)] hover:-translate-y-1 active:scale-95 transition-all">Área do Aluno</Link>
+            ) : (
+              <Link to="/login" className="bg-gradient-to-r from-[#137fec] to-[#3b82f6] text-white px-8 py-4 rounded-[20px] text-[10px] font-black uppercase tracking-[0.2em] shadow-[0_20px_40px_-10px_rgba(19,127,236,0.3)] hover:shadow-[0_25px_50px_-12px_rgba(19,127,236,0.4)] hover:-translate-y-1 active:scale-95 transition-all">Começar Agora</Link>
+            )}
           </div>
         </div>
       </nav>

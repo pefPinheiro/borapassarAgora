@@ -86,15 +86,15 @@ const App: React.FC = () => {
         {/* Student Routes */}
         <Route path="/aluno" element={<StudentLayout />}>
           <Route index element={<StudentRedirect />} />
-          <Route path="meus-cursos" element={<MyCourses />} />
+          <Route path="meus-cursos" element={<AuthGuard><MyCourses /></AuthGuard>} />
           <Route path="catalogo" element={<CourseCatalog />} />
           <Route path="curso/:id" element={<CourseView />} />
           <Route path="curso/:id/comprar" element={<CoursePurchase />} />
           <Route path="curso/:id/checkout" element={<CourseCheckout />} />
-          <Route path="suporte" element={<SupportTicket />} /> {/* Legacy/Tickets */}
+          <Route path="suporte" element={<AuthGuard><SupportTicket /></AuthGuard>} /> {/* Legacy/Tickets */}
           <Route path="faq" element={<FaqStudent />} />
           <Route path="professores" element={<TeachersList />} />
-          <Route path="config" element={<ProfileConfig />} />
+          <Route path="config" element={<AuthGuard><ProfileConfig /></AuthGuard>} />
         </Route>
 
 

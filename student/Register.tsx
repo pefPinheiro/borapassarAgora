@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
@@ -15,6 +15,28 @@ const Register: React.FC = () => {
 
     const navigate = useNavigate();
     const location = useLocation();
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+                const params = new URLSearchParams(location.search);
+                const redirect = params.get('redirect');
+                navigate(redirect || '/aluno/meus-cursos', { replace: true });
+            }
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+                const params = new URLSearchParams(location.search);
+                const redirect = params.get('redirect');
+                navigate(redirect || '/aluno/meus-cursos', { replace: true });
+            }
+        });
+
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, [navigate, location]);
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
