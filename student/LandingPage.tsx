@@ -88,7 +88,7 @@ const LandingPage: React.FC = () => {
         </div>
 
         <div className="space-y-4 flex-1 flex flex-col px-4 pb-4">
-          <h4 className="text-2xl font-black text-white leading-tight uppercase italic group-hover:text-[#137fec] transition-colors line-clamp-2">{course.title}</h4>
+          <h4 className="text-2xl font-black text-white leading-tight uppercase italic group-hover:text-[#137fec] transition-colors">{course.title}</h4>
           <p className="text-slate-400 font-medium text-sm line-clamp-2 italic">{course.area} • Acesso Imediato</p>
 
           <div className="pt-8 mt-auto flex items-end justify-between border-t border-white/10">

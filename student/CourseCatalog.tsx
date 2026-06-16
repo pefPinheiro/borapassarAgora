@@ -237,7 +237,7 @@ const CourseCatalog: React.FC = () => {
                                         </span>
                                     </div>
 
-                                    <h3 className="text-3xl font-black text-slate-900 leading-[1] tracking-tighter group-hover:text-[#ff3b9a] transition-colors uppercase italic line-clamp-2">
+                                    <h3 className="text-3xl font-black text-slate-900 leading-[1.1] tracking-tighter group-hover:text-[#ff3b9a] transition-colors uppercase italic">
                                         {curso.title}
                                     </h3>
 
