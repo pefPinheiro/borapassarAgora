@@ -248,8 +248,6 @@ const CourseView: React.FC = () => {
     }
   };
 
-  // ... (aux functions)
-
   // Helper for progress display
   const getCourseProgress = () => {
     if (!items.length) return 0;
@@ -612,7 +610,7 @@ const CourseView: React.FC = () => {
                             return (
                               <div
                                 key={item.id}
-                                onClick={() => navigate(`/aluno/apostila/${item.apostila_id}`)}
+                                onClick={() => navigate(`/aluno/apostila/${item.apostila_id}?courseId=${id}`)}
                                 className={`group flex items-center gap-4 px-6 py-4 rounded-[24px] transition-all cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50 ${isRead ? 'bg-emerald-50/10' : ''}`}
                               >
                                 <div className={`size-10 rounded-xl flex items-center justify-center transition-all duration-500 shadow-sm ${isRead ? 'bg-emerald-500 text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-[#137fec] group-hover:text-white'}`}>
@@ -627,11 +625,13 @@ const CourseView: React.FC = () => {
                                   </p>
                                 </div>
 
-                                <div className="flex items-center gap-6">
-                                  <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest hidden sm:block">Apostila Interativa</span>
+                                <div className="flex items-center gap-3 sm:gap-4">
+                                  <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest hidden lg:block">Apostila Interativa</span>
+
                                   <button
                                     onClick={(e) => toggleRead(item.apostila_id, e)}
                                     className={`size-8 rounded-lg flex items-center justify-center transition-all ${isRead ? 'bg-emerald-100 text-emerald-600' : 'text-slate-200 hover:text-[#137fec] hover:bg-blue-50'}`}
+                                    title={isRead ? 'Concluído' : 'Marcar como lido'}
                                   >
                                     <span className="material-symbols-outlined text-[20px]">
                                       {isRead ? 'verified' : 'radio_button_unchecked'}
@@ -693,7 +693,7 @@ const CourseView: React.FC = () => {
                                         return (
                                           <div
                                             key={item.id}
-                                            onClick={() => navigate(`/aluno/apostila/${item.apostila_id}`)}
+                                            onClick={() => navigate(`/aluno/apostila/${item.apostila_id}?courseId=${id}`)}
                                             className={`group flex items-center gap-4 px-6 py-4 rounded-[24px] transition-all cursor-pointer border-b border-slate-800/40 last:border-0 hover:bg-slate-800/40 ${isRead ? 'bg-emerald-950/10' : ''}`}
                                           >
                                             <div className={`size-10 rounded-xl flex items-center justify-center transition-all duration-500 shadow-sm ${isRead ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20' : 'bg-slate-800 text-slate-400 group-hover:bg-emerald-500 group-hover:text-slate-950'}`}>
@@ -711,11 +711,13 @@ const CourseView: React.FC = () => {
                                               </span>
                                             </div>
 
-                                            <div className="flex items-center gap-6">
-                                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest hidden sm:block">Revisão Direcionada</span>
+                                            <div className="flex items-center gap-3 sm:gap-4">
+                                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest hidden lg:block">Revisão Direcionada</span>
+                                              
                                               <button
                                                 onClick={(e) => toggleRead(item.apostila_id, e)}
                                                 className={`size-8 rounded-lg flex items-center justify-center transition-all ${isRead ? 'bg-emerald-500/10 text-emerald-400' : 'text-slate-600 hover:text-emerald-400 hover:bg-slate-800'}`}
+                                                title={isRead ? 'Concluído' : 'Marcar como lido'}
                                               >
                                                 <span className="material-symbols-outlined text-[20px]">
                                                   {isRead ? 'verified' : 'radio_button_unchecked'}
@@ -786,9 +788,9 @@ const CourseView: React.FC = () => {
                                 <h4 className={`text-base font-black uppercase italic tracking-tight leading-tight ${isCompleted ? 'text-emerald-900' : 'text-slate-900'}`}>{item.title}</h4>
                               </div>
 
-                              <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-3 sm:gap-4">
                                 {(item.type === 'apostila' || item.type === 'resolvido') && item.ref_id && (
-                                  <button onClick={() => navigate(`/aluno/apostila/${item.ref_id}`)} className="size-10 bg-slate-50 text-slate-400 hover:text-[#137fec] hover:bg-blue-50 rounded-xl flex items-center justify-center transition-all">
+                                  <button onClick={() => navigate(`/aluno/apostila/${item.ref_id}?courseId=${id}`)} className="size-10 bg-slate-50 text-slate-400 hover:text-[#137fec] hover:bg-blue-50 rounded-xl flex items-center justify-center transition-all" title="Abrir no Leitor">
                                     <span className="material-symbols-outlined">arrow_forward</span>
                                   </button>
                                 )}
@@ -1196,6 +1198,23 @@ const CourseView: React.FC = () => {
                                 <p className="text-xs text-slate-400 font-medium leading-relaxed mb-6 line-clamp-2">{item.type === 'apostila' ? 'Leitura teórica completa com questões interativas.' : 'Prática focada no assunto para fixação.'}</p>
 
                                 <div className="flex items-center gap-3">
+                                  {(item.type === 'apostila' || item.type === 'resolvido') && item.ref_id && (
+                                    <button
+                                      onClick={(e) => handleDownloadPdf(item.ref_id, item.title, e)}
+                                      disabled={downloadingId === item.ref_id}
+                                      className={`size-11 rounded-2xl flex items-center justify-center transition-all shadow-sm ${
+                                        downloadingId === item.ref_id
+                                          ? 'bg-pink-50 text-pink-500 cursor-wait animate-pulse'
+                                          : 'bg-slate-50 text-slate-400 hover:text-pink-500 hover:bg-pink-50 border border-slate-100'
+                                      }`}
+                                      title="Baixar Apostila em PDF"
+                                    >
+                                      <span className={`material-symbols-outlined text-[20px] ${downloadingId === item.ref_id ? 'animate-spin' : ''}`}>
+                                        {downloadingId === item.ref_id ? 'progress_activity' : 'download'}
+                                      </span>
+                                    </button>
+                                  )}
+
                                   <button 
                                     onClick={() => {
                                       if (item.type === 'apostila' || item.type === 'resolvido') navigate(`/aluno/apostila/${item.ref_id}`);

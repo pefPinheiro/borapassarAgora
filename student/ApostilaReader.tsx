@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import InteractiveQuestion from '../components/InteractiveQuestion';
 import katex from 'katex';
@@ -41,8 +41,66 @@ interface Profile {
     cpf: string;
 }
 
+const cleanLatex = (tex: string) => {
+    return tex
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/<br\s*\/?>/gi, ' ')
+        .replace(/<\/?(?:p|div|br|span|strong|b|em|i|u|s|h[1-6]|ol|ul|li|pre|code|font)\b[^>]*?>/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+};
+
+const processMath = (text: string) => {
+    if (!text) return '';
+    return text
+        .replace(/<code>([\s\S]*?\\(?:frac|sqrt|cdot|times|sum|int|align|begin|quad|implies|iff|neg|lor|land)[\s\S]*?)<\/code>/gi, '$1')
+        .replace(/\$\$([\s\S]*?)\$\$/g, (_, tex) => {
+            try {
+                return katex.renderToString(cleanLatex(tex), { displayMode: true, throwOnError: false });
+            } catch { return _; }
+        })
+        .replace(/\\\[([\s\S]*?)\\\]/g, (_, tex) => {
+            try {
+                return katex.renderToString(cleanLatex(tex), { displayMode: true, throwOnError: false });
+            } catch { return _; }
+        })
+        .replace(/\\\(([\s\S]*?)\\\)/g, (_, tex) => {
+            try {
+                return katex.renderToString(cleanLatex(tex), { displayMode: false, throwOnError: false });
+            } catch { return _; }
+        })
+        .replace(/\$([^\n\$]+?)\$/g, (_, tex) => {
+            if (/[\\^_\{\}\+\=\-\/\(\)]/.test(tex)) {
+                try {
+                    return katex.renderToString(cleanLatex(tex), { displayMode: false, throwOnError: false });
+                } catch { return _; }
+            }
+            return _;
+        })
+        .replace(/\\begin\{array\}([\s\S]*?)\\end\{array\}/gi, (match) => {
+            try {
+                return katex.renderToString(cleanLatex(match), { displayMode: true, throwOnError: false });
+            } catch { return match; }
+        });
+};
+
+const formatPrintText = (text: string | null | undefined) => {
+    if (!text) return '';
+    let processed = text
+        .replace(/\\n/g, '<br/>')
+        .replace(/\n/g, '<br/>');
+    processed = processMath(processed);
+    processed = processed.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    return processed;
+};
+
 const ApostilaReader: React.FC = () => {
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
+    const courseIdParam = searchParams.get('courseId');
     const navigate = useNavigate();
     const [isFocusMode, setIsFocusMode] = useState(false);
     const [apostila, setApostila] = useState<Apostila | null>(null);
@@ -51,12 +109,13 @@ const ApostilaReader: React.FC = () => {
     const [profile, setProfile] = useState<Profile | null>(null);
     const [loading, setLoading] = useState(true);
     const [notebooks, setNotebooks] = useState<any[]>([]);
+    const [questionsList, setQuestionsList] = useState<any[]>([]);
     const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (id) fetchData();
-    }, [id]);
+    }, [id, courseIdParam]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -78,45 +137,79 @@ const ApostilaReader: React.FC = () => {
             setApostila(apData);
 
             // 1.5. Check Access Security
-            // Checks if student has an ACTIVE enrollment in ANY course that contains this apostila
+            // Checks all courses containing this apostila
             const { data: accessData } = await supabase
                 .from('course_items')
-                .select('course_id, courses!inner(id)')
+                .select('course_id, courses!inner(id, banner_url, title)')
                 .eq('apostila_id', id);
 
-            const courseIds = accessData?.map(item => item.course_id) || [];
+            const courseIds = accessData?.map(item => item.course_id).filter(Boolean) || [];
             
-            const { data: enrollmentData } = await supabase
-                .from('enrollments')
-                .select('status')
-                .eq('profile_id', user.id)
-                .in('course_id', courseIds)
-                .eq('status', 'Ativo')
-                .limit(1)
-                .maybeSingle();
+            // Check student's role
+            const { data: profileData } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single();
 
-            if (!enrollmentData) {
-                const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-                if (!['admin', 'super', 'teacher', 'editor', 'moderator', 'collaborator'].includes(profile?.role)) {
-                    console.error('Sem acesso à apostila: Matrícula não ativa.');
-                    alert('Você não tem uma matrícula ativa para acessar este material.');
-                    navigate('/aluno/cursos');
-                    return;
+            const isStaff = ['admin', 'super', 'teacher', 'editor', 'moderator', 'collaborator'].includes(profileData?.role || '');
+
+            let activeEnrollments: any[] = [];
+            if (courseIds.length > 0) {
+                const { data: enrolls } = await supabase
+                    .from('enrollments')
+                    .select('course_id, status, courses(id, banner_url, title)')
+                    .eq('profile_id', user.id)
+                    .in('course_id', courseIds)
+                    .eq('status', 'Ativo');
+                activeEnrollments = enrolls || [];
+            }
+
+            if (!isStaff && activeEnrollments.length === 0) {
+                console.error('Sem acesso à apostila: Matrícula não ativa.');
+                alert('Você não tem uma matrícula ativa para acessar este material.');
+                navigate('/aluno/meus-cursos');
+                return;
+            }
+
+            // 2. Fetch Course Banner and Title correctly
+            let selectedCourse: { id?: string; banner_url?: string; title?: string } | null = null;
+
+            // Priority A: If courseId is passed explicitly in URL query param (?courseId=...)
+            if (courseIdParam) {
+                const { data: paramCourse } = await supabase
+                    .from('courses')
+                    .select('id, banner_url, title')
+                    .eq('id', courseIdParam)
+                    .maybeSingle();
+
+                if (paramCourse) {
+                    selectedCourse = paramCourse;
                 }
             }
 
-            // 2. Fetch Course Banner using relation
-            const { data: itemData } = await supabase
-                .from('course_items')
-                .select('courses(banner_url, title)')
-                .eq('apostila_id', id)
-                .limit(1)
-                .maybeSingle();
+            // Priority B: If no courseId in URL, use the course where the user is actively enrolled
+            if (!selectedCourse && activeEnrollments.length > 0) {
+                const matched = activeEnrollments[0];
+                if (matched?.courses) {
+                    selectedCourse = matched.courses as any;
+                }
+            }
 
-            if (itemData?.courses) {
-                const course = itemData.courses as any;
-                setCourseBanner(course.banner_url);
-                setCourseName(course.title);
+            // Priority C: Fallback for staff / previews without active enrollment
+            if (!selectedCourse && accessData && accessData.length > 0) {
+                const first = accessData[0];
+                if (first?.courses) {
+                    selectedCourse = first.courses as any;
+                }
+            }
+
+            if (selectedCourse) {
+                setCourseBanner(selectedCourse.banner_url || null);
+                setCourseName(selectedCourse.title || null);
+            } else {
+                setCourseBanner(null);
+                setCourseName(null);
             }
 
             // 3. Fetch User Profile for Footer
@@ -136,6 +229,65 @@ const ApostilaReader: React.FC = () => {
 
             if (nbData) setNotebooks(nbData);
 
+            // 5. Extract and resolve all questions in document order for print Gabarito Comentado
+            try {
+                const questionTagRegex = /\[\s*(?:QUESTÃO INTERATIVA ID|QUESTÃO INTERATIVA|VÍDEO AULA|quest_id)\s*[:=]\s*(?:")?([^"\]]+)(?:")?\s*\]|\[--QUESTAO-JSON--\]([\s\S]*?)\[\/--QUESTAO-JSON--\]/gi;
+                const questionItems: Array<{ type: 'json' | 'id', data?: any, id?: string, order: number }> = [];
+                let qOrder = 0;
+                let qMatch: RegExpExecArray | null;
+                const cleanContentForQuestions = apData?.content || '';
+
+                while ((qMatch = questionTagRegex.exec(cleanContentForQuestions)) !== null) {
+                    const rawId = qMatch[1]?.trim().replace(/<[^>]*>/g, '') || '';
+                    const jsonContent = qMatch[2]?.trim();
+                    const fullTag = qMatch[0].toUpperCase();
+
+                    if (jsonContent) {
+                        qOrder++;
+                        try {
+                            const cleanJson = jsonContent.replace(/<[^>]*>/g, '').replace(/\\/g, '\\\\');
+                            const qData = JSON.parse(cleanJson);
+                            questionItems.push({ type: 'json', data: { ...qData, questionNumber: qOrder }, order: qOrder });
+                        } catch (err) {
+                            console.error('Error parsing question json in reader:', err);
+                        }
+                    } else if (fullTag.includes('QUESTÃO') || fullTag.includes('QUEST_ID')) {
+                        qOrder++;
+                        questionItems.push({ type: 'id', id: rawId, order: qOrder });
+                    }
+                }
+
+                const dbIds = questionItems.filter(item => item.type === 'id' && item.id).map(item => item.id as string);
+                const dbQuestionsMap = new Map<string, any>();
+
+                if (dbIds.length > 0) {
+                    const { data: dbQuestions } = await supabase
+                        .from('questions')
+                        .select('*, bancas(name, sigla), disciplinas(name), assuntos(name), text_bases(content, title)')
+                        .in('id', dbIds);
+
+                    if (dbQuestions) {
+                        dbQuestions.forEach(q => dbQuestionsMap.set(q.id, q));
+                    }
+                }
+
+                const resolvedQuestions = questionItems.map(item => {
+                    if (item.type === 'json') {
+                        return item.data;
+                    } else {
+                        const dbQ = dbQuestionsMap.get(item.id || '');
+                        if (dbQ) {
+                            return { ...dbQ, questionNumber: item.order };
+                        }
+                        return null;
+                    }
+                }).filter(Boolean);
+
+                setQuestionsList(resolvedQuestions);
+            } catch (err) {
+                console.error('Error processing questions list for print:', err);
+            }
+
         } catch (e) {
             console.error('Error fetching data:', e);
         } finally {
@@ -143,9 +295,26 @@ const ApostilaReader: React.FC = () => {
         }
     };
 
-    const handleExportPDF = () => {
+    const handlePrint = () => {
         window.print();
     };
+
+    const autoPrint = searchParams.get('autoPrint') === '1' || searchParams.get('print') === '1';
+
+    useEffect(() => {
+        if (apostila?.title) {
+            document.title = `${apostila.title} - Bora Passar Agora`;
+        }
+    }, [apostila]);
+
+    useEffect(() => {
+        if (!loading && apostila && autoPrint) {
+            const timer = setTimeout(() => {
+                window.print();
+            }, 800);
+            return () => clearTimeout(timer);
+        }
+    }, [loading, apostila, autoPrint]);
 
     const toggleFocus = () => {
         if (!document.fullscreenElement) {
@@ -375,6 +544,7 @@ const ApostilaReader: React.FC = () => {
         const parts: React.ReactNode[] = [];
         let lastIndex = 0;
         let match;
+        let questionCounter = 0;
 
         while ((match = tagRegex.exec(cleanContent)) !== null) {
             // Adiciona o texto antes do marcador
@@ -398,6 +568,8 @@ const ApostilaReader: React.FC = () => {
 
             // Lógica unificada para detectar se é questão (support old and new formats)
             if (jsonContent) {
+                questionCounter++;
+                const qNum = questionCounter;
                 try {
                     // Limpar possíveis tags HTML que o editor pode ter inserido dentro do bloco JSON
                     const cleanJson = jsonContent.replace(/<[^>]*>/g, '');
@@ -405,7 +577,7 @@ const ApostilaReader: React.FC = () => {
                     const questionData = JSON.parse(safeJson);
                     parts.push(
                         <div key={`q-json-${match.index}`} className="my-16 print:my-4">
-                            <InteractiveQuestion question={questionData} />
+                            <InteractiveQuestion question={questionData} questionNumber={qNum} />
                         </div>
                     );
                 } catch (err) {
@@ -417,9 +589,11 @@ const ApostilaReader: React.FC = () => {
                     );
                 }
             } else if (fullTag.includes('QUESTÃO') || fullTag.includes('QUEST_ID')) {
+                questionCounter++;
+                const qNum = questionCounter;
                 parts.push(
                     <div key={`q-wrap-${rawId}-${match.index}`} className="my-16 print:my-4">
-                        <InteractiveQuestion id={rawId} />
+                        <InteractiveQuestion id={rawId} questionNumber={qNum} />
                     </div>
                 );
             } else if (match[0].toUpperCase().includes('VÍDEO AULA')) {
@@ -865,42 +1039,93 @@ const ApostilaReader: React.FC = () => {
                 }
 
                 /* Lists with Icons */
-                .apostila-content ul, .apostila-content ol { 
-                    margin: 2rem 0; 
-                    padding-left: 2rem; 
+                .apostila-content ul,
+                .apostila-content .ql-editor ul,
+                .apostila-content .tiptap ul,
+                .tag-text ul,
+                .custom-tag ul { 
+                    margin: 1.5rem 0 !important; 
+                    padding-left: 0.5rem !important; 
+                    list-style: none !important;
                 }
-                .apostila-content ul li { 
-                    position: relative;
-                    padding-left: 2rem;
-                    margin-bottom: 1rem;
+                .apostila-content ul li,
+                .apostila-content .ql-editor ul li,
+                .apostila-content .tiptap ul li,
+                .tag-text ul li,
+                .custom-tag ul li { 
+                    position: relative !important;
+                    padding-left: 2.25rem !important;
+                    margin-bottom: 0.75rem !important;
                     font-weight: 500;
-                    list-style-type: none;
+                    list-style: none !important;
+                    list-style-type: none !important;
+                    line-height: 1.75 !important;
                 }
-                .apostila-content ul li::before {
-                    content: 'check_circle';
-                    font-family: 'Material Symbols Outlined';
-                    position: absolute;
-                    left: 0;
-                    top: 2px;
-                    color: #3b82f6;
-                    font-size: 1.2rem;
-                    background: none;
-                    box-shadow: none;
-                    width: auto;
-                    height: auto;
-                    border-radius: 0;
+                .apostila-content ul li::before,
+                .apostila-content .ql-editor ul li::before,
+                .apostila-content .tiptap ul li::before,
+                .tag-text ul li::before,
+                .custom-tag ul li::before { 
+                    content: 'check_circle' !important;
+                    font-family: 'Material Symbols Outlined' !important;
+                    position: absolute !important;
+                    left: 0 !important;
+                    top: 0.15rem !important;
+                    color: #3b82f6 !important;
+                    font-size: 1.25rem !important;
+                    line-height: 1 !important;
+                    width: 1.5rem !important;
+                    height: 1.5rem !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    font-style: normal !important;
+                    font-weight: normal !important;
+                    letter-spacing: normal !important;
+                    text-transform: none !important;
+                    user-select: none !important;
+                    pointer-events: none !important;
+                    background: none !important;
+                    box-shadow: none !important;
+                    border-radius: 0 !important;
                 }
                 
-                .apostila-content ol li {
-                    margin-bottom: 1rem;
-                    color: #334155;
-                    font-weight: 600;
-                    padding-left: 0.5rem;
+                .apostila-content ol,
+                .apostila-content .ql-editor ol,
+                .apostila-content .tiptap ol,
+                .tag-text ol,
+                .custom-tag ol { 
+                    margin: 1.5rem 0 !important; 
+                    padding-left: 2rem !important; 
+                    list-style-type: decimal !important;
                 }
-                .apostila-content ol li::marker {
-                    color: #3b82f6;
-                    font-weight: 900;
-                    font-size: 1.1rem;
+                .apostila-content ol li,
+                .apostila-content .ql-editor ol li,
+                .apostila-content .tiptap ol li,
+                .tag-text ol li,
+                .custom-tag ol li {
+                    position: relative !important;
+                    margin-bottom: 0.75rem !important;
+                    color: #334155 !important;
+                    font-weight: 600;
+                    padding-left: 0.5rem !important;
+                    list-style-type: decimal !important;
+                    line-height: 1.75 !important;
+                }
+                .apostila-content ol li::before,
+                .apostila-content .ql-editor ol li::before,
+                .apostila-content .tiptap ol li::before,
+                .tag-text ol li::before,
+                .custom-tag ol li::before {
+                    content: none !important;
+                }
+                .apostila-content ol li::marker,
+                .tag-text ol li::marker,
+                .custom-tag ol li::marker {
+                    color: #3b82f6 !important;
+                    font-weight: 900 !important;
+                    font-size: 1.1rem !important;
+                    font-family: 'Lexend', sans-serif !important;
                 }
                 
                 /* Blockquote: Vibrant Pink/Violet Insight Card */
@@ -1069,31 +1294,53 @@ const ApostilaReader: React.FC = () => {
                 .no-scrollbar::-webkit-scrollbar { display: none; }
 
                 /* PRINT STYLES - MAGAZINE FORMAT */
+                .print-cover-page {
+                    display: none;
+                }
+
                 @media print {
                     @page {
-                        margin: 1.5cm 1cm 1.5cm 1cm; /* Margens para encadernação */
-                        size: A4;
+                        margin: 14mm 12mm 16mm 12mm;
+                        size: A4 portrait;
                     }
                     body {
                         background: white !important;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
-                        font-family: 'Inter', sans-serif;
+                        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
+                        color: #1e293b !important;
                     }
                     
-                    /* Esconde Interface do Usuário */
-                    /* Esconde Interface do Usuário */
+                    /* Esconde Interface do Usuário e Elementos Interativos */
                     .no-print, 
                     .material-symbols-outlined, 
                     iframe,
                     .video-container,
-                    .print-hidden {
+                    .print-hidden,
+                    header {
                         display: none !important;
+                    }
+
+                    /* Capa de Impressão (Página 1 Exclusiva) */
+                    .print-cover-page {
+                        display: flex !important;
+                        flex-direction: column !important;
+                        justify-content: space-between !important;
+                        align-items: center !important;
+                        height: 100vh !important;
+                        min-height: 250mm !important;
+                        page-break-after: always !important;
+                        break-after: page !important;
+                        box-sizing: border-box !important;
+                        padding: 25mm 15mm 15mm 15mm !important;
+                        text-align: center !important;
+                        background: white !important;
                     }
 
                     /* Ajuste do Layout Principal */
                     .apostila-sheet {
                         padding: 0 !important;
+                        padding-bottom: 12mm !important;
                         margin: 0 !important;
                         border: none !important;
                         box-shadow: none !important;
@@ -1103,236 +1350,543 @@ const ApostilaReader: React.FC = () => {
                     }
 
                     .apostila-content {
-                        font-size: 12pt;
-                        line-height: 1.6;
-                        color: #1a1a1a;
+                        font-size: 10pt !important;
+                        line-height: 1.55 !important;
+                        color: #1e293b !important;
                     }
                     
-                    .apostila-content p {
-                        text-align: justify;
-                        hyphens: auto;
-                    }
-
-                    /* Tags e Caixas - Estilo Revista */
-                    .custom-tag {
-                        break-inside: avoid;
-                        border-left: 4px solid #000 !important;
-                        box-shadow: none !important;
-                        margin: 1cm 0 !important;
-                        background: transparent !important;
-                        padding-left: 10px;
-                    }
-                    .custom-tag .tag-icon-box { display: none !important; }
-                    .custom-tag .tag-content-wrapper { padding: 0 !important; }
-                    .custom-tag .tag-body strong { color: #000 !important; text-transform: uppercase; font-size: 0.9rem; }
-                    
-                    /* Título Principal */
-                    /* Título Principal */
-                    h1 {
-                        font-family: 'Lexend', sans-serif !important;
-                        font-weight: 900 !important;
-                        font-size: 3rem !important;
-                        color: #000 !important;
-                        text-shadow: none !important;
-                        text-transform: uppercase;
-                        letter-spacing: -0.05em;
-                        margin-bottom: 2rem;
-                    }
-
-                    /* Banner Impresso Limpo */
-                    header { margin-bottom: 1rem !important; }
-                    .banner-container {
-                        height: auto !important;
-                        border: none !important;
-                        margin-bottom: 1rem !important;
-                        background: none !important;
-                        box-shadow: none !important;
-                        display: block !important;
-                        position: relative !important;
-                    }
-                    .banner-container img {
-                        height: 250px !important;
-                        object-fit: cover !important;
-                        margin-bottom: 1rem !important;
-                        display: block !important;
-                        max-width: 100% !important;
-                    }
-                    .banner-logo-container {
-                        display: none !important; /* Remove logo de DENTRO do banner na impressão */
-                    }
-                    .print-header-top {
-                        display: flex !important;
-                        justify-content: space-between !important;
-                        align-items: center !important;
-                        border-bottom: 2px solid #000 !important;
-                        padding-bottom: 0.5rem !important;
-                        margin-bottom: 1rem !important;
-                    }
-                    .print-header-top img {
-                        height: 40px !important;
-                        filter: brightness(0) !important; /* Torna a logo preta */
-                    }
-                    .print-header-top span {
-                        font-family: 'Lexend', sans-serif !important;
-                        font-weight: 900 !important;
-                        font-size: 14pt !important;
-                        text-transform: uppercase !important;
-                        color: #000 !important;
-                    }
-                    .banner-overlay { display: none !important; }
-                    .banner-text-container {
-                        position: static !important;
-                        padding: 0 !important;
-                        background: none !important;
-                        color: black !important;
-                        display: block !important;
-                    }
-                    .banner-text-container h1 {
-                        color: black !important;
-                        font-size: 24pt !important;
-                        text-shadow: none !important;
-                        box-shadow: none !important;
-                        filter: none !important;
-                        margin: 0 !important;
-                        line-height: 1.2 !important;
-                     }
-                    .banner-text-container span {
-                        background: #eee !important;
-                        color: #333 !important;
-                        border: 1px solid #ddd;
-                        box-shadow: none !important;
-                        display: inline-block !important;
-                        margin-bottom: 0.5rem !important;
-                    }
-
-                    /* Remover Cabeçalho Decorativo da Questão */
-                    .question-header { display: none !important; }
-                    
-                    .custom-tag,
-                    .print-question-wrapper, 
-                    .premium-question-wrapper,
-                    .interactive-question-block,
                     .apostila-content p,
-                    .apostila-sheet { 
-                        break-inside: auto !important; 
+                    .apostila-content .ql-editor p {
+                        font-size: 10pt !important;
+                        line-height: 1.55 !important;
+                        color: #1e293b !important;
+                        margin-bottom: 6pt !important;
+                        text-align: justify !important;
+                        hyphens: auto !important;
+                        orphans: 3 !important;
+                        widows: 3 !important;
                     }
 
-                    /* Questões Estilo Prova - Texto Puro */
+                    .apostila-content strong,
+                    .apostila-content b {
+                        font-weight: 800 !important;
+                        color: #0f172a !important;
+                    }
 
-                    /* REMOVE VÍDEOS NA IMPRESSÃO */
-                    .tag-video, 
-                    .video-container, 
-                    iframe[src*="youtube"], 
-                    iframe[src*="vimeo"] {
+                    /* Títulos Limpos e Profissionais */
+                    .apostila-content h1,
+                    .apostila-content .ql-editor h1 {
+                        font-family: 'Lexend', sans-serif !important;
+                        font-weight: 900 !important;
+                        font-size: 16pt !important;
+                        color: #0f172a !important;
+                        text-shadow: none !important;
+                        text-transform: uppercase !important;
+                        letter-spacing: -0.02em !important;
+                        margin: 16pt 0 8pt 0 !important;
+                        padding: 0 !important;
+                        border: none !important;
+                        background: none !important;
+                        -webkit-text-fill-color: initial !important;
+                        break-after: avoid !important;
+                        page-break-after: avoid !important;
+                    }
+
+                    .apostila-content h2,
+                    .apostila-content .ql-editor h2 {
+                        font-family: 'Lexend', sans-serif !important;
+                        font-size: 12.5pt !important;
+                        font-weight: 800 !important;
+                        color: #0f172a !important;
+                        margin: 14pt 0 6pt 0 !important;
+                        padding: 2pt 0 2pt 8pt !important;
+                        border-left: 3.5pt solid #2563eb !important;
+                        border-right: none !important;
+                        border-top: none !important;
+                        border-bottom: none !important;
+                        line-height: 1.25 !important;
+                        background: none !important;
+                        break-after: avoid !important;
+                        page-break-after: avoid !important;
+                    }
+
+                    .apostila-content h3,
+                    .apostila-content .ql-editor h3 {
+                        font-family: 'Lexend', sans-serif !important;
+                        font-size: 11pt !important;
+                        font-weight: 800 !important;
+                        color: #1e293b !important;
+                        margin: 10pt 0 4pt 0 !important;
+                        padding: 0 !important;
+                        border: none !important;
+                        display: block !important;
+                        break-after: avoid !important;
+                        page-break-after: avoid !important;
+                    }
+                    .apostila-content h3::before,
+                    .apostila-content .ql-editor h3::before {
+                        display: none !important;
+                        content: none !important;
+                    }
+
+                    .apostila-content h4,
+                    .apostila-content .ql-editor h4 {
+                        font-family: 'Lexend', sans-serif !important;
+                        font-size: 10pt !important;
+                        font-weight: 800 !important;
+                        color: #334155 !important;
+                        margin: 8pt 0 3pt 0 !important;
+                        text-transform: uppercase !important;
+                        border: none !important;
+                        break-after: avoid !important;
+                        page-break-after: avoid !important;
+                    }
+
+                    /* LISTAS COMPACTAS E ALINHADAS */
+                    .apostila-content ul,
+                    .apostila-content .ql-editor ul,
+                    .apostila-content .tiptap ul,
+                    .tag-text ul,
+                    .custom-tag ul {
+                        margin: 5pt 0 !important;
+                        padding-left: 18pt !important;
+                        list-style-type: disc !important;
+                    }
+                    .apostila-content ul li,
+                    .apostila-content .ql-editor ul li,
+                    .apostila-content .tiptap ul li,
+                    .tag-text ul li,
+                    .custom-tag ul li {
+                        position: static !important;
+                        padding-left: 0 !important;
+                        margin-bottom: 2.5pt !important;
+                        font-size: 10pt !important;
+                        line-height: 1.45 !important;
+                        list-style-type: disc !important;
+                    }
+                    .apostila-content ul li::before,
+                    .apostila-content .ql-editor ul li::before,
+                    .apostila-content .tiptap ul li::before,
+                    .tag-text ul li::before,
+                    .custom-tag ul li::before {
+                        display: none !important;
+                        content: none !important;
+                    }
+
+                    .apostila-content ol,
+                    .apostila-content .ql-editor ol,
+                    .apostila-content .tiptap ol,
+                    .tag-text ol,
+                    .custom-tag ol {
+                        margin: 5pt 0 !important;
+                        padding-left: 18pt !important;
+                        list-style-type: decimal !important;
+                    }
+                    .apostila-content ol li,
+                    .apostila-content .ql-editor ol li,
+                    .apostila-content .tiptap ol li,
+                    .tag-text ol li,
+                    .custom-tag ol li {
+                        position: static !important;
+                        padding-left: 0 !important;
+                        margin-bottom: 2.5pt !important;
+                        font-size: 10pt !important;
+                        line-height: 1.45 !important;
+                        list-style-type: decimal !important;
+                    }
+                    .apostila-content ol li::before,
+                    .apostila-content .ql-editor ol li::before,
+                    .apostila-content .tiptap ol li::before,
+                    .tag-text ol li::before,
+                    .custom-tag ol li::before {
+                        display: none !important;
+                        content: none !important;
+                    }
+
+                    /* TAGS PERSONALIZADAS - DESIGN PROFISSIONAL CONCURSOS */
+                    .custom-tag {
+                        break-inside: avoid !important;
+                        page-break-inside: avoid !important;
+                        margin: 8pt 0 !important;
+                        padding: 7pt 10pt !important;
+                        background: #f8fafc !important;
+                        border: 1px solid #e2e8f0 !important;
+                        border-left: 3.5pt solid #0f172a !important;
+                        border-right: none !important;
+                        border-radius: 0 4px 4px 0 !important;
+                        box-shadow: none !important;
+                        display: block !important;
+                    }
+                    .custom-tag .tag-icon-box { 
+                        display: none !important; 
+                    }
+                    .custom-tag .tag-content-wrapper { 
+                        padding: 0 !important; 
+                        background: transparent !important;
+                        border: none !important;
+                        display: block !important;
+                    }
+                    .custom-tag .tag-text {
+                        font-size: 9.5pt !important;
+                        line-height: 1.45 !important;
+                        color: #1e293b !important;
+                    }
+                    .custom-tag .tag-text p {
+                        font-size: 9.5pt !important;
+                        line-height: 1.45 !important;
+                        color: #1e293b !important;
+                        margin-bottom: 3pt !important;
+                        text-align: justify !important;
+                    }
+                    .custom-tag .tag-text p:last-child {
+                        margin-bottom: 0 !important;
+                    }
+                    .custom-tag .tag-body strong,
+                    .custom-tag .tag-body b { 
+                        font-family: 'Lexend', 'Inter', sans-serif !important;
+                        font-size: 8.5pt !important;
+                        font-weight: 800 !important;
+                        text-transform: uppercase !important;
+                        letter-spacing: 0.06em !important;
+                        margin-bottom: 3pt !important;
+                        display: block !important;
+                        line-height: 1.2 !important;
+                    }
+
+                    /* Cores Específicas por Tag (Sem barras laterais duplas) */
+                    .tag-aviso {
+                        border-left: 3.5pt solid #dc2626 !important;
+                        border-right: none !important;
+                        background: #fef2f2 !important;
+                        border-top: 1px solid #fecaca !important;
+                        border-bottom: 1px solid #fecaca !important;
+                    }
+                    .tag-aviso .tag-body strong { color: #b91c1c !important; }
+
+                    .tag-importante {
+                        border-left: 3.5pt solid #d97706 !important;
+                        border-right: none !important;
+                        background: #fffbeb !important;
+                        border-top: 1px solid #fde68a !important;
+                        border-bottom: 1px solid #fde68a !important;
+                    }
+                    .tag-importante .tag-body strong { color: #b45309 !important; }
+
+                    .tag-lei {
+                        border-left: 3.5pt solid #7c3aed !important;
+                        border-right: none !important;
+                        background: #f5f3ff !important;
+                        border-top: 1px solid #ddd6fe !important;
+                        border-bottom: 1px solid #ddd6fe !important;
+                    }
+                    .tag-lei .tag-body strong { color: #6d28d9 !important; }
+                    .tag-lei .tag-text { font-family: 'Georgia', serif !important; font-style: italic !important; color: #4c1d95 !important; }
+
+                    .tag-link {
+                        border-left: 3.5pt solid #2563eb !important;
+                        border-right: none !important;
+                        background: #eff6ff !important;
+                        border-top: 1px solid #bfdbfe !important;
+                        border-bottom: 1px solid #bfdbfe !important;
+                    }
+                    .tag-link .tag-body strong { color: #1d4ed8 !important; }
+
+                    .tag-observe {
+                        border-left: 3.5pt solid #0891b2 !important;
+                        border-right: none !important;
+                        background: #ecfeff !important;
+                        border-top: 1px solid #a5f3fc !important;
+                        border-bottom: 1px solid #a5f3fc !important;
+                    }
+                    .tag-observe .tag-body strong { color: #0e7490 !important; }
+
+                    .tag-frequente {
+                        border-left: 3.5pt solid #ea580c !important;
+                        border-right: none !important;
+                        background: #fff7ed !important;
+                        border-top: 1px solid #ffedd5 !important;
+                        border-bottom: 1px solid #ffedd5 !important;
+                    }
+                    .tag-frequente .tag-body strong { color: #c2410c !important; }
+
+                    .tag-extra {
+                        border-left: 3.5pt solid #0d9488 !important;
+                        border-right: none !important;
+                        background: #f0fdfa !important;
+                        border-top: 1px solid #ccfbf1 !important;
+                        border-bottom: 1px solid #ccfbf1 !important;
+                    }
+                    .tag-extra .tag-body strong { color: #0f766e !important; }
+
+                    .tag-novidade {
+                        border-left: 3.5pt solid #db2777 !important;
+                        border-right: none !important;
+                        background: #fdf2f8 !important;
+                        border-top: 1px solid #fce7f3 !important;
+                        border-bottom: 1px solid #fce7f3 !important;
+                    }
+                    .tag-novidade .tag-body strong { color: #be185d !important; }
+
+                    .tag-correcao {
+                        border-left: 3.5pt solid #e11d48 !important;
+                        border-right: none !important;
+                        background: #fff1f2 !important;
+                        border-top: 1px solid #ffe4e6 !important;
+                        border-bottom: 1px solid #ffe4e6 !important;
+                    }
+                    .tag-correcao .tag-body strong { color: #be123c !important; }
+
+                    .tag-exemplo {
+                        border-left: 3.5pt solid #65a30d !important;
+                        border-right: none !important;
+                        background: #f7fee7 !important;
+                        border-top: 1px solid #ecfccb !important;
+                        border-bottom: 1px solid #ecfccb !important;
+                    }
+                    .tag-exemplo .tag-body strong { color: #4d7c0f !important; }
+
+                    .tag-praticar {
+                        border-left: 3.5pt solid #4338ca !important;
+                        border-right: none !important;
+                        background: #eef2ff !important;
+                        border-top: 1px solid #e0e7ff !important;
+                        border-bottom: 1px solid #e0e7ff !important;
+                    }
+                    .tag-praticar .tag-body strong { color: #3730a3 !important; }
+
+                    .tag-titulo {
+                        border: none !important;
+                        border-left: 3.5pt solid #0284c7 !important;
+                        background: #f0f9ff !important;
+                        border-radius: 0 4px 4px 0 !important;
+                        padding: 8pt 10pt !important;
+                        margin: 12pt 0 6pt 0 !important;
+                    }
+                    .tag-titulo .tag-text, .tag-titulo .tag-text p {
+                        color: #0369a1 !important;
+                        font-family: 'Lexend', sans-serif !important;
+                        font-weight: 800 !important;
+                        font-size: 11pt !important;
+                        text-transform: uppercase !important;
+                        letter-spacing: 0.05em !important;
+                        margin: 0 !important;
+                    }
+
+                    .tag-resolve {
+                        margin: 12pt 0 !important;
+                        border: none !important;
+                        background: transparent !important;
+                        padding: 0 !important;
+                    }
+                    .resolve-header {
+                        margin: 8pt 0 !important;
+                    }
+                    .resolve-header span {
+                        font-size: 8.5pt !important;
+                        color: #475569 !important;
+                        padding: 0 8pt !important;
+                    }
+                    .resolve-solution {
+                        margin-top: 6pt !important;
+                        padding: 7pt 10pt !important;
+                        background: #f0f9ff !important;
+                        border: 1px solid #bae6fd !important;
+                        border-left: 3.5pt solid #0284c7 !important;
+                        border-radius: 0 4px 4px 0 !important;
+                    }
+                    .resolve-solution::before {
+                        font-size: 7.5pt !important;
+                        color: #0369a1 !important;
+                        margin-bottom: 3pt !important;
+                    }
+
+                    /* BLOCKQUOTE */
+                    .apostila-content blockquote {
+                        margin: 8pt 0 !important;
+                        padding: 7pt 12pt !important;
+                        background: #f8fafc !important;
+                        border: 1px solid #e2e8f0 !important;
+                        border-left: 3pt solid #64748b !important;
+                        border-radius: 0 4px 4px 0 !important;
+                        box-shadow: none !important;
+                    }
+                    .apostila-content blockquote p {
+                        font-size: 9.5pt !important;
+                        font-style: italic !important;
+                        color: #334155 !important;
+                        text-align: left !important;
+                        margin: 0 !important;
+                    }
+                    .apostila-content blockquote::after {
                         display: none !important;
                     }
 
-                    /* Questões Estilo Prova */
-                    .interactive-question-block {
-                        padding: 0 !important;
-                        margin: 1.5cm 0 !important;
-                        background: transparent !important;
-                        border: none !important;
+                    /* TABELAS */
+                    .table-container {
+                        margin: 8pt 0 !important;
+                        border: 1px solid #cbd5e1 !important;
+                        border-radius: 0 !important;
                         box-shadow: none !important;
+                        break-inside: avoid !important;
+                        page-break-inside: avoid !important;
                     }
-                    .interactive-question-block .bg-white {
-                        padding: 0 !important;
-                        border: none !important;
-                        box-shadow: none !important;
+                    .apostila-content table {
+                        width: 100% !important;
+                        border-collapse: collapse !important;
+                        font-size: 8.5pt !important;
                     }
-                    /* Remove Question Cards in Print */
-                    .print-question-wrapper {
-                        background: none !important;
-                        padding: 0 !important;
-                        margin: 1cm 0 !important;
+                    .apostila-content th {
+                        background: #0f172a !important;
+                        color: #ffffff !important;
+                        padding: 5pt 7pt !important;
+                        font-size: 8pt !important;
+                        font-weight: 800 !important;
+                        border: 1px solid #334155 !important;
                     }
-                    .print-question-card {
-                        background: none !important;
-                        border: none !important;
-                        box-shadow: none !important;
-                        padding: 0 !important;
+                    .apostila-content td {
+                        padding: 4pt 7pt !important;
+                        font-size: 8.5pt !important;
+                        line-height: 1.4 !important;
+                        color: #1e293b !important;
+                        border: 1px solid #e2e8f0 !important;
                     }
-                    
-                    /* Tira margens internas exageradas das questões na impressão */
-                    .premium-question-header, 
-                    .premium-question-text {
-                        margin-bottom: 0.5rem !important;
-                    }
-                    .premium-button-alt {
-                        padding: 0.5rem 0 !important;
-                        background: none !important;
-                        border: none !important;
-                    }
-                    .premium-alt-circle {
-                        border: 1px solid #000 !important;
-                        background: none !important;
-                        color: #000 !important;
-                        width: 20px !important;
-                        height: 20px !important;
-                        font-size: 10px !important;
+                    .apostila-content tr:nth-child(even) td {
+                        background: #f8fafc !important;
                     }
 
-                    /* Esconder botões de interação na impressão se desejar apenas o texto limpo, 
-                       mas o usuário pediu "como questões de prova", então manter as alternativas é bom. 
-                       Vamos apenas limpar o estilo. */
-                     .interactive-question-block button {
-                        display: flex !important;
-                        position: relative !important;
-                        border: none !important;
-                        background: transparent !important;
-                        color: black !important;
-                        padding: 5px 0 !important;
-                        width: 100% !important;
-                        text-align: left !important;
+                    /* EQUAÇÕES KATEX */
+                    .katex-display {
+                        margin: 6pt 0 !important;
+                        padding: 5pt 8pt !important;
+                        background: #f8fafc !important;
+                        border: 1px solid #e2e8f0 !important;
+                        border-radius: 4px !important;
                         box-shadow: none !important;
-                     }
-                     .interactive-question-block button div {
-                        border: none !important;
-                        background: transparent !important;
-                        color: black !important;
-                        width: auto !important;
-                        height: auto !important;
-                        margin-right: 8px !important;
-                        font-weight: 900 !important;
-                     }
-                     .interactive-question-block button div span {
-                         font-size: 1rem !important; /* Tamanho texto letra */
-                     }
-                     
-                     /* Mostrar Gabarito Oculto */
-                     .print-gabarito {
-                         display: block !important;
-                     }
-                    
-                    /* Imagens */
-                    .apostila-content img {
-                        max-height: 10cm;
-                        margin: 1cm auto !important;
-                        break-inside: avoid;
-                        box-shadow: none !important;
-                        border: 1px solid #eee !important;
+                        break-inside: avoid !important;
+                        page-break-inside: avoid !important;
                     }
-                    
-                    /* Rodapé da Página Fixado */
+                    .katex {
+                        font-size: 1em !important;
+                    }
+
+                    /* QUESTÕES INTERATIVAS NO ESTILO PROVA */
+                    .interactive-question-block,
+                    .print-question-wrapper,
+                    .print-question-card,
+                    .premium-question-wrapper {
+                        break-inside: avoid !important;
+                        page-break-inside: avoid !important;
+                        margin: 10pt 0 !important;
+                        padding: 8pt 10pt !important;
+                        background: #ffffff !important;
+                        border: 1px solid #cbd5e1 !important;
+                        border-radius: 4px !important;
+                        box-shadow: none !important;
+                    }
+                    .premium-question-header {
+                        margin-bottom: 6pt !important;
+                    }
+                    .premium-question-text {
+                        font-size: 9.5pt !important;
+                        line-height: 1.45 !important;
+                        color: #1e293b !important;
+                        margin-bottom: 6pt !important;
+                    }
+                    .premium-button-alt {
+                        padding: 2.5pt 0 !important;
+                        background: none !important;
+                        border: none !important;
+                        border-radius: 0 !important;
+                        min-height: auto !important;
+                    }
+                    .premium-alt-circle {
+                        border: 1px solid #334155 !important;
+                        background: #f1f5f9 !important;
+                        color: #0f172a !important;
+                        font-weight: 800 !important;
+                        width: 18px !important;
+                        height: 18px !important;
+                        font-size: 8.5pt !important;
+                        display: inline-flex !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                        margin-right: 5pt !important;
+                        border-radius: 50% !important;
+                        flex-shrink: 0 !important;
+                    }
+                    .print-gabarito {
+                        display: block !important;
+                        margin-top: 6pt !important;
+                        padding: 3pt 6pt !important;
+                        background: #ecfdf5 !important;
+                        border: 1px solid #a7f3d0 !important;
+                        border-left: 3pt solid #10b981 !important;
+                        color: #065f46 !important;
+                        font-size: 8.5pt !important;
+                        font-weight: bold !important;
+                    }
+
+                    /* IMAGENS */
+                    .apostila-content img {
+                        max-height: 8cm !important;
+                        margin: 6pt auto !important;
+                        break-inside: avoid !important;
+                        page-break-inside: avoid !important;
+                        box-shadow: none !important;
+                        border: 1px solid #e2e8f0 !important;
+                        border-radius: 4px !important;
+                    }
+
+                    /* PREVENÇÃO DE QUEBRAS INDESEJADAS */
+                    .custom-tag,
+                    .tag-content-wrapper,
+                    .tag-text,
+                    .print-question-wrapper, 
+                    .premium-question-wrapper,
+                    .interactive-question-block,
+                    .print-question-card,
+                    .table-container,
+                    table,
+                    tr,
+                    blockquote,
+                    .katex-display { 
+                        break-inside: avoid !important; 
+                        page-break-inside: avoid !important; 
+                    }
+
+                    /* SEÇÃO FINAL DE QUESTÕES E GABARITO COMENTADO */
+                    .print-questions-final-page {
+                        display: block !important;
+                        page-break-before: always !important;
+                        break-before: page !important;
+                        margin-top: 15mm !important;
+                    }
+                    .print-final-question-card {
+                        break-inside: avoid !important;
+                        page-break-inside: avoid !important;
+                        margin-bottom: 8pt !important;
+                        padding: 7pt 10pt !important;
+                        border: 1px solid #cbd5e1 !important;
+                        background: #ffffff !important;
+                    }
+
+                    /* RODAPÉ FIXO NA PARTE INFERIOR DE TODAS AS PÁGINAS */
                     .print-only-footer {
                         display: flex !important;
-                        position: fixed;
-                        bottom: 0;
-                        left: 0;
-                        right: 0;
-                        padding-top: 10px;
-                        border-top: 1px solid #000;
-                        font-size: 9pt;
-                        justify-content: space-between;
-                        font-weight: bold;
-                        background: white;
-                        z-index: 9999;
-                    }
-                    
-                    /* Headers Ajustados */
-                    h1, h2, h3 { 
-                        color: #000 !important; 
-                        break-after: avoid; 
+                        position: fixed !important;
+                        bottom: 0 !important;
+                        left: 0 !important;
+                        right: 0 !important;
+                        height: 6mm !important;
+                        padding-top: 2px !important;
+                        border-top: 1px solid #94a3b8 !important;
+                        font-size: 7.5pt !important;
+                        color: #64748b !important;
+                        justify-content: space-between !important;
+                        align-items: center !important;
+                        font-weight: bold !important;
+                        background: white !important;
+                        z-index: 9999 !important;
                     }
                 }
 
@@ -1411,7 +1965,13 @@ const ApostilaReader: React.FC = () => {
             <div className={`no-print flex items-center justify-between mx-auto max-w-4xl transition-all duration-500 ${isFocusMode ? 'fixed top-6 right-8 z-[100] gap-4' : 'mb-12'}`}>
                 {!isFocusMode && (
                     <button
-                        onClick={() => navigate(-1)}
+                        onClick={() => {
+                            if (courseIdParam) {
+                                navigate(`/aluno/curso/${courseIdParam}`);
+                            } else {
+                                navigate(-1);
+                            }
+                        }}
                         className="size-12 flex items-center justify-center bg-white text-slate-400 hover:text-slate-900 transition-all rounded-2xl border border-slate-100 hover:shadow-xl shadow-sm group"
                         title="Voltar"
                     >
@@ -1420,20 +1980,23 @@ const ApostilaReader: React.FC = () => {
                 )}
 
                 <div className={`flex items-center gap-3 ${isFocusMode ? '' : 'ml-auto'}`}>
-                    <div className="bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm flex gap-1">
+                    <div className="bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-1.5">
                         <button
                             onClick={toggleFocus}
-                            className={`size-10 flex items-center justify-center transition-all rounded-xl ${isFocusMode ? 'bg-[#137fec] text-white' : 'text-slate-400 hover:bg-slate-50'}`}
-                            title="Modo Foco"
+                            className={`size-10 flex items-center justify-center transition-all rounded-xl ${isFocusMode ? 'bg-[#137fec] text-white' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}`}
+                            title={isFocusMode ? 'Sair do Modo Foco' : 'Modo Foco'}
                         >
                             <span className="material-symbols-outlined text-xl">{isFocusMode ? 'close_fullscreen' : 'fullscreen'}</span>
                         </button>
+
+                        {/* Botão Imprimir */}
                         <button
-                            onClick={handleExportPDF}
-                            className="size-10 flex items-center justify-center text-slate-400 hover:bg-slate-50 rounded-xl transition-all"
-                            title="Exportar PDF Profissional"
+                            onClick={handlePrint}
+                            className="flex items-center gap-2 px-4 h-10 bg-slate-900 text-white hover:bg-slate-800 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                            title="Imprimir Material"
                         >
-                            <span className="material-symbols-outlined text-xl">file_save</span>
+                            <span className="material-symbols-outlined text-lg">print</span>
+                            <span className="hidden sm:inline">Imprimir</span>
                         </button>
                     </div>
                 </div>
@@ -1442,7 +2005,46 @@ const ApostilaReader: React.FC = () => {
             {/* Main Sheet */}
             <article className={`apostila-sheet transition-all duration-700 ${isFocusMode ? 'rounded-none border-0 shadow-none py-20 px-10' : 'p-8 md:p-20'} ${apostila.is_resumo_8020 ? 'resumo-mode' : ''}`}>
                 
-                {/* Header Professional with Breadcrumbs & Banner */}
+                {/* Print & PDF Cover Page (Page 1) */}
+                <div className="print-cover-page hidden print:flex flex-col justify-between items-center text-center p-8 md:p-16 min-h-[90vh]">
+                    <div className="flex flex-col items-center w-full pt-10">
+                        <img src="/bora_passar_logo.png" alt="Bora Passar Agora" className="h-20 md:h-24 w-auto object-contain mb-8 filter brightness-0" />
+                        <div className="inline-block px-6 py-2 border-2 border-slate-900 text-slate-900 font-black text-xs uppercase tracking-[0.3em] rounded-full">
+                            Material Didático Oficial
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col items-center justify-center my-auto w-full max-w-2xl py-12">
+                        <h2 className="text-xl md:text-2xl font-black text-slate-700 uppercase tracking-widest mb-4">
+                            {courseName || apostila.disciplina?.name || 'Preparatório para Concursos'}
+                        </h2>
+                        <div className="w-24 h-1.5 bg-slate-900 rounded-full mx-auto mb-8"></div>
+                        <h1 className="text-4xl md:text-5xl font-black text-slate-900 leading-tight uppercase tracking-tight mb-6">
+                            {apostila.title}
+                        </h1>
+                        {apostila.disciplina?.name && (
+                            <p className="text-lg font-bold text-slate-600 uppercase tracking-wider mb-2">
+                                Disciplina: {apostila.disciplina.name}
+                            </p>
+                        )}
+                        {(apostila.teacher?.name || apostila.author?.full_name) && (
+                            <p className="text-sm font-semibold text-slate-500 uppercase tracking-widest mt-4">
+                                {apostila.teacher ? `Professor: ${apostila.teacher.name}` : `Prof. ${apostila.author?.full_name}`}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="w-full pt-8 pb-10 border-t-2 border-slate-900 text-slate-700 space-y-2">
+                        <p className="text-xs font-black uppercase tracking-widest">
+                            Plataforma Bora Passar Agora • Todos os Direitos Reservados
+                        </p>
+                        {profile?.full_name && (
+                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                Licenciado para: {profile.full_name} {profile.cpf ? `• CPF: ${profile.cpf}` : ''}
+                            </p>
+                        )}
+                    </div>
+                </div>
 
                 {/* Header Professional with Breadcrumbs & Banner */}
                 <header className="mb-16 animate-in fade-in slide-in-from-bottom-10 duration-700 relative">
@@ -1533,10 +2135,151 @@ const ApostilaReader: React.FC = () => {
                     )}
                 </header>
 
+                {/* Editorial Header Exclusively for Print (Page 2 Start) */}
+                <div className="hidden print:block mb-8 pb-4 border-b-2 border-slate-900 break-after-avoid">
+                    <div className="flex justify-between items-center text-[8pt] font-black uppercase text-slate-500 tracking-wider mb-2">
+                        <span>{courseName || apostila.disciplina?.name || 'Material Didático'}</span>
+                        <span>Bora Passar Agora</span>
+                    </div>
+                    <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight m-0">
+                        {apostila.title}
+                    </h1>
+                    {apostila.description && (
+                        <p className="text-xs text-slate-600 font-medium italic mt-2 mb-0">
+                            {apostila.description}
+                        </p>
+                    )}
+                </div>
+
                 {/* Content body */}
                 <div className="apostila-content select-text selection:bg-[#137fec]/20 selection:text-[#137fec]">
                     {renderProcessedContent(apostila.content)}
                 </div>
+
+                {/* Dedicated Final Page for Questions with Full Answer and Explanation */}
+                {questionsList.length > 0 && (
+                    <section className="print-questions-final-page hidden print:block">
+                        <div className="print-questions-final-header mb-8 pb-4 border-b-2 border-slate-900">
+                            <div className="flex justify-between items-center text-[8pt] font-black uppercase text-slate-500 tracking-wider mb-2">
+                                <span>{courseName || apostila.disciplina?.name || 'Material Didático'}</span>
+                                <span>Bora Passar Agora</span>
+                            </div>
+                            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight m-0">
+                                Questões da Apostila — Gabarito e Comentários
+                            </h2>
+                            <p className="text-[9pt] text-slate-500 font-bold uppercase tracking-wider mt-1 mb-0">
+                                Resoluções detalhadas e análise dos professores
+                            </p>
+                        </div>
+
+                        <div className="space-y-6">
+                            {questionsList.map((q, idx) => {
+                                const qNum = q.questionNumber || idx + 1;
+                                const correctAltIdx = q.alternativas?.findIndex((a: any) => a.isCorreta);
+                                let gabaritoText = 'N/A';
+                                if (correctAltIdx !== -1 && correctAltIdx !== undefined) {
+                                    const text = q.alternativas[correctAltIdx]?.texto || '';
+                                    if (['certo', 'errado'].includes(text.toLowerCase().trim())) {
+                                        gabaritoText = text.toUpperCase();
+                                    } else {
+                                        gabaritoText = `Letra ${String.fromCharCode(65 + correctAltIdx)}`;
+                                    }
+                                }
+
+                                const bancaObj = Array.isArray(q.bancas) ? q.bancas[0] : q.bancas;
+                                const bancaName = bancaObj?.sigla ? `${bancaObj.sigla} - ${bancaObj.name}` : bancaObj?.name;
+
+                                const tb = q.text_bases as any;
+                                let baseTextContent = '';
+                                if (Array.isArray(tb) && tb.length > 0) baseTextContent = tb[0].content;
+                                else if (tb && !Array.isArray(tb)) baseTextContent = tb.content;
+                                else if (q.texto_base) baseTextContent = q.texto_base;
+
+                                return (
+                                    <div key={q.id || idx} className="print-final-question-card border border-slate-300 rounded p-4 mb-6 break-inside-avoid">
+                                        {/* Header */}
+                                        <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="text-[10pt] font-black text-slate-900 uppercase">
+                                                    Questão {String(qNum).padStart(2, '0')}
+                                                </span>
+                                                {q.disciplinas?.name && (
+                                                    <span className="text-[8pt] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                                        {q.disciplinas.name}
+                                                    </span>
+                                                )}
+                                                {bancaName && (
+                                                    <span className="text-[8pt] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded">
+                                                        {bancaName}
+                                                    </span>
+                                                )}
+                                                {q.ano && (
+                                                    <span className="text-[8pt] font-bold text-slate-500">
+                                                        {q.ano}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-[9pt] font-black text-emerald-800 bg-emerald-50 border border-emerald-300 px-2.5 py-0.5 rounded">
+                                                Gabarito: {gabaritoText}
+                                            </div>
+                                        </div>
+
+                                        {/* Texto Base se houver */}
+                                        {baseTextContent && (
+                                            <div className="mb-3 p-3 bg-slate-50 border-l-2 border-indigo-400 text-[8.5pt] text-slate-600 leading-relaxed">
+                                                <span className="text-[7.5pt] font-black text-indigo-600 uppercase tracking-widest block mb-1">
+                                                    Texto de Apoio
+                                                </span>
+                                                <div dangerouslySetInnerHTML={{ __html: formatPrintText(baseTextContent) }} />
+                                            </div>
+                                        )}
+
+                                        {/* Enunciado */}
+                                        <div 
+                                            className="text-[9.5pt] font-bold text-slate-800 leading-relaxed mb-3"
+                                            dangerouslySetInnerHTML={{ __html: formatPrintText(q.enunciado) }}
+                                        />
+
+                                        {/* Alternativas */}
+                                        {q.alternativas && q.alternativas.length > 0 && (
+                                            <div className="space-y-1.5 mb-3">
+                                                {q.alternativas.map((alt: any, aIdx: number) => {
+                                                    const isCorrect = alt.isCorreta;
+                                                    return (
+                                                        <div 
+                                                            key={alt.id || aIdx} 
+                                                            className={`flex items-start gap-2 text-[9pt] p-1.5 rounded ${isCorrect ? 'bg-emerald-50 text-emerald-950 font-semibold' : 'text-slate-700'}`}
+                                                        >
+                                                            <span className={`size-4 rounded-full flex items-center justify-center text-[7.5pt] font-black shrink-0 ${isCorrect ? 'bg-emerald-600 text-white' : 'border border-slate-300 text-slate-600'}`}>
+                                                                {String.fromCharCode(65 + aIdx)}
+                                                            </span>
+                                                            <span className="flex-1" dangerouslySetInnerHTML={{ __html: formatPrintText(alt.texto) }} />
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {/* Comentário do Professor */}
+                                        {q.resposta_professor && (
+                                            <div className="mt-3 pt-3 border-t border-slate-200 bg-emerald-50/40 p-3 rounded border-l-2 border-emerald-500">
+                                                <div className="flex items-center gap-1.5 mb-1.5">
+                                                    <span className="text-[8pt] font-black text-emerald-700 uppercase tracking-wider">
+                                                        Comentário do Especialista / Explicação:
+                                                    </span>
+                                                </div>
+                                                <div 
+                                                    className="text-[9pt] text-slate-700 leading-relaxed"
+                                                    dangerouslySetInnerHTML={{ __html: formatPrintText(q.resposta_professor) }}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+                )}
 
 
                 <footer className="mt-20 pt-10 border-t border-slate-100 text-center space-y-6">

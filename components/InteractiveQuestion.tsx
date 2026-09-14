@@ -25,6 +25,7 @@ export interface InteractiveQuestionProps {
     disabled?: boolean;
     onAnswer?: (altId: string) => void;
     onBeforeAnswer?: () => boolean;
+    questionNumber?: number;
 }
 
 // Move processing functions outside to avoid recreation and allow potential caching
@@ -205,7 +206,7 @@ const processContent = (text: string | null | undefined) => {
     return processed;
 };
 
-const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question: propQuestion, onAnswer, onBeforeAnswer, disabled }) => {
+const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question: propQuestion, onAnswer, onBeforeAnswer, disabled, questionNumber }) => {
     const [localQuestion, setLocalQuestion] = React.useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [selectedAlt, setSelectedAlt] = useState<string | null>(null);
@@ -314,7 +315,9 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                             <span className="material-symbols-outlined text-2xl">quiz</span>
                         </div>
                         <div>
-                            <h3 className="text-xl font-black text-slate-900 m-0 leading-none tracking-tight">Desafio de Fixação</h3>
+                            <h3 className="text-xl font-black text-slate-900 m-0 leading-none tracking-tight">
+                                {questionNumber ? `Questão ${String(questionNumber).padStart(2, '0')}` : 'Desafio de Fixação'}
+                            </h3>
                             <div className="flex flex-wrap items-center gap-2 mt-3 text-left">
                                 {activeQuestion.disciplinas?.name && (
                                     <span className="bg-slate-900 text-white text-[9px] font-black uppercase tracking-[0.1em] px-2.5 py-1 rounded-sm">
@@ -423,18 +426,18 @@ const InteractiveQuestion: React.FC<InteractiveQuestionProps> = ({ id, question:
                     </div>
                 )}
 
-                {/* Print Only Footer */}
-                <div className="hidden print-gabarito mt-6 pt-6 border-t border-slate-300">
-                    <div className="text-[11px] font-black uppercase tracking-widest text-slate-900 mb-4">Gabarito Oficial</div>
-                    <div className="text-xl font-black text-[#137fec]">
-                        Resposta: {(() => {
-                            const idx = activeQuestion.alternativas.findIndex((a: any) => a.isCorreta);
-                            if (idx === -1) return 'N/A';
+                {/* Print Only Inline Discreet Answer Key (sem explicação, tamanho reduzido e sem destaque) */}
+                <div className="hidden print:flex items-center justify-between mt-3 pt-2 border-t border-slate-200 text-slate-400 text-[8pt] italic">
+                    <span>Gabarito</span>
+                    <span className="text-slate-600 font-bold not-italic">
+                        {(() => {
+                            const idx = activeQuestion.alternativas?.findIndex((a: any) => a.isCorreta);
+                            if (idx === -1 || idx === undefined) return 'N/A';
                             const text = activeQuestion.alternativas[idx].texto;
-                            if (['certo', 'errado'].includes(text.toLowerCase().trim())) return text.toUpperCase();
-                            return String.fromCharCode(65 + idx);
+                            if (['certo', 'errado'].includes(text?.toLowerCase().trim())) return text.toUpperCase();
+                            return `Letra ${String.fromCharCode(65 + idx)}`;
                         })()}
-                    </div>
+                    </span>
                 </div>
             </div>
             <style>{`
