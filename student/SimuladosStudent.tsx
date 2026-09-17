@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Simulado, Questao } from '../types';
 import katex from 'katex';
@@ -136,6 +136,8 @@ const processAll = (text: string) => {
 
 const SimuladosStudent: React.FC = () => {
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
+    const courseIdParam = searchParams.get('courseId');
     const navigate = useNavigate();
 
     const [simulado, setSimulado] = useState<Simulado | null>(null);
@@ -153,7 +155,7 @@ const SimuladosStudent: React.FC = () => {
 
     useEffect(() => {
         if (id) fetchSimuladoData();
-    }, [id]);
+    }, [id, courseIdParam]);
 
     const fetchSimuladoData = async () => {
         try {
@@ -177,30 +179,32 @@ const SimuladosStudent: React.FC = () => {
                 });
             }
 
-            // 0. Check Access
+            // 0. Check Access & Courses linked to this simulado
             const { data: courseLinks } = await supabase
                 .from('course_simulados')
-                .select('course_id')
+                .select('course_id, courses(id, title, banner_url)')
                 .eq('simulado_id', id);
 
-            const courseIds = courseLinks?.map(cl => cl.course_id) || [];
+            const courseIds = courseLinks?.map(cl => cl.course_id).filter(Boolean) || [];
 
-            const { data: enrollmentData } = await supabase
-                .from('enrollments')
-                .select('status')
-                .eq('profile_id', user.id)
-                .in('course_id', courseIds)
-                .eq('status', 'Ativo')
-                .limit(1)
-                .maybeSingle();
+            let activeEnrollments: any[] = [];
+            if (courseIds.length > 0) {
+                const { data: enrolls } = await supabase
+                    .from('enrollments')
+                    .select('course_id, status, courses(id, title, banner_url)')
+                    .eq('profile_id', user.id)
+                    .in('course_id', courseIds)
+                    .eq('status', 'Ativo');
+                activeEnrollments = enrolls || [];
+            }
 
-            if (!enrollmentData) {
-                if (!profile || !['admin', 'super', 'teacher', 'editor', 'moderator', 'collaborator'].includes(profile.role)) {
-                    console.error('Sem acesso ao simulado: Matrícula não ativa.');
-                    alert('Você não tem uma matrícula ativa em um curso que ofereça este simulado.');
-                    navigate('/aluno/cursos');
-                    return;
-                }
+            const isStaff = ['admin', 'super', 'teacher', 'editor', 'moderator', 'collaborator'].includes(profile?.role || '');
+
+            if (!isStaff && activeEnrollments.length === 0) {
+                console.error('Sem acesso ao simulado: Matrícula não ativa.');
+                alert('Você não tem uma matrícula ativa em um curso que ofereça este simulado.');
+                navigate('/aluno/cursos');
+                return;
             }
 
             const { data: sData, error: sError } = await supabase
@@ -213,17 +217,43 @@ const SimuladosStudent: React.FC = () => {
             setSimulado(sData);
             setTimeLeft(sData.duration * 60);
 
-            // Fetch course info tied to this simulado
-            const { data: cData } = await supabase
-                .from('course_simulados')
-                .select('courses(title, banner_url)')
-                .eq('simulado_id', id)
-                .limit(1)
-                .maybeSingle();
+            // 1. Resolve exact course info
+            let selectedCourse: { id?: string; title?: string; banner_url?: string } | null = null;
 
-            if (cData?.courses) {
-                // @ts-ignore
-                setCourseInfo({ title: cData.courses.title, banner: cData.courses.banner_url });
+            // Priority A: Explicit ?courseId= from the active course view
+            if (courseIdParam) {
+                const { data: paramCourse } = await supabase
+                    .from('courses')
+                    .select('id, title, banner_url')
+                    .eq('id', courseIdParam)
+                    .maybeSingle();
+
+                if (paramCourse) {
+                    selectedCourse = paramCourse;
+                }
+            }
+
+            // Priority B: Course where user is actively enrolled
+            if (!selectedCourse && activeEnrollments.length > 0) {
+                const matched = activeEnrollments[0];
+                if (matched?.courses) {
+                    selectedCourse = matched.courses as any;
+                }
+            }
+
+            // Priority C: Fallback to first course link
+            if (!selectedCourse && courseLinks && courseLinks.length > 0) {
+                const first = courseLinks[0];
+                if (first?.courses) {
+                    selectedCourse = first.courses as any;
+                }
+            }
+
+            if (selectedCourse) {
+                setCourseInfo({
+                    title: selectedCourse.title || '',
+                    banner: selectedCourse.banner_url || undefined
+                });
             }
 
             const { data: qData, error: qError } = await supabase
@@ -500,7 +530,13 @@ const SimuladosStudent: React.FC = () => {
                                 Imprimir Caderno e Cartão de Respostas
                             </button>
                             <button
-                                onClick={() => navigate(-1)}
+                                onClick={() => {
+                                    if (courseIdParam) {
+                                        navigate(`/aluno/curso/${courseIdParam}`);
+                                    } else {
+                                        navigate(-1);
+                                    }
+                                }}
                                 className="w-full py-3 bg-transparent text-slate-400 font-bold uppercase text-xs tracking-widest hover:text-slate-900 transition-colors"
                             >
                                 Voltar
@@ -558,7 +594,13 @@ const SimuladosStudent: React.FC = () => {
 
                             {status === 'finished' && (
                                 <button
-                                    onClick={() => navigate(-1)}
+                                    onClick={() => {
+                                        if (courseIdParam) {
+                                            navigate(`/aluno/curso/${courseIdParam}`);
+                                        } else {
+                                            navigate(-1);
+                                        }
+                                    }}
                                     className="px-4 h-9 bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-95"
                                 >
                                     Sair

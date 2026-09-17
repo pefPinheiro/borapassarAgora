@@ -795,7 +795,7 @@ const CourseView: React.FC = () => {
                                   </button>
                                 )}
                                 {item.type === 'simulado' && item.ref_id && (
-                                  <button onClick={() => navigate(`/aluno/simulado/${item.ref_id}`)} className="size-10 bg-slate-50 text-slate-400 hover:text-[#137fec] hover:bg-blue-50 rounded-xl flex items-center justify-center transition-all">
+                                  <button onClick={() => navigate(`/aluno/simulado/${item.ref_id}?courseId=${id}`)} className="size-10 bg-slate-50 text-slate-400 hover:text-[#137fec] hover:bg-blue-50 rounded-xl flex items-center justify-center transition-all">
                                     <span className="material-symbols-outlined">arrow_forward</span>
                                   </button>
                                 )}
@@ -888,7 +888,7 @@ const CourseView: React.FC = () => {
                         </div>
                       </div>
                       <button
-                        onClick={() => !isLocked && navigate(`/aluno/simulado/${simItem.simulado?.id}`)}
+                        onClick={() => !isLocked && navigate(`/aluno/simulado/${simItem.simulado?.id}?courseId=${id}`)}
                         disabled={isLocked}
                         className={`w-full mt-8 py-4 rounded-[20px] font-black text-[10px] uppercase tracking-[0.2em] shadow-xl transition-all ${isLocked ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' :
                           latestAttempt ? 'bg-white text-slate-900 border border-slate-200 hover:bg-slate-50' : 'bg-slate-900 text-white hover:bg-[#137fec] active:scale-95'}`}
@@ -1217,9 +1217,9 @@ const CourseView: React.FC = () => {
 
                                   <button 
                                     onClick={() => {
-                                      if (item.type === 'apostila' || item.type === 'resolvido') navigate(`/aluno/apostila/${item.ref_id}`);
-                                      else if (item.type === 'simulado') navigate(`/aluno/simulado/${item.ref_id}`);
-                                      else if (item.type === 'caderno') navigate(`/aluno/caderno/${item.ref_id}`);
+                                      if (item.type === 'apostila' || item.type === 'resolvido') navigate(`/aluno/apostila/${item.ref_id}?courseId=${id}`);
+                                      else if (item.type === 'simulado') navigate(`/aluno/simulado/${item.ref_id}?courseId=${id}`);
+                                      else if (item.type === 'caderno') navigate(`/aluno/caderno/${item.ref_id}?courseId=${id}`);
                                       else if (item.type === 'questao') {
                                         const params = new URLSearchParams();
                                         if (item.filters?.disciplina_id) params.append('disciplinas', item.filters.disciplina_id);
@@ -1242,7 +1242,7 @@ const CourseView: React.FC = () => {
                                   </button>
                                   
                                   {item.type === 'simulado' && isDone && (
-                                    <button onClick={() => navigate(`/aluno/simulado/${item.ref_id}`)} className="px-4 py-3 bg-amber-50 border border-amber-100 text-amber-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all">
+                                    <button onClick={() => navigate(`/aluno/simulado/${item.ref_id}?courseId=${id}`)} className="px-4 py-3 bg-amber-50 border border-amber-100 text-amber-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all">
                                       Erros
                                     </button>
                                   )}
