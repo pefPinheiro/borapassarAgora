@@ -157,6 +157,10 @@ const StudentLayout: React.FC = () => {
           </div>
 
           <div className="flex flex-col items-center gap-3 mt-8 mb-6 border-b border-slate-100 pb-6">
+            <div className="flex items-center gap-4 mb-1">
+              <a href="https://www.instagram.com/borapassaragoraa/" target="_blank" rel="noopener noreferrer" className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-pink-500 transition-colors">Insta</a>
+              <a href="https://www.youtube.com/@BoraPassarAgora" target="_blank" rel="noopener noreferrer" className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-red-500 transition-colors">Tube</a>
+            </div>
             <Link to="/quem-somos" className="text-[9px] font-bold text-slate-400 uppercase tracking-widest hover:text-blue-500 transition-colors">Quem Somos</Link>
             <Link to="/termos" className="text-[9px] font-bold text-slate-400 uppercase tracking-widest hover:text-blue-500 transition-colors">Termos e Privacidade</Link>
           </div>

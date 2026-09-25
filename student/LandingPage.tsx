@@ -268,9 +268,22 @@ const LandingPage: React.FC = () => {
       <footer className="pt-20 pb-16 px-10 border-t border-slate-50 flex flex-col items-center gap-12 text-center">
         <img src="/bora_passar_logo.png" alt="Logo" className="h-10 opacity-40" />
         <div className="flex gap-10">
-          {['Insta', 'Tube', 'Tiktok'].map(s => (
-            <a key={s} href="#" className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 hover:text-slate-900 transition-colors">{s}</a>
-          ))}
+          <a
+            href="https://www.instagram.com/borapassaragoraa/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 hover:text-slate-900 transition-colors"
+          >
+            Insta
+          </a>
+          <a
+            href="https://www.youtube.com/@BoraPassarAgora"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 hover:text-slate-900 transition-colors"
+          >
+            Tube
+          </a>
         </div>
         <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">&copy; 2026 Bora Passar Agora • Future of Education</p>
       </footer>

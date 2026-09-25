@@ -501,11 +501,11 @@ const CourseLandingPage: React.FC = () => {
                 {/* Footer */}
                 <footer className="py-20 border-t border-white/5 bg-black px-6 lg:px-20 flex flex-col lg:flex-row justify-between items-center gap-10">
                     <img src="/bora_passar_logo.png" className="h-6 grayscale opacity-30" alt="" />
-                    <div className="flex gap-10 text-[9px] font-black uppercase tracking-widest text-white/20">
-                        <a href="#" className="hover:text-white">Termos de Uso</a>
-                        <a href="#" className="hover:text-white">Políticas de Vendas</a>
-                        <a href="#" className="hover:text-white">Suporte</a>
-                        <a href="#" className="hover:text-white">FAQ</a>
+                    <div className="flex gap-10 text-[9px] font-black uppercase tracking-widest text-white/40">
+                        <a href="https://www.instagram.com/borapassaragoraa/" target="_blank" rel="noopener noreferrer" className="hover:text-yellow-500 transition-colors">Instagram</a>
+                        <a href="https://www.youtube.com/@BoraPassarAgora" target="_blank" rel="noopener noreferrer" className="hover:text-yellow-500 transition-colors">YouTube</a>
+                        <a href="/termos" className="hover:text-white transition-colors">Termos de Uso</a>
+                        <a href="/quem-somos" className="hover:text-white transition-colors">Quem Somos</a>
                     </div>
                     <p className="text-[9px] font-black uppercase tracking-[0.5em] text-white/10">BORA PASSAR AGORA © 2026</p>
                 </footer>
@@ -770,6 +770,11 @@ const CourseLandingPage: React.FC = () => {
 
                 <footer className="py-12 bg-white border-t border-slate-100 px-6 lg:px-20 flex flex-col md:flex-row justify-between items-center gap-6">
                     <img src="/bora_passar_logo.png" className="h-6 grayscale opacity-50" alt="" />
+                    <div className="flex gap-8 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        <a href="https://www.instagram.com/borapassaragoraa/" target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">Instagram</a>
+                        <a href="https://www.youtube.com/@BoraPassarAgora" target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">YouTube</a>
+                        <a href="/termos" className="hover:text-slate-900 transition-colors">Termos</a>
+                    </div>
                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">BORA PASSAR AGORA © 2026</p>
                 </footer>
             </div>
@@ -955,6 +960,16 @@ const CourseLandingPage: React.FC = () => {
                         </div>
                     </div>
                 </section>
+
+                <footer className="py-16 border-t border-white/5 bg-black px-6 lg:px-20 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <img src="/bora_passar_logo.png" className="h-6 grayscale opacity-30" alt="" />
+                    <div className="flex gap-8 text-[10px] font-black uppercase tracking-widest text-white/30">
+                        <a href="https://www.instagram.com/borapassaragoraa/" target="_blank" rel="noopener noreferrer" className="hover:text-[#00f5d4] transition-colors">Instagram</a>
+                        <a href="https://www.youtube.com/@BoraPassarAgora" target="_blank" rel="noopener noreferrer" className="hover:text-[#00f5d4] transition-colors">YouTube</a>
+                        <a href="/termos" className="hover:text-white transition-colors">Termos</a>
+                    </div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">BORA PASSAR AGORA © 2026</p>
+                </footer>
             </div>
         );
     };

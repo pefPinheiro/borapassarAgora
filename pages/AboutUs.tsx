@@ -66,7 +66,11 @@ const AboutUs: React.FC = () => {
                     </p>
                 </article>
 
-                <footer className="text-center pt-10 border-t border-slate-100">
+                <footer className="text-center pt-10 border-t border-slate-100 flex flex-col items-center gap-6">
+                    <div className="flex gap-8 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        <a href="https://www.instagram.com/borapassaragoraa/" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">Instagram</a>
+                        <a href="https://www.youtube.com/@BoraPassarAgora" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">YouTube</a>
+                    </div>
                     <p className="text-slate-400 text-sm font-bold uppercase tracking-[0.2em]">&copy; 2026 Bora Passar Agora • Todos os direitos reservados</p>
                 </footer>
             </main>

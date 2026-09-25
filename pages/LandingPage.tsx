@@ -187,9 +187,27 @@ const CampaignLandingPage: React.FC = () => {
                 </div>
             </main>
 
-            <footer className="py-20 border-t border-slate-100 text-center">
+            <footer className="py-20 border-t border-slate-100 text-center flex flex-col items-center gap-6">
+                <div className="flex justify-center gap-10">
+                    <a
+                        href="https://www.instagram.com/borapassaragoraa/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 hover:text-slate-900 transition-colors"
+                    >
+                        Insta
+                    </a>
+                    <a
+                        href="https://www.youtube.com/@BoraPassarAgora"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 hover:text-slate-900 transition-colors"
+                    >
+                        Tube
+                    </a>
+                </div>
                 <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">&copy; 2026 Bora Passar Agora • Todos os direitos reservados</p>
-                <div className="flex justify-center gap-8 mt-6">
+                <div className="flex justify-center gap-8 mt-2">
                     <img src="/bcode_logo.png" className="h-3 opacity-20 grayscale" alt="Bcode" />
                 </div>
             </footer>
